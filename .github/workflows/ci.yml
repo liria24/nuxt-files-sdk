@@ -42,6 +42,8 @@ jobs:
                         - 'content/**'
 
     build:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -54,6 +56,8 @@ jobs:
             - run: bunx attw --pack packages/nuxt-files-sdk --profile esm-only
 
     typecheck:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -63,6 +67,8 @@ jobs:
             - uses: ./.github/actions/setup
             - run: bun run typecheck
     lint:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -74,6 +80,8 @@ jobs:
             - run: bun run lint
             - run: bun run workspace:check
     knip:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -84,6 +92,8 @@ jobs:
             - run: bunx knip
             - run: bunx knip --production
     unit:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -94,6 +104,8 @@ jobs:
             - run: bun run test
 
     test-nuxt4:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -103,6 +115,8 @@ jobs:
             - uses: ./.github/actions/setup
             - run: bun run test:nuxt4
     test-nuxt5-nightly:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         continue-on-error: true
@@ -113,6 +127,8 @@ jobs:
             - uses: ./.github/actions/setup
             - run: bun run test:nuxt5
     test-nitro2:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -122,6 +138,8 @@ jobs:
             - uses: ./.github/actions/setup
             - run: bun run test:nitro2
     test-nitro3:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -131,11 +149,15 @@ jobs:
             - uses: ./.github/actions/setup
             - run: bun run test:nitro3
     test-fixtures:
+        permissions:
+          contents: read
         needs: [test-nuxt4, test-nitro2, test-nitro3]
         runs-on: ubuntu-latest
         steps:
             - run: echo 'Fixture jobs passed'
     test-consumer:
+        permissions:
+          contents: read
         needs: [changes, build]
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -145,6 +167,8 @@ jobs:
             - uses: ./.github/actions/setup
             - run: bun run test:consumer
     test-size:
+        permissions:
+          contents: read
         needs: [changes, test-nuxt4]
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
@@ -154,6 +178,8 @@ jobs:
             - uses: ./.github/actions/setup
             - run: bun run test:size
     benchmark:
+        permissions:
+          contents: read
         needs: changes
         if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
