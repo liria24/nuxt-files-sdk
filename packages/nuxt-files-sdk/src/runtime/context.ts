@@ -29,9 +29,7 @@ export function useServerFiles<Name extends Extract<keyof NuxtFilesStorageRegist
 ): Promise<NuxtFilesStorageRegistry[Name]>
 export function useServerFiles(name?: string): Promise<Files> {
     if (!registry) {
-        throw new Error(
-            '[nuxt-files-sdk:not-configured] The Files registry has not been configured.',
-        )
+        throw new Error('[nuxt-files-sdk:not-configured] The Files registry has not been configured.')
     }
     return registry.get(name)
 }

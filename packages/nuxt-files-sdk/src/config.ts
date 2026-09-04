@@ -11,9 +11,7 @@ export type StorageConfig<Plugins extends readonly FilesPlugin[] = readonly File
     plugins?: Plugins
 }
 
-export interface FilesConfig<
-    Storage extends Record<string, StorageConfig> = Record<string, StorageConfig>,
-> {
+export interface FilesConfig<Storage extends Record<string, StorageConfig> = Record<string, StorageConfig>> {
     /** Storage used when useServerFiles() is called without a name. */
     default?: keyof Storage & string
     /** Explicit development overrides. These never act as failure fallbacks. */
@@ -22,5 +20,4 @@ export interface FilesConfig<
 }
 
 /** Preserve storage names and plugin tuples for generated/project types. */
-export const defineFilesConfig = <const Config extends FilesConfig>(config: Config): Config =>
-    config
+export const defineFilesConfig = <const Config extends FilesConfig>(config: Config): Config => config

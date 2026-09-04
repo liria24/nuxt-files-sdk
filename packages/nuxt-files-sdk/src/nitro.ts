@@ -10,15 +10,10 @@ export interface NitroFilesOptions {
     development?: boolean
 }
 
-export const loadFilesConfig = async (
-    cwd: string,
-    configFile = 'files.config',
-): Promise<FilesConfig> => {
+export const loadFilesConfig = async (cwd: string, configFile = 'files.config'): Promise<FilesConfig> => {
     const result = await loadConfig<FilesConfig>({ cwd, configFile, dotenv: true })
     if (!result.config) {
-        throw new Error(
-            `[nuxt-files-sdk:config-not-found] Could not load ${configFile} from ${cwd}.`,
-        )
+        throw new Error(`[nuxt-files-sdk:config-not-found] Could not load ${configFile} from ${cwd}.`)
     }
     return result.config
 }
@@ -26,8 +21,7 @@ export const loadFilesConfig = async (
 /** Standalone Nitro can initialize this from a Nitro plugin. */
 export const setupNitroFiles = async (rootDir: string, options: NitroFilesOptions = {}) => {
     const config = await loadFilesConfig(rootDir, options.config ?? 'files.config')
-    const runtimeOptions =
-        options.development === undefined ? {} : { development: options.development }
+    const runtimeOptions = options.development === undefined ? {} : { development: options.development }
     return configureFiles(config, runtimeOptions)
 }
 

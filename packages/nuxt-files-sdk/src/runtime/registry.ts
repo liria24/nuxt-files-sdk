@@ -3,8 +3,7 @@ import { loadFiles } from 'files-sdk/loader'
 
 import type { FilesConfig, StorageConfig } from '../config'
 
-export type FilesForStorage<T extends StorageConfig> = Files &
-    ExtensionsOf<NonNullable<T['plugins']>>
+export type FilesForStorage<T extends StorageConfig> = Files & ExtensionsOf<NonNullable<T['plugins']>>
 
 export type StorageRegistry<C extends FilesConfig> = {
     [Name in keyof C['storage']]: FilesForStorage<C['storage'][Name]>
@@ -59,8 +58,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         const base = this.#config.storage[name]
         const override = this.#development ? this.#config.devStorage?.[name] : undefined
         const selected = override ?? base
-        if (!selected)
-            throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
+        if (!selected) throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
         const { adapter, plugins, ...options } = selected
         const loaded = await loadFiles({ ...withNuxtEnvironment(options), provider: adapter })
         return new Files({

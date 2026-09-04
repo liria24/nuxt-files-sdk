@@ -7,11 +7,7 @@
             "project": ["*.config.ts"]
         },
         "packages/nuxt-files-sdk": {
-            "entry": [
-                "tsdown.config.ts",
-                "src/{module,config,nitro,plugins}.ts",
-                "test/**/*.test.ts"
-            ],
+            "entry": ["tsdown.config.ts", "src/{module,config,nitro,plugins}.ts", "test/**/*.test.ts"],
             "ignoreDependencies": ["@arethetypeswrong/cli", "@nuxt/schema", "nitropack"],
             "ignoreIssues": { "package.json": ["optionalPeerDependencies"] },
             "project": ["src/**/*.ts!", "test/**/*.ts", "*.config.ts"]

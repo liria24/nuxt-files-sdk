@@ -1,12 +1,6 @@
 import { resolve } from 'node:path'
 
-import {
-    addImports,
-    addServerPlugin,
-    addTemplate,
-    createResolver,
-    defineNuxtModule,
-} from '@nuxt/kit'
+import { addImports, addServerPlugin, addTemplate, createResolver, defineNuxtModule } from '@nuxt/kit'
 
 export interface ModuleOptions {
     /** Files configuration path, relative to the Nuxt root. */
