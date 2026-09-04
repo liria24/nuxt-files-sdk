@@ -17,7 +17,15 @@
         "test": "bun --filter nuxt-files-sdk test",
         "typecheck": "bun --filter nuxt-files-sdk typecheck",
         "unused": "knip && knip --production",
-        "workspace:check": "sherif"
+        "workspace:check": "sherif",
+        "test:nuxt4": "bun run test:fixture nuxt4",
+        "test:nuxt5": "bun run test:fixture nuxt5-nightly",
+        "test:nitro2": "bun run test:fixture nitro-v2",
+        "test:nitro3": "bun run test:fixture nitro-v3",
+        "test:fixture": "bash test/scripts/fixture.sh",
+        "test:consumer": "bash test/scripts/packed-consumer.sh",
+        "test:size": "bash test/scripts/bundle-contract.sh",
+        "benchmark": "bun packages/nuxt-files-sdk/test/benchmark.ts"
     },
     "devDependencies": {
         "knip": "^6.34.0",

@@ -7,7 +7,7 @@ export default defineConfig({
         suspicious: 'error',
     },
     env: { browser: true, node: true },
-    ignorePatterns: ['**/.nuxt/**', '**/.output/**', '**/coverage/**', '**/dist/**'],
+    ignorePatterns: ['**/.nuxt/**', '**/.output/**', '**/coverage/**', '**/dist/**', 'test/fixtures/nuxt*/**'],
     options: { typeAware: true },
     plugins: ['import', 'typescript', 'unicorn', 'vitest'],
     rules: {

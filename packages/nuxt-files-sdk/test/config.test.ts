@@ -1,3 +1,4 @@
+import { versioning } from 'files-sdk/versioning'
 import { afterEach, describe, expect, expectTypeOf, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../src/config'
@@ -5,8 +6,8 @@ import { FilesRegistry, withNuxtEnvironment } from '../src/runtime/registry'
 
 describe('configuration', () => {
     afterEach(() => {
-        delete process.env.NUXT_FILES_SDK_TEST_TOKEN
-        delete process.env.FILES_SDK_TEST_TOKEN
+        delete process.env.NUXT_AWS_ACCESS_KEY_ID
+        delete process.env.AWS_ACCESS_KEY_ID
     })
 
     test('preserves inferred configuration', () => {
@@ -37,6 +38,23 @@ describe('configuration', () => {
             { development: true },
         )
         await expect(registry.get('blob')).resolves.toMatchObject({ adapter: { name: 'fs' } })
+    })
+
+    test('preserves logical plugins and native hooks with a development adapter override', async () => {
+        const onAction = vi.fn<(event: unknown) => void>()
+        const files = await new FilesRegistry(
+            {
+                storage: {
+                    blob: { adapter: 'not-a-provider', plugins: [versioning()], hooks: { onAction } },
+                },
+                devStorage: { blob: { adapter: 'fs', root: '.data/test-files' } },
+            },
+            { development: true },
+        ).get('blob')
+
+        expect(files.versions).toBeTypeOf('function')
+        await files.upload('plugin-contract.txt', 'hello')
+        expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'upload' }))
     })
 
     test('memoizes one lazy native instance per storage', async () => {
@@ -89,13 +107,17 @@ describe('configuration', () => {
         expectTypeOf(get).parameter(0).toEqualTypeOf<'blob' | undefined>()
     })
 
-    test('bridges generic NUXT_ aliases without overriding native env', () => {
-        process.env.NUXT_FILES_SDK_TEST_TOKEN = 'nuxt'
-        delete process.env.FILES_SDK_TEST_TOKEN
-        withNuxtEnvironment({})
-        expect(process.env.FILES_SDK_TEST_TOKEN).toBe('nuxt')
-        process.env.FILES_SDK_TEST_TOKEN = 'native'
-        withNuxtEnvironment({})
-        expect(process.env.FILES_SDK_TEST_TOKEN).toBe('native')
+    test('bridges only provider-declared NUXT_ aliases without lasting mutation', async () => {
+        process.env.NUXT_AWS_ACCESS_KEY_ID = 'nuxt'
+        await withNuxtEnvironment('s3', async () => {
+            expect(process.env.AWS_ACCESS_KEY_ID).toBe('nuxt')
+        })
+        expect(process.env.AWS_ACCESS_KEY_ID).toBeUndefined()
+
+        process.env.AWS_ACCESS_KEY_ID = 'native'
+        await withNuxtEnvironment('s3', async () => {
+            expect(process.env.AWS_ACCESS_KEY_ID).toBe('native')
+        })
+        expect(process.env.AWS_ACCESS_KEY_ID).toBe('native')
     })
 })

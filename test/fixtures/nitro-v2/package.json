@@ -1,0 +1,11 @@
+{
+    "private": true,
+    "scripts": {
+        "prepare": "nitropack prepare",
+        "build": "nitropack build"
+    },
+    "dependencies": {
+        "nitropack": "^2.13.0",
+        "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
+    }
+}

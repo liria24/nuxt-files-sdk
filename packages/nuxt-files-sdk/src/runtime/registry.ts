@@ -1,5 +1,13 @@
-import { Files, type ExtensionsOf } from 'files-sdk'
+import {
+    createFiles,
+    type ExtensionsOf,
+    type Files,
+    type FilesActionEvent,
+    type FilesErrorEvent,
+    type FilesRetryEvent,
+} from 'files-sdk'
 import { loadFiles } from 'files-sdk/loader'
+import { getProvider } from 'files-sdk/providers'
 
 import type { FilesConfig, StorageConfig } from '../config'
 
@@ -10,9 +18,9 @@ export type StorageRegistry<C extends FilesConfig> = {
 }
 
 export interface FilesRuntimeHooks {
-    onError?: (event: unknown, storage: string) => void | Promise<void>
-    onAction?: (event: unknown, storage: string) => void | Promise<void>
-    onRetry?: (event: unknown, storage: string) => void | Promise<void>
+    onError?: (event: FilesErrorEvent, storage: string) => void | Promise<void>
+    onAction?: (event: FilesActionEvent, storage: string) => void | Promise<void>
+    onRetry?: (event: FilesRetryEvent, storage: string) => void | Promise<void>
 }
 
 export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
@@ -57,16 +65,28 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     async #create(name: string): Promise<Files> {
         const base = this.#config.storage[name]
         const override = this.#development ? this.#config.devStorage?.[name] : undefined
-        const selected = override ?? base
+        const selected = override ? { ...base, ...override, plugins: base?.plugins, hooks: base?.hooks } : base
         if (!selected) throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
-        const { adapter, plugins, ...options } = selected
-        const loaded = await loadFiles({ ...withNuxtEnvironment(options), provider: adapter })
-        return new Files({
+        const { adapter, plugins, hooks: userHooks, ...options } = selected
+        const loaded = await withNuxtEnvironment(adapter, () => loadFiles({ ...options, provider: adapter }))
+        // The upstream loader has no hooks/plugins input. Avoid rebuilding the
+        // native instance unless those native capabilities are actually used.
+        if (!plugins && !userHooks && !Object.values(this.#hooks).some(Boolean)) return loaded.files
+        return createFiles({
             adapter: loaded.files.adapter,
             hooks: {
-                onAction: (event) => void this.#hooks.onAction?.(event, name),
-                onError: (event) => void this.#hooks.onError?.(event, name),
-                onRetry: (event) => void this.#hooks.onRetry?.(event, name),
+                onAction: (event) => {
+                    userHooks?.onAction?.(event)
+                    void this.#hooks.onAction?.(event, name)
+                },
+                onError: (event) => {
+                    userHooks?.onError?.(event)
+                    void this.#hooks.onError?.(event, name)
+                },
+                onRetry: (event) => {
+                    userHooks?.onRetry?.(event)
+                    void this.#hooks.onRetry?.(event, name)
+                },
             },
             ...(plugins ? { plugins } : {}),
             ...(options.prefix === undefined ? {} : { prefix: options.prefix }),
@@ -76,12 +96,28 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     }
 }
 
-/** Add generic NUXT_ aliases without duplicating provider-specific metadata. */
-export const withNuxtEnvironment = <T extends Record<string, unknown>>(options: T): T => {
-    for (const [key, value] of Object.entries(process.env)) {
-        if (!key.startsWith('NUXT_') || value === undefined) continue
-        const nativeKey = key.slice(5)
-        if (process.env[nativeKey] === undefined) process.env[nativeKey] = value
+/** Bridge only NUXT_ aliases declared by the configured native provider. */
+export const withNuxtEnvironment = async <T>(provider: string, load: () => Promise<T>): Promise<T> => {
+    const metadata = getProvider(provider)
+    if (!metadata) return load()
+    const variables = [
+        ...(metadata.env.required ?? []),
+        ...(metadata.env.optional ?? []),
+        ...(metadata.env.credentialModes?.flatMap((group) => group.vars) ?? []),
+    ]
+    const injected: string[] = []
+    for (const variable of variables) {
+        for (const key of [variable.key, ...(variable.aliases ?? [])]) {
+            const value = process.env[`NUXT_${key}`]
+            if (value !== undefined && process.env[key] === undefined) {
+                process.env[key] = value
+                injected.push(key)
+            }
+        }
     }
-    return options
+    try {
+        return await load()
+    } finally {
+        for (const key of injected) delete process.env[key]
+    }
 }
