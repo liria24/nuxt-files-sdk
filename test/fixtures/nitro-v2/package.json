@@ -5,7 +5,7 @@
         "build": "nitropack build"
     },
     "dependencies": {
-        "nitropack": "nitropack@^2.13.0",
+        "nitropack": "^2.13.0",
         "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
     }
 }

@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 
-import { addImports, addServerPlugin, addTemplate, createResolver, defineNuxtModule } from '@nuxt/kit'
+import { addImports, addServerPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule } from '@nuxt/kit'
+import type { Nuxt } from '@nuxt/schema'
 
 export interface ModuleOptions {
     /** Files configuration path, relative to the Nuxt root. */
@@ -19,14 +20,15 @@ export default defineNuxtModule<ModuleOptions>({
         config: 'files.config.ts',
         devtools: true,
     },
-    setup(options, nuxt) {
+    setup(options, nuxt: Nuxt) {
         const resolver = createResolver(import.meta.url)
         const configPath = resolve(nuxt.options.rootDir, options.config)
         const runtime = resolver.resolve('./runtime/context')
 
-        const storageTypes = addTemplate({
-            filename: 'nuxt-files-sdk/storage-registry.d.ts',
-            getContents: () => `
+        addTypeTemplate(
+            {
+                filename: 'nuxt-files-sdk/storage-registry.d.ts',
+                getContents: () => `
 import type config from ${JSON.stringify(configPath)}
 import type { StorageRegistry } from 'nuxt-files-sdk'
 
@@ -35,7 +37,7 @@ type IsUnion<T, C = T> = T extends C ? ([C] extends [T] ? false : true) : never
 type DefaultName = typeof config extends { default: infer Name extends Names } ? Name :
   'default' extends Names ? 'default' : IsUnion<Names> extends false ? Names : never
 
-declare module 'nuxt-files-sdk' {
+declare module ${JSON.stringify(runtime)} {
   interface NuxtFilesStorageRegistry extends StorageRegistry<typeof config> {}
   interface NuxtFilesDefaultStorage {
     value: StorageRegistry<typeof config>[DefaultName]
@@ -43,7 +45,13 @@ declare module 'nuxt-files-sdk' {
 }
 
 export {}`,
-        })
+            },
+            { nuxt: true, nitro: true },
+        )
+        addTypeTemplate(
+            { filename: 'nuxt-files-sdk/types.d.ts', src: resolver.resolve('./types.d.ts') },
+            { nuxt: true, nitro: true },
+        )
 
         const plugin = addTemplate({
             filename: 'nuxt-files-sdk/server-plugin.mjs',
@@ -67,11 +75,6 @@ export default defineNitroPlugin((nitroApp) => {
         for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {
             addImports({ name, from: 'files-sdk/vue' })
         }
-
-        nuxt.hook('prepare:types', ({ references }) => {
-            references.push({ path: resolver.resolve('./types') })
-            references.push({ path: storageTypes.dst })
-        })
     },
 })
 
