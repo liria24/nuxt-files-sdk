@@ -1,29 +1,35 @@
 {
-  "name": "nuxt-files-sdk-workspace",
-  "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
-  "type": "module",
-  "scripts": {
-    "build": "bun --filter nuxt-files-sdk build",
-    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run build",
-    "deps:update": "taze",
-    "format": "oxfmt . --write",
-    "format:check": "oxfmt . --check",
-    "lint": "oxlint .",
-    "lint:fix": "oxlint . --fix",
-    "test": "bun --filter nuxt-files-sdk test",
-    "typecheck": "bun --filter nuxt-files-sdk typecheck"
-  },
-  "devDependencies": {
-    "oxfmt": "^0.65.0",
-    "oxlint": "^1.80.0",
-    "oxlint-tsgolint": "^7.0.2001",
-    "taze": "^21.1.0"
-  },
-  "engines": {
-    "node": ">=22.6.0"
-  },
-  "packageManager": "bun@1.4.0"
+    "name": "nuxt-files-sdk-workspace",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
+    "type": "module",
+    "scripts": {
+        "build": "bun --filter nuxt-files-sdk build",
+        "check": "bun run format:check && bun run lint && bun run workspace:check && bun run unused && bun run typecheck && bun run test && bun run build",
+        "deps:update": "taze",
+        "format": "oxfmt . --write",
+        "format:check": "oxfmt . --check",
+        "lint": "oxlint .",
+        "lint:fix": "oxlint . --fix",
+        "preview:package": "pkg-pr-new publish ./packages/nuxt-files-sdk --bun --compact --previewVersion",
+        "test": "bun --filter nuxt-files-sdk test",
+        "typecheck": "bun --filter nuxt-files-sdk typecheck",
+        "unused": "knip && knip --production",
+        "workspace:check": "sherif"
+    },
+    "devDependencies": {
+        "knip": "^6.34.0",
+        "oxfmt": "^0.66.0",
+        "oxlint": "^1.81.0",
+        "oxlint-tsgolint": "^7.0.2001",
+        "pkg-pr-new": "^0.0.88",
+        "sherif": "^1.13.0",
+        "taze": "^21.1.0"
+    },
+    "engines": {
+        "node": ">=24.0.0"
+    },
+    "packageManager": "bun@1.4.0"
 }
