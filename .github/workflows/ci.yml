@@ -4,53 +4,171 @@ on:
     push:
         branches: [main]
     pull_request:
+    merge_group:
     workflow_dispatch:
 
-permissions:
-    contents: read
+permissions: {}
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+    cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
-    quality:
+    changes:
+        permissions:
+            contents: read
+            pull-requests: read
+        runs-on: ubuntu-latest
+        outputs:
+            src: ${{ steps.filter.outputs.src }}
+            docs: ${{ steps.filter.outputs.docs }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with: { persist-credentials: false }
+            - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+              id: filter
+              with:
+                  filters: |
+                      src:
+                        - 'packages/**'
+                        - 'test/**'
+                        - 'fixtures/**'
+                        - 'package.json'
+                        - 'bun.lock'
+                        - 'tsconfig.json'
+                        - '*.config.ts'
+                        - '.github/workflows/ci.yml'
+                      docs:
+                        - 'README.md'
+                        - 'content/**'
+
+    build:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with: { persist-credentials: false }
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-              with: { node-version: 24 }
-            - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-              with: { bun-version: 1.4.0 }
-            - run: bun ci
-            - name: Source and workspace contracts
-              run: bun run check
-            - name: Packed package contract
-              run: bun pm pack --cwd packages/nuxt-files-sdk --destination "$RUNNER_TEMP"
+            - uses: ./.github/actions/setup
+            - run: bun run build
+            - run: bunx publint packages/nuxt-files-sdk
+            - run: bunx attw --pack packages/nuxt-files-sdk --profile esm-only
 
-    compat-nitro:
-        strategy:
-            matrix:
-                nitro: [latest, npm:nitro-nightly@latest]
+    typecheck:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
               with: { persist-credentials: false }
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-              with: { node-version: 24 }
-            - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-              with: { bun-version: 1.4.0 }
-            - run: bun ci
-            - run: bun add --cwd packages/nuxt-files-sdk --dev nitropack@${{ matrix.nitro }}
-            - run: bun run typecheck && bun run test && bun run build
+            - uses: ./.github/actions/setup
+            - run: bun run typecheck
+    lint:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run format:check
+            - run: bun run lint
+            - run: bun run workspace:check
+    knip:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bunx knip
+            - run: bunx knip --production
+    unit:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run test
 
-    compat-nuxt5-nightly:
+    test-nuxt4:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run test:nuxt4
+    test-nuxt5-nightly:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
         continue-on-error: true
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
               with: { persist-credentials: false }
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-              with: { node-version: 24 }
-            - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-              with: { bun-version: 1.4.0 }
-            - run: bun ci
-            - run: bun add --cwd packages/nuxt-files-sdk --dev nuxt@npm:nuxt-nightly@latest
-            - run: bun run typecheck && bun run build
+            - uses: ./.github/actions/setup
+            - run: bun run test:nuxt5
+    test-nitro2:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run test:nitro2
+    test-nitro3:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run test:nitro3
+    test-fixtures:
+        needs: [test-nuxt4, test-nitro2, test-nitro3]
+        runs-on: ubuntu-latest
+        steps:
+            - run: echo 'Fixture jobs passed'
+    test-consumer:
+        needs: [changes, build]
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run test:consumer
+    test-size:
+        needs: [changes, test-nuxt4]
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run test:size
+    benchmark:
+        needs: changes
+        if: needs.changes.outputs.src == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run benchmark
+
+    ci-ok:
+        if: always()
+        needs: [changes, build, typecheck, lint, knip, unit, test-fixtures, test-consumer, test-size, benchmark]
+        runs-on: ubuntu-latest
+        steps:
+            - name: Require blocking jobs
+              env:
+                  RESULTS: ${{ join(needs.*.result, ',') }}
+              run: '[[ $RESULTS != *failure* && $RESULTS != *cancelled* ]]'

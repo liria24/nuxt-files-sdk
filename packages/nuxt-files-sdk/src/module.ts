@@ -13,7 +13,7 @@ export default defineNuxtModule<ModuleOptions>({
     meta: {
         name: 'nuxt-files-sdk',
         configKey: 'files',
-        compatibility: { nuxt: '^4.0.0 || >=5.0.0-0' },
+        compatibility: { nuxt: '^4.0.0 || ^5.0.0' },
     },
     defaults: {
         config: 'files.config.ts',
@@ -30,8 +30,16 @@ export default defineNuxtModule<ModuleOptions>({
 import type config from ${JSON.stringify(configPath)}
 import type { StorageRegistry } from 'nuxt-files-sdk'
 
+type Names = keyof typeof config.storage
+type IsUnion<T, C = T> = T extends C ? ([C] extends [T] ? false : true) : never
+type DefaultName = typeof config extends { default: infer Name extends Names } ? Name :
+  'default' extends Names ? 'default' : IsUnion<Names> extends false ? Names : never
+
 declare module 'nuxt-files-sdk' {
   interface NuxtFilesStorageRegistry extends StorageRegistry<typeof config> {}
+  interface NuxtFilesDefaultStorage {
+    value: StorageRegistry<typeof config>[DefaultName]
+  }
 }
 
 export {}`,

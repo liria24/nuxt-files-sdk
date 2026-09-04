@@ -1,4 +1,4 @@
-import type { FilesPlugin } from 'files-sdk'
+import type { FilesHooks, FilesPlugin } from 'files-sdk'
 import type { LoadFilesOptions } from 'files-sdk/loader'
 
 export type StorageConfig<Plugins extends readonly FilesPlugin[] = readonly FilesPlugin[]> = Omit<
@@ -9,6 +9,8 @@ export type StorageConfig<Plugins extends readonly FilesPlugin[] = readonly File
     adapter: string
     /** Native Files SDK plugins, applied in array order. */
     plugins?: Plugins
+    /** Native Files SDK hooks. They run before the integration hook bridge. */
+    hooks?: FilesHooks
 }
 
 export interface FilesConfig<Storage extends Record<string, StorageConfig> = Record<string, StorageConfig>> {

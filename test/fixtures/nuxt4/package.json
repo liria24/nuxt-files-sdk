@@ -1,0 +1,12 @@
+{
+    "private": true,
+    "scripts": {
+        "prepare": "nuxt prepare",
+        "typecheck": "nuxt typecheck",
+        "build": "nuxt build"
+    },
+    "dependencies": {
+        "nuxt": "^4.0.0",
+        "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
+    }
+}

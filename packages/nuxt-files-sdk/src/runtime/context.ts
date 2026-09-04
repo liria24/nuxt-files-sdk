@@ -20,10 +20,10 @@ export const configureFiles = <const C extends FilesConfig>(
 
 /** Project storage names are merged into this interface by the generated Nuxt declaration. */
 export interface NuxtFilesStorageRegistry {}
+/** Generated from the project's default-storage selection. */
+export interface NuxtFilesDefaultStorage {}
 
-export function useServerFiles(): Promise<
-    NuxtFilesStorageRegistry extends Record<'default', infer Default> ? Default : Files
->
+export function useServerFiles(): Promise<NuxtFilesDefaultStorage extends { value: infer Default } ? Default : Files>
 export function useServerFiles<Name extends Extract<keyof NuxtFilesStorageRegistry, string>>(
     name: Name,
 ): Promise<NuxtFilesStorageRegistry[Name]>

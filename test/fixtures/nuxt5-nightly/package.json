@@ -1,0 +1,12 @@
+{
+    "private": true,
+    "scripts": {
+        "prepare": "nuxt prepare",
+        "typecheck": "nuxt typecheck",
+        "build": "nuxt build"
+    },
+    "dependencies": {
+        "nuxt": "npm:nuxt-nightly@latest",
+        "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
+    }
+}
