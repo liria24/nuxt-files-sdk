@@ -30,8 +30,8 @@
         "./package.json": "./package.json"
     },
     "scripts": {
-        "build": "bun --bun ../../node_modules/.bin/tsdown",
-        "dev": "bun --bun ../../node_modules/.bin/tsdown --watch",
+        "build": "tsdown",
+        "dev": "tsdown --watch",
         "prepack": "bun run build",
         "test": "vitest run",
         "typecheck": "tsc --noEmit"
