@@ -1,0 +1,64 @@
+{
+  "name": "nuxt-files-sdk",
+  "version": "0.0.0",
+  "description": "Native-first Files SDK integration for Nuxt and Nitro",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/module.mjs",
+  "types": "./dist/module.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/module.d.mts",
+      "import": "./dist/module.mjs"
+    },
+    "./config": {
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs"
+    },
+    "./nitro": {
+      "types": "./dist/nitro.d.mts",
+      "import": "./dist/nitro.mjs"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.mts",
+      "import": "./dist/plugins.mjs"
+    }
+  },
+  "scripts": {
+    "build": "nuxt-module-build build",
+    "dev": "nuxt-module-build dev",
+    "prepack": "bun run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^4.1.1",
+    "c12": "^3.2.0",
+    "files-sdk": "^2.3.0"
+  },
+  "devDependencies": {
+    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/schema": "^4.1.1",
+    "@types/node": "^24.3.0",
+    "nitropack": "^2.12.4",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "vue": "^3.5.21"
+  },
+  "peerDependencies": {
+    "nuxt": "^4.0.0 || >=5.0.0-0",
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "nuxt": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  }
+}
