@@ -1,6 +1,6 @@
 {
     "name": "nuxt-files-sdk",
-    "version": "0.0.1",
+    "version": "0.0.0",
     "description": "Native-first Files SDK integration for Nuxt and Nitro",
     "homepage": "https://github.com/liria24/nuxt-files-sdk#readme",
     "license": "MIT",
