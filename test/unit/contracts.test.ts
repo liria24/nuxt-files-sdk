@@ -3,13 +3,12 @@ import { resolve } from 'node:path'
 
 import { expect, test } from 'vitest'
 
+import { contracts } from '../contracts'
 import { repositoryRoot } from '../utils/fixture'
 
 test('[META-001] every registered contract is referenced by a test and maps to an existing blocking job', async () => {
-    const registry = await readFile(resolve(repositoryRoot, 'docs/contracts.md'), 'utf8')
     const ci = await readFile(resolve(repositoryRoot, '.github/workflows/ci.yml'), 'utf8')
-    const rows = [...registry.matchAll(/^\|\s*([A-Z]+-\d{3})\s*\|[^\n]+\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|$/gmu)]
-    expect(rows.length).toBeGreaterThan(0)
+    expect(contracts.length).toBeGreaterThan(0)
     const sources: string[] = []
     for (const name of ['unit', 'nuxt', 'nitro', 'consumer', 'bundle', 'types']) {
         const directory = resolve(repositoryRoot, 'test', name)
@@ -18,9 +17,9 @@ test('[META-001] every registered contract is referenced by a test and maps to a
         }
     }
     const referenced = new Set(sources.join('\n').match(/[A-Z]+-\d{3}/gu))
-    expect(rows.map((row) => row[1]!).toSorted()).toEqual([...referenced].toSorted())
-    for (const [, id, source, job] of rows) {
-        expect(await readFile(resolve(repositoryRoot, source!), 'utf8'), id).not.toBe('')
+    expect(contracts.map(({ id }) => id).toSorted()).toEqual([...referenced].toSorted())
+    for (const { id, source, job } of contracts) {
+        expect(await readFile(resolve(repositoryRoot, source), 'utf8'), id).not.toBe('')
         expect(ci, id).toContain(`    ${job}:`)
         expect(ci.slice(ci.indexOf('    ci-ok:')), id).toContain(`            - ${job}`)
     }
@@ -37,7 +36,19 @@ test('[REL-002] mandatory jobs and the release artifact fail closed', async () =
         expect(gate, name).toContain(`            - ${name}`)
     }
     expect(gate).toContain('.result == "success"')
+    expect(ci).not.toContain('paths-filter')
+    expect(ci).not.toContain('needs: changes')
     expect(ci).toContain('windows-latest')
+    for (const path of [
+        'actions/setup/action.yml',
+        'workflows/autofix.yml',
+        'workflows/preview.yml',
+        'workflows/release.yml',
+    ]) {
+        expect(await readFile(resolve(repositoryRoot, '.github', path), 'utf8'), path).toContain(
+            'bun-version-file: package.json',
+        )
+    }
     const release = await readFile(resolve(repositoryRoot, '.github/workflows/release.yml'), 'utf8')
     expect(release).toContain('gh run watch "$run_id" --exit-status')
     expect(release).toContain('select(.name == "ci-ok")')

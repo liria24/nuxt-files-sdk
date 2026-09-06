@@ -4,10 +4,10 @@ import { resolve } from 'node:path'
 import { expect } from 'vitest'
 
 import { invalidTypeCases } from '../types/invalid/cases'
-import { repositoryRoot, runCommand } from './fixture'
+import { runCommand } from './fixture'
 
 export const cleanTypeContracts = async (directory: string): Promise<void> => {
-    for (const name of ['.contract-invalid', '.contract-docs']) {
+    for (const name of ['.contract-invalid', '.contract-examples']) {
         await rm(resolve(directory, name), { recursive: true, force: true })
     }
 }
@@ -45,34 +45,20 @@ export const checkInvalidType = async (
     expect(error).toMatch(diagnostic)
 }
 
-export const checkDocs = async (directory: string): Promise<void> => {
-    const readme = await readFile(resolve(repositoryRoot, 'README.md'), 'utf8')
-    const snippets = [...readme.matchAll(/```ts\r?\n([\s\S]*?)```/gu)].map((match) => match[1])
-    expect(snippets).toHaveLength(3)
-    const docsDirectory = resolve(directory, '.contract-docs')
-    await mkdir(docsDirectory, { recursive: true })
-    await Promise.all([
-        writeFile(
-            resolve(docsDirectory, 'nuxt.config.ts'),
-            `import { defineNuxtConfig } from 'nuxt/config'\n${snippets[0]}`,
-        ),
-        writeFile(resolve(docsDirectory, 'files.config.ts'), snippets[1]!),
-        writeFile(
-            resolve(docsDirectory, 'usage.ts'),
-            `import { useServerFiles } from 'nuxt-files-sdk/runtime'\n${snippets[2]}`,
-        ),
-        writeFile(
-            resolve(docsDirectory, 'tsconfig.json'),
-            JSON.stringify({
-                extends: '../.nuxt/tsconfig.server.json',
-                include: [
-                    '../.nuxt/types/nitro.d.ts',
-                    '../.nuxt/nuxt-files-sdk/storage-registry.d.ts',
-                    '../types.contract.ts',
-                    './*.ts',
-                ],
-            }),
-        ),
-    ])
-    await runCommand('bun', ['x', 'vue-tsc', '--noEmit', '-p', '.contract-docs/tsconfig.json'], { cwd: directory })
+export const checkPublicExamples = async (directory: string): Promise<void> => {
+    const examplesDirectory = resolve(directory, '.contract-examples')
+    await mkdir(examplesDirectory, { recursive: true })
+    await writeFile(
+        resolve(examplesDirectory, 'tsconfig.json'),
+        JSON.stringify({
+            extends: '../.nuxt/tsconfig.server.json',
+            include: [
+                '../.nuxt/types/nitro.d.ts',
+                '../.nuxt/nuxt-files-sdk/storage-registry.d.ts',
+                '../files.config.ts',
+                '../types.contract.ts',
+            ],
+        }),
+    )
+    await runCommand('bun', ['x', 'vue-tsc', '--noEmit', '-p', '.contract-examples/tsconfig.json'], { cwd: directory })
 }

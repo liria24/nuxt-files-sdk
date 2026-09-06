@@ -1,7 +1,6 @@
 import type { FilesHooks, FilesPlugin, ProviderSlug } from 'files-sdk'
 import type { LoadFilesOptions } from 'files-sdk/loader'
 
-// TODO(files-sdk): consume upstream generic provider option types when the native loader exports them.
 export type StorageConfig<Plugins extends readonly FilesPlugin[] = readonly FilesPlugin[]> = Omit<
     LoadFilesOptions,
     'provider'

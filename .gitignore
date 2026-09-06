@@ -3,7 +3,7 @@ dist
 .nuxt
 .nitro
 .contract-invalid
-.contract-docs
+.contract-examples
 .output
 *.tgz
 .data

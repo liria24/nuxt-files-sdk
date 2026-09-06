@@ -13,40 +13,9 @@ concurrency:
     cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
-    changes:
-        permissions:
-            contents: read
-            pull-requests: read
-        runs-on: ubuntu-latest
-        outputs:
-            src: ${{ steps.filter.outputs.src }}
-            docs: ${{ steps.filter.outputs.docs }}
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-              with: { persist-credentials: false, fetch-depth: 0 }
-            - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
-              id: filter
-              with:
-                  filters: |
-                      src:
-                        - 'packages/**'
-                        - 'test/**'
-                        - 'fixtures/**'
-                        - 'package.json'
-                        - 'bun.lock'
-                        - 'tsconfig.json'
-                        - '*.config.ts'
-                        - '.github/**'
-                        - 'docs/**'
-                        - 'README.md'
-                      docs:
-                        - 'README.md'
-                        - 'content/**'
-
     build:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,7 +28,6 @@ jobs:
     typecheck:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -69,7 +37,6 @@ jobs:
     lint:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -81,7 +48,6 @@ jobs:
     knip:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -92,7 +58,6 @@ jobs:
     unit:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -103,7 +68,6 @@ jobs:
     test-nuxt4:
         permissions:
             contents: read
-        needs: changes
         strategy:
             fail-fast: false
             matrix:
@@ -117,7 +81,6 @@ jobs:
     test-nuxt5-nightly:
         permissions:
             contents: read
-        needs: changes
         continue-on-error: true
         runs-on: ubuntu-latest
         steps:
@@ -128,7 +91,6 @@ jobs:
     test-nitro2:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -138,7 +100,6 @@ jobs:
     test-nitro3:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -148,17 +109,17 @@ jobs:
     test-consumer:
         permissions:
             contents: read
-        needs: [changes, build]
+        needs: build
         strategy:
             fail-fast: false
             matrix:
                 include:
                     - compatibility: minimum
-                      sdk: '2.3.0'
+                      sdk: '2.3.1'
                       nuxt: '4.0.0'
                       nitro2: '2.13.0'
                     - compatibility: latest-supported
-                      sdk: '^2.3.0'
+                      sdk: '^2.3.1'
                       nuxt: '^4.0.0'
                       nitro2: '^2.13.0'
         env:
@@ -174,7 +135,7 @@ jobs:
     test-size:
         permissions:
             contents: read
-        needs: [changes, test-nuxt4]
+        needs: test-nuxt4
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -184,7 +145,6 @@ jobs:
     benchmark:
         permissions:
             contents: read
-        needs: changes
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -195,7 +155,6 @@ jobs:
     ci-ok:
         if: always()
         needs:
-            - changes
             - build
             - typecheck
             - lint

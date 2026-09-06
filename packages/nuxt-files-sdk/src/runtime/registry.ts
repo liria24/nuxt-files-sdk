@@ -149,7 +149,7 @@ export const withNuxtEnvironment = async <T>(provider: ProviderSlug, load: () =>
     if (!metadata) return load()
     const variables = listEnvVars(provider)
     if (variables.length === 0) return load()
-    // ponytail: global lock; remove when Files SDK accepts an injectable env resolver.
+    // ponytail: module-local env lock; use native env keys to avoid temporary aliases.
     const previous = environmentLock
     let release!: () => void
     environmentLock = new Promise<void>((resolveLock) => (release = resolveLock))

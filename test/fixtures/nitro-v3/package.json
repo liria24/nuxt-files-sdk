@@ -10,6 +10,7 @@
         "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
     },
     "devDependencies": {
+        "@rollup/plugin-terser": "^0.4.4",
         "hookable": "^5.5.3",
         "typescript": "^6.0.3"
     }

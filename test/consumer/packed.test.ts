@@ -14,7 +14,12 @@ import {
     startFixtureServer,
     unusedPlugins,
 } from '../utils/fixture'
-import { checkDocs, checkGeneratedTypes, checkInvalidType, cleanTypeContracts } from '../utils/generated-types'
+import {
+    checkPublicExamples,
+    checkGeneratedTypes,
+    checkInvalidType,
+    cleanTypeContracts,
+} from '../utils/generated-types'
 
 let packed: Awaited<ReturnType<typeof packPackage>>
 let contents: string[]
@@ -120,7 +125,7 @@ describe('Packed consumer', () => {
             if (name === 'nuxt4') {
                 await checkGeneratedTypes(consumer)
                 for (const entry of invalidTypeCases) await checkInvalidType(consumer, entry)
-                await checkDocs(consumer)
+                await checkPublicExamples(consumer)
                 await cleanTypeContracts(consumer)
             }
             const paths = await outputPaths(resolve(consumer, '.output'))

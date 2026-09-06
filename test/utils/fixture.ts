@@ -164,7 +164,16 @@ export const packPackage = async (): Promise<{ directory: string; tarball: strin
 
 export const copyPackedConsumer = async (fixture: string, directory: string, tarball: string): Promise<string> => {
     const destination = resolve(directory, fixture)
-    const ignored = new Set(['node_modules', '.nuxt', '.nitro', '.output', '.data', '.contract-invalid', 'bun.lock'])
+    const ignored = new Set([
+        'node_modules',
+        '.nuxt',
+        '.nitro',
+        '.output',
+        '.data',
+        '.contract-invalid',
+        '.contract-examples',
+        'bun.lock',
+    ])
     await cp(fixtureDirectory(fixture), destination, {
         recursive: true,
         filter: (source) => !ignored.has(basename(source)),
