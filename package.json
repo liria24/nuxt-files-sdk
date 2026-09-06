@@ -14,30 +14,35 @@
         "lint": "oxlint .",
         "lint:fix": "oxlint . --fix",
         "preview:package": "pkg-pr-new publish ./packages/nuxt-files-sdk --bun --compact --previewVersion",
-        "test": "bun --filter nuxt-files-sdk test",
-        "typecheck": "bun --filter nuxt-files-sdk typecheck",
+        "test": "vitest run",
+        "test:unit": "vitest run --project unit",
+        "typecheck": "bun --filter nuxt-files-sdk typecheck && tsc --noEmit -p test/tsconfig.json",
         "unused": "knip && knip --production",
         "workspace:check": "sherif",
-        "test:nuxt4": "bun run test:fixture nuxt4",
-        "test:nuxt5": "bun run test:fixture nuxt5-nightly",
-        "test:nitro2": "bun run test:fixture nitro-v2",
-        "test:nitro3": "bun run test:fixture nitro-v3",
-        "test:fixture": "bash test/scripts/fixture.sh",
-        "test:consumer": "bash test/scripts/packed-consumer.sh",
-        "test:size": "bash test/scripts/bundle-contract.sh",
+        "test:nuxt4": "vitest run --project nuxt4",
+        "test:nuxt5": "vitest run --project nuxt5",
+        "test:nitro2": "vitest run --project nitro-v2",
+        "test:nitro3": "vitest run --project nitro-v3",
+        "test:consumer": "vitest run --project consumer",
+        "test:size": "vitest run --project bundle",
         "benchmark": "bun packages/nuxt-files-sdk/test/benchmark.ts"
     },
     "devDependencies": {
+        "@nuxt/schema": "^4.5.2",
+        "@nuxt/test-utils": "^4.2.0",
+        "files-sdk": "^2.3.1",
         "knip": "^6.34.0",
         "oxfmt": "^0.66.0",
         "oxlint": "^1.81.0",
         "oxlint-tsgolint": "^7.0.2001",
         "pkg-pr-new": "^0.0.88",
         "sherif": "^1.13.0",
-        "taze": "^21.1.0"
+        "taze": "^21.1.0",
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.0"
     },
     "engines": {
         "node": ">=24.0.0"
     },
-    "packageManager": "bun@1.4.0"
+    "packageManager": "bun@1.4.2"
 }

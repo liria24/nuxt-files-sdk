@@ -2,7 +2,12 @@
     "name": "nuxt-files-sdk",
     "version": "0.0.1",
     "description": "Native-first Files SDK integration for Nuxt and Nitro",
+    "homepage": "https://github.com/liria24/nuxt-files-sdk#readme",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/liria24/nuxt-files-sdk.git"
+    },
     "files": [
         "dist"
     ],
@@ -27,18 +32,22 @@
             "types": "./dist/plugins.d.ts",
             "import": "./dist/plugins.js"
         },
+        "./runtime": {
+            "types": "./dist/runtime.d.ts",
+            "import": "./dist/runtime.js"
+        },
         "./package.json": "./package.json"
     },
     "scripts": {
         "build": "tsdown",
         "dev": "tsdown --watch",
         "prepack": "bun run build",
-        "test": "vitest run",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@nuxt/kit": "^4.5.2",
-        "files-sdk": "^2.3.0"
+        "devframe": "^0.9.12",
+        "files-sdk": "^2.3.1"
     },
     "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.5",
@@ -47,7 +56,6 @@
         "publint": "^0.3.24",
         "tsdown": "^0.23.0",
         "typescript": "^7.0.2",
-        "vitest": "^5.0.0",
         "vue": "^3.5.42"
     },
     "peerDependencies": {

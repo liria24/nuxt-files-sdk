@@ -7,7 +7,14 @@ export default defineConfig({
         suspicious: 'error',
     },
     env: { browser: true, node: true },
-    ignorePatterns: ['**/.nuxt/**', '**/.output/**', '**/coverage/**', '**/dist/**', 'test/fixtures/nuxt*/**'],
+    ignorePatterns: [
+        '**/.nuxt/**',
+        '**/.nitro/**',
+        '**/.output/**',
+        '**/coverage/**',
+        '**/dist/**',
+        'test/fixtures/**',
+    ],
     options: { typeAware: true },
     plugins: ['import', 'typescript', 'unicorn', 'vitest'],
     rules: {
@@ -17,8 +24,15 @@ export default defineConfig({
     },
     overrides: [
         {
-            files: ['**/*.test.ts', '**/*.spec.ts'],
-            rules: { 'typescript/no-explicit-any': 'off' },
+            files: ['test/**/*.ts'],
+            rules: {
+                'typescript/no-explicit-any': 'off',
+                // Negative inputs and minimal framework doubles deliberately narrow types.
+                'typescript/no-unsafe-type-assertion': 'off',
+                'vitest/valid-expect': ['error', { maxArgs: 2 }],
+                // Fixture prepare/typecheck/build and dependent lifecycle operations are ordered.
+                'no-await-in-loop': 'off',
+            },
         },
     ],
 })

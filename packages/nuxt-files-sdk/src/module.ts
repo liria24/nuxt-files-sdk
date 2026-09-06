@@ -1,7 +1,16 @@
 import { resolve } from 'node:path'
 
-import { addImports, addServerPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule } from '@nuxt/kit'
+import { addImports, addServerImports, defineNuxtModule, getNuxtModuleVersion } from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
+
+import { shouldEnableFilesDevtools } from './devtools/enabled'
+import { setupNitroFilesIntegration, type NitroIntegration } from './integration/nitro'
+
+declare module '@nuxt/schema' {
+    interface NuxtHooks {
+        'nitro:init': (nitro: NitroIntegration) => void | Promise<void>
+    }
+}
 
 export interface ModuleOptions {
     /** Files configuration path, relative to the Nuxt root. */
@@ -20,65 +29,30 @@ export default defineNuxtModule<ModuleOptions>({
         config: 'files.config.ts',
         devtools: true,
     },
-    setup(options, nuxt: Nuxt) {
-        const resolver = createResolver(import.meta.url)
+    async setup(options, nuxt: Nuxt) {
         const configPath = resolve(nuxt.options.rootDir, options.config)
-        const runtime = resolver.resolve('./runtime/context')
-
-        addTypeTemplate(
-            {
-                filename: 'nuxt-files-sdk/storage-registry.d.ts',
-                getContents: () => `
-import type config from ${JSON.stringify(configPath)}
-import type { StorageRegistry } from 'nuxt-files-sdk'
-
-type Names = keyof typeof config.storage
-type IsUnion<T, C = T> = T extends C ? ([C] extends [T] ? false : true) : never
-type DefaultName = typeof config extends { default: infer Name extends Names } ? Name :
-  'default' extends Names ? 'default' : IsUnion<Names> extends false ? Names : never
-
-declare module ${JSON.stringify(runtime)} {
-  interface NuxtFilesStorageRegistry extends StorageRegistry<typeof config> {}
-  interface NuxtFilesDefaultStorage {
-    value: StorageRegistry<typeof config>[DefaultName]
-  }
-}
-
-export {}`,
-            },
-            { nuxt: true, nitro: true },
+        nuxt.hook('nitro:init', (nitro) =>
+            setupNitroFilesIntegration(nitro, {
+                configPath,
+                development: nuxt.options.dev,
+            }),
         )
-        addTypeTemplate(
-            { filename: 'nuxt-files-sdk/types.d.ts', src: resolver.resolve('./types.d.ts') },
-            { nuxt: true, nitro: true },
-        )
-
-        const plugin = addTemplate({
-            filename: 'nuxt-files-sdk/server-plugin.mjs',
-            getContents: () => `
-import config from ${JSON.stringify(configPath)}
-import { configureFiles } from ${JSON.stringify(runtime)}
-
-export default defineNitroPlugin((nitroApp) => {
-  configureFiles(config, {
-    development: import.meta.dev,
-    hooks: {
-      onAction: (event, storage) => nitroApp.hooks.callHook('files:action', { event, storage }),
-      onError: (event, storage) => nitroApp.hooks.callHook('files:error', { event, storage }),
-      onRetry: (event, storage) => nitroApp.hooks.callHook('files:retry', { event, storage }),
-    },
-  })
-})`,
+        nuxt.hook('prepare:types', ({ references }) => {
+            references.push({ path: resolve(nuxt.options.buildDir, 'nuxt-files-sdk/storage-registry.d.ts') })
         })
-        addServerPlugin(plugin.dst)
-        addImports({ name: 'useServerFiles', from: runtime })
+
+        addServerImports({ name: 'useServerFiles', from: 'nuxt-files-sdk/runtime' })
         for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {
             addImports({ name, from: 'files-sdk/vue' })
+        }
+
+        if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
+            const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
+            const { setupFilesDevtools } = await import('./devtools')
+            setupFilesDevtools(nuxt, version || '3')
         }
     },
 })
 
 export * from 'files-sdk'
-export { configureFiles, useServerFiles } from './runtime/context'
-export { FilesRegistry } from './runtime/registry'
-export type { FilesForStorage, StorageRegistry } from './runtime/registry'
+export * from './runtime'

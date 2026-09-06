@@ -1,4 +1,6 @@
-import { useServerFiles } from 'nuxt-files-sdk/nitro'
-export default defineEventHandler(async () => ({
-    adapter: (await useServerFiles('blob')).adapter.name,
-}))
+import { useServerFiles } from 'nuxt-files-sdk/runtime'
+
+export default defineEventHandler(async () => {
+    const files = await useServerFiles()
+    return { adapter: files.adapter.name, versions: (await files.versions('missing.txt')).length }
+})

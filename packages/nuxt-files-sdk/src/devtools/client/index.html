@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Files</title>
+        <style>
+            :root {
+                color-scheme: light dark;
+                font-family: system-ui, sans-serif;
+            }
+            body {
+                margin: 0;
+                padding: 20px;
+                background: Canvas;
+                color: CanvasText;
+            }
+            h1 {
+                margin: 0 0 4px;
+                font-size: 20px;
+            }
+            #summary {
+                margin: 0 0 20px;
+                color: GrayText;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th,
+            td {
+                padding: 10px;
+                border-bottom: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+                text-align: left;
+            }
+            th {
+                font-size: 12px;
+                color: GrayText;
+                text-transform: uppercase;
+            }
+            code {
+                font-family: ui-monospace, monospace;
+            }
+            .warning,
+            .error {
+                padding: 10px;
+                border-radius: 6px;
+                background: color-mix(in srgb, orange 16%, Canvas);
+            }
+            .error {
+                background: color-mix(in srgb, red 16%, Canvas);
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>Files</h1>
+            <p id="summary" aria-live="polite">Loading resolved configuration…</p>
+            <section aria-labelledby="storages-heading">
+                <h2 id="storages-heading">Storages</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Adapter</th>
+                            <th>Plugins</th>
+                            <th>Source</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="storages"></tbody>
+                </table>
+            </section>
+            <section aria-labelledby="diagnostics-heading">
+                <h2 id="diagnostics-heading">Diagnostics</h2>
+                <div id="diagnostics"></div>
+            </section>
+        </main>
+        <script type="module">
+            const snapshot = await fetch('./snapshot').then((response) => response.json())
+            document.querySelector('#summary').textContent =
+                `${snapshot.storages.length} configured storage${snapshot.storages.length === 1 ? '' : 's'}`
+            document.querySelector('#storages').replaceChildren(
+                ...snapshot.storages.map((storage) => {
+                    const row = document.createElement('tr')
+                    for (const value of [
+                        storage.name,
+                        storage.adapter,
+                        storage.plugins.join(', ') || '—',
+                        storage.source,
+                        storage.initialized ? 'Initialized' : 'Not initialized',
+                    ]) {
+                        const cell = document.createElement('td')
+                        cell.textContent = value
+                        row.append(cell)
+                    }
+                    return row
+                }),
+            )
+            const diagnostics = document.querySelector('#diagnostics')
+            if (!snapshot.diagnostics.length) diagnostics.textContent = 'No integration diagnostics.'
+            else
+                diagnostics.replaceChildren(
+                    ...snapshot.diagnostics.map((item) => {
+                        const message = document.createElement('p')
+                        message.className = item.level
+                        message.textContent = `${item.code}: ${item.message}`
+                        return message
+                    }),
+                )
+        </script>
+    </body>
+</html>

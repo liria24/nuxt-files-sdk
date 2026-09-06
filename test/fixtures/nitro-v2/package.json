@@ -2,10 +2,14 @@
     "private": true,
     "scripts": {
         "prepare": "nitropack prepare",
+        "typecheck": "tsc --noEmit -p .nitro/types/tsconfig.json",
         "build": "nitropack build"
     },
     "dependencies": {
         "nitropack": "^2.13.0",
         "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
+    },
+    "devDependencies": {
+        "typescript": "^6.0.3"
     }
 }

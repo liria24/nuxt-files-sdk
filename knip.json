@@ -1,23 +1,19 @@
 {
     "$schema": "https://unpkg.com/knip@6/schema.json",
     "ignoreExportsUsedInFile": true,
+    "ignore": ["test/fixtures/**"],
     "workspaces": {
         ".": {
-            "entry": ["*.config.ts"],
-            "project": ["*.config.ts"]
+            "entry": ["*.config.ts", "test/**/*.test.ts"],
+            "project": ["*.config.ts", "test/**/*.ts"]
         },
         "packages/nuxt-files-sdk": {
-            "entry": [
-                "tsdown.config.ts",
-                "src/{module,config,nitro,plugins}.ts",
-                "test/**/*.test.ts",
-                "test/benchmark.ts"
-            ],
-            "ignoreDependencies": ["@arethetypeswrong/cli", "nitropack"],
+            "entry": ["tsdown.config.ts", "src/{module,config,nitro,plugins}.ts", "test/benchmark.ts"],
+            "ignoreDependencies": ["@arethetypeswrong/cli"],
             "ignoreIssues": {
                 "package.json": ["optionalPeerDependencies"]
             },
-            "project": ["src/**/*.ts!", "test/**/*.ts", "*.config.ts"]
+            "project": ["src/**/*.ts!", "test/benchmark.ts", "*.config.ts"]
         }
     }
 }

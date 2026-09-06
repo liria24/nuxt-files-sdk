@@ -1,7 +1,9 @@
 node_modules
 dist
 .nuxt
+.nitro
+.contract-invalid
+.contract-docs
 .output
 *.tgz
 .data
-

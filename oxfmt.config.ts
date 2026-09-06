@@ -1,7 +1,15 @@
 import { defineConfig } from 'oxfmt'
 
 export default defineConfig({
-    ignorePatterns: ['**/.nuxt/**', '**/.output/**', '**/coverage/**', '**/dist/**', '**/node_modules/**'],
+    ignorePatterns: [
+        '**/.nuxt/**',
+        '**/.nitro/**',
+        '**/.output/**',
+        '**/.contract-*/**',
+        '**/coverage/**',
+        '**/dist/**',
+        '**/node_modules/**',
+    ],
     printWidth: 120,
     semi: false,
     singleQuote: true,
