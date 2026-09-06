@@ -38,6 +38,10 @@
         },
         "./package.json": "./package.json"
     },
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
     "scripts": {
         "build": "tsdown",
         "dev": "tsdown --watch",
@@ -65,9 +69,5 @@
         "nuxt": {
             "optional": true
         }
-    },
-    "publishConfig": {
-        "access": "public",
-        "provenance": true
     }
 }
