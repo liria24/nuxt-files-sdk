@@ -53,6 +53,7 @@ describe('Packed consumer', () => {
     test('[PKG-001][PKG-002] tarball contains only the declared release files', () => {
         for (const required of [
             'package/package.json',
+            'package/LICENSE',
             'package/dist/module.js',
             'package/dist/module.d.ts',
             'package/dist/config.js',

@@ -65,5 +65,9 @@
         "nuxt": {
             "optional": true
         }
+    },
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
     }
 }
