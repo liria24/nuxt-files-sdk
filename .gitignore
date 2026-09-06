@@ -7,3 +7,4 @@ dist
 .output
 *.tgz
 .data
+packages/nuxt-files-sdk/README.md

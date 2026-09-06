@@ -22,6 +22,7 @@
 
 ## Verification boundaries
 
+- Keep GitHub's default CodeQL setup enabled for JavaScript/TypeScript and Actions; the main ruleset requires its code-scanning results before merging.
 - `ci-ok` must directly await every blocking job and accept only `success`; failed, cancelled, or skipped jobs fail the gate. Nightly is visible but non-blocking. No change-detection job is needed: required checks also run for documentation/workflow changes.
 - The supported matrix and runner/toolchain choices are defined by CI and manifests. Locked integration fixtures, minimum/latest-supported packed consumers, and platform coverage are distinct evidence; nightly resolution does not prove support for a future stable release.
 - Release verifies successful push CI for the tagged commit, then tests the exact archive produced by `uppt/pack` through `NUXT_FILES_TARBALL`. Do not rebuild on that path. Only a successful artifact verification permits publishing the same uploaded archive; its SHA-256 must remain unchanged.

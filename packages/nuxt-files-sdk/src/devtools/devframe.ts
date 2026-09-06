@@ -2,12 +2,13 @@ import { fileURLToPath } from 'node:url'
 
 import { defineDevframe } from 'devframe'
 
+import { version } from '../../package.json'
 import { FILES_DEVTOOLS_PATH } from './snapshot'
 
 export default defineDevframe({
     id: 'nuxt-files-sdk',
     name: 'Files',
-    version: '0.0.1',
+    version,
     packageName: 'nuxt-files-sdk',
     importMetaUrl: import.meta.url,
     homepage: 'https://github.com/liria24/nuxt-files-sdk',
