@@ -54,6 +54,7 @@ describe('Packed consumer', () => {
         for (const required of [
             'package/package.json',
             'package/LICENSE',
+            'package/README.md',
             'package/dist/module.js',
             'package/dist/module.d.ts',
             'package/dist/config.js',
