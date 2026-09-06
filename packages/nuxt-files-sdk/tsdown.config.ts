@@ -3,7 +3,10 @@ import { defineConfig } from 'tsdown'
 export default defineConfig({
     attw: { level: 'error', profile: 'esm-only' },
     clean: true,
-    copy: [{ from: 'src/devtools/client/index.html', to: 'dist/devtools/client' }],
+    copy: [
+        { from: 'src/devtools/client/index.html', to: 'dist/devtools/client' },
+        { from: '../../README.md', to: '.' },
+    ],
     deps: {
         dts: { neverBundle: true },
         neverBundle: true,
