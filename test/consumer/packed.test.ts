@@ -15,9 +15,10 @@ import {
     unusedPlugins,
 } from '../utils/fixture'
 import {
-    checkPublicExamples,
     checkGeneratedTypes,
+    checkHoverDocumentation,
     checkInvalidType,
+    checkPublicExamples,
     cleanTypeContracts,
 } from '../utils/generated-types'
 
@@ -119,6 +120,7 @@ describe('Packed consumer', () => {
                 await checkGeneratedTypes(consumer)
                 for (const entry of invalidTypeCases) await checkInvalidType(consumer, entry)
                 await checkPublicExamples(consumer)
+                await checkHoverDocumentation(consumer)
                 await cleanTypeContracts(consumer)
             }
             const paths = await outputPaths(resolve(consumer, '.output'))

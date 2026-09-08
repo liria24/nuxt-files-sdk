@@ -13,14 +13,17 @@ import { getProvider, listEnvVars } from 'files-sdk/providers'
 import type { FilesConfig, StorageConfig } from '../config'
 import type { FilesDevtoolsSnapshot } from '../devtools/snapshot'
 
+/** Native Files client plus the methods contributed by a storage's plugins. */
 export type FilesForStorage<T extends StorageConfig> = Files & ExtensionsOf<NonNullable<T['plugins']>>
 
+/** Map each configured storage name to its native Files client and plugin extensions. */
 export type StorageRegistry<C extends FilesConfig> = {
     [Name in keyof C['storage']]: FilesForStorage<C['storage'][Name]>
 }
 
 type IsUnion<T, C = T> = T extends C ? ([C] extends [T] ? false : true) : never
 
+/** Resolve the explicit, conventional, or only storage name used by an unnamed access. */
 export type DefaultStorageName<C extends FilesConfig> = C extends {
     default: infer Name extends Extract<keyof C['storage'], string>
 }
@@ -31,11 +34,16 @@ export type DefaultStorageName<C extends FilesConfig> = C extends {
         ? Extract<keyof C['storage'], string>
         : never
 
+/** Files client and plugin extensions returned for a configuration's default storage. */
 export type DefaultStorage<C extends FilesConfig> = StorageRegistry<C>[DefaultStorageName<C>]
 
+/** Hooks emitted by the Nuxt/Nitro bridge after the storage's native hooks. */
 export interface FilesRuntimeHooks {
+    /** Observe a failed native Files operation. */
     onError?: (event: FilesErrorEvent, storage: string) => void | Promise<void>
+    /** Observe a completed native Files operation. */
     onAction?: (event: FilesActionEvent, storage: string) => void | Promise<void>
+    /** Observe a native Files retry. */
     onRetry?: (event: FilesRetryEvent, storage: string) => void | Promise<void>
 }
 
@@ -49,22 +57,35 @@ const runHooks = async (...hooks: (() => void | Promise<void> | undefined)[]): P
     }
 }
 
+/** Lazily initialize and memoize native Files clients for a validated project configuration. */
 export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     readonly #config: C
     readonly #development: boolean
     readonly #hooks: FilesRuntimeHooks
     readonly #instances = new Map<string, Promise<Files>>()
 
+    /**
+     * Create a registry and validate storage references without initializing or connecting to a provider.
+     */
     constructor(config: C, options: { development?: boolean; hooks?: FilesRuntimeHooks } = {}) {
         if (!config.storage || Object.keys(config.storage).length === 0) {
             throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
+        }
+        for (const name of [config.default, ...Object.keys(config.devStorage ?? {})]) {
+            if (name !== undefined && !Object.hasOwn(config.storage, name)) {
+                throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
+            }
         }
         this.#config = config
         this.#development = options.development ?? false
         this.#hooks = options.hooks ?? {}
     }
 
-    get<Name extends keyof C['storage'] & string>(name?: Name): Promise<StorageRegistry<C>[Name]> {
+    /** Return the default storage, sharing its in-flight initialization Promise. */
+    get(name?: undefined): Promise<DefaultStorage<C>>
+    /** Return a named storage with its plugin extensions, sharing its in-flight initialization Promise. */
+    get<Name extends keyof C['storage'] & string>(name: Name): Promise<StorageRegistry<C>[Name]>
+    get(name?: string): Promise<Files> {
         const resolvedName = name ?? this.#defaultName()
         if (!Object.hasOwn(this.#config.storage, resolvedName)) {
             throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${resolvedName}".`)
@@ -75,11 +96,10 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             this.#instances.set(resolvedName, instance)
             void instance.catch(() => this.#instances.delete(resolvedName))
         }
-        // The instance is created from the same named config; the loader cannot express that link.
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-        return instance as Promise<StorageRegistry<C>[Name]>
+        return instance
     }
 
+    /** Return secret-free storage metadata and initialization state for development diagnostics. */
     inspect(): FilesDevtoolsSnapshot {
         return {
             storages: Object.entries(this.#config.storage).map(([name, storage]) => {
@@ -97,7 +117,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     }
 
     #defaultName(): string {
-        if (this.#config.default) return this.#config.default
+        if (this.#config.default !== undefined) return this.#config.default
         const names = Object.keys(this.#config.storage)
         if (names.length === 1 && names[0]) return names[0]
         if (Object.hasOwn(this.#config.storage, 'default')) return 'default'

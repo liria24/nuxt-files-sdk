@@ -23,4 +23,16 @@ export const invalidTypeCases = [
         diagnostic: /error TS2322:/u,
         source: `import { defineFilesConfig } from 'nuxt-files-sdk/config'\n\ndefineFilesConfig({\n  storage: { blob: { adapter: 'fs' } },\n  devStorage: { blob: { adapter: 'fs', hooks: {} } },\n})\n`,
     },
+    {
+        id: 'TYPE-007',
+        name: 'unknown default storage',
+        diagnostic: /error TS2322:/u,
+        source: `import { defineFilesConfig } from 'nuxt-files-sdk/config'\n\ndefineFilesConfig({\n  default: 'unknown',\n  storage: { blob: { adapter: 'fs' } },\n})\n`,
+    },
+    {
+        id: 'TYPE-008',
+        name: 'unknown devStorage name',
+        diagnostic: /error TS2353:/u,
+        source: `import { defineFilesConfig } from 'nuxt-files-sdk/config'\n\ndefineFilesConfig({\n  storage: { blob: { adapter: 'fs' } },\n  devStorage: { unknown: { adapter: 'fs' } },\n})\n`,
+    },
 ] as const

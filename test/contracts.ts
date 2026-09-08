@@ -48,6 +48,12 @@ export const contracts = [
         job: 'unit',
     },
     {
+        id: 'CFG-008',
+        guarantee: 'Unknown default and development override names fail before provider initialization',
+        source: 'test/unit/no-fallback.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'API-001',
         guarantee: 'useServerFiles returns the cached initialization Promise',
         source: 'test/unit/registry.test.ts',
@@ -100,6 +106,18 @@ export const contracts = [
         guarantee: 'Standalone Nitro generates storage, default/plugin, and major-specific hook declarations',
         source: 'test/nitro/suite.ts',
         job: 'test-nitro3',
+    },
+    {
+        id: 'TYPE-007',
+        guarantee: 'Configuration defaults must name a declared storage',
+        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        job: 'test-nuxt4',
+    },
+    {
+        id: 'TYPE-008',
+        guarantee: 'Development overrides are limited to declared storage names',
+        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        job: 'test-nuxt4',
     },
     {
         id: 'ENV-001',
@@ -291,6 +309,12 @@ export const contracts = [
     {
         id: 'DOCS-001',
         guarantee: 'Canonical fixture examples and native public types compile against generated declarations',
+        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        job: 'test-nuxt4',
+    },
+    {
+        id: 'DOCS-002',
+        guarantee: 'Packed public APIs, generated auto-imports, and configuration fields retain hover documentation',
         source: 'test/nuxt/nuxt4-generated-types.test.ts',
         job: 'test-nuxt4',
     },

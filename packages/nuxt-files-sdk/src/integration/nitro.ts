@@ -4,6 +4,14 @@ import { resolve } from 'node:path'
 export interface NitroIntegration {
     meta?: { majorVersion?: number }
     options: { rootDir: string; buildDir: string; dev?: boolean; plugins: string[]; externals?: { inline?: unknown[] } }
+    unimport?: {
+        getInternalContext(): {
+            addons: {
+                name?: string
+                declaration?: (declarations: string) => string
+            }[]
+        }
+    }
     hooks: {
         hook(
             name: 'types:extend',
@@ -46,6 +54,14 @@ export const setupNitroFilesIntegration = async (
     options: NitroFilesIntegrationOptions,
 ): Promise<void> => {
     const configPath = options.configPath.replaceAll('\\', '/')
+    nitro.unimport?.getInternalContext().addons.push({
+        name: 'nuxt-files-sdk-jsdoc',
+        declaration: (declarations) =>
+            declarations.replace(
+                /^(\s*)(const useServerFiles: typeof .*\.useServerFiles)$/mu,
+                "$1/** Return the project's default Files client, including its configured plugin extensions. */\n$1$2",
+            ),
+    })
     // Inline both packages so installed consumers also tree-shake the plugin barrel.
     const externals = (nitro.options.externals ??= {})
     ;(externals.inline ??= []).push('nuxt-files-sdk')
