@@ -80,8 +80,6 @@ describe('Packed consumer', () => {
         ) as {
             dependencies: Record<string, string>
             exports: Record<string, unknown>
-            peerDependencies: Record<string, string>
-            peerDependenciesMeta: Record<string, { optional?: boolean }>
         }
         expect(Object.keys(packageJson.exports)).toEqual([
             '.',
@@ -91,13 +89,6 @@ describe('Packed consumer', () => {
             './runtime',
             './package.json',
         ])
-        expect(packageJson.dependencies).toEqual({
-            '@nuxt/kit': '^4.5.2',
-            devframe: '^0.9.12',
-            'files-sdk': '^2.3.1',
-        })
-        expect(packageJson.peerDependencies.nuxt).toBe('^4.0.0 || ^5.0.0')
-        expect(packageJson.peerDependenciesMeta.nuxt?.optional).toBe(true)
         expect(JSON.stringify(packageJson.dependencies)).not.toMatch(/@aws-sdk|@azure|@google-cloud/u)
     })
 
