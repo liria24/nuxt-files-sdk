@@ -172,6 +172,7 @@ export const copyPackedConsumer = async (fixture: string, directory: string, tar
         '.data',
         '.contract-invalid',
         '.contract-examples',
+        '.contract-docs',
         'bun.lock',
     ])
     await cp(fixtureDirectory(fixture), destination, {

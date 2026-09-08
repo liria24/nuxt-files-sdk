@@ -11,6 +11,24 @@ afterEach(() => {
     vi.mocked(loadFiles).mockReset()
 })
 
+test('[CFG-008] rejects unknown config storage references before provider initialization', () => {
+    expect(
+        () =>
+            new FilesRegistry({
+                default: 'missing',
+                storage: { blob: { adapter: 's3' } },
+            }),
+    ).toThrow('[nuxt-files-sdk:unknown-storage] Unknown storage "missing"')
+    expect(
+        () =>
+            new FilesRegistry({
+                storage: { blob: { adapter: 's3' } },
+                devStorage: { missing: { adapter: 'fs' } },
+            }),
+    ).toThrow('[nuxt-files-sdk:unknown-storage] Unknown storage "missing"')
+    expect(loadFiles).not.toHaveBeenCalled()
+})
+
 test('[CFG-006][ERR-002] failed provider initialization makes no HTTP or alternate-provider attempt', async () => {
     const failure = new FilesError('Provider', 'Missing provider configuration')
     vi.mocked(loadFiles).mockRejectedValue(failure)

@@ -3,9 +3,10 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { invalidTypeCases } from '../types/invalid/cases'
 import { cleanFixture, fixtureDirectory, runFixture } from '../utils/fixture'
 import {
-    checkPublicExamples,
     checkGeneratedTypes,
+    checkHoverDocumentation,
     checkInvalidType,
+    checkPublicExamples,
     cleanTypeContracts,
 } from '../utils/generated-types'
 
@@ -24,3 +25,5 @@ test.each(invalidTypeCases)('[$id] rejects $name in an actual generated consumer
 )
 test('[DOCS-001] fixture examples and native public types compile against generated consumer declarations', () =>
     expect(checkPublicExamples(directory)).resolves.toBeUndefined())
+test('[DOCS-002] public, auto-imported, and configuration hovers retain their documentation', () =>
+    expect(checkHoverDocumentation(directory)).resolves.toBeUndefined())

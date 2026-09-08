@@ -12,13 +12,15 @@ declare module '@nuxt/schema' {
     }
 }
 
+/** Options for the Nuxt Files SDK module. */
 export interface ModuleOptions {
-    /** Files configuration path, relative to the Nuxt root. */
+    /** Path to the Files configuration module, relative to the Nuxt root directory. */
     config: string
-    /** Enable development diagnostics integrations. */
+    /** Enable Files SDK development diagnostics when Nuxt DevTools is available. */
     devtools: boolean
 }
 
+/** Install Files SDK storage configuration, server utilities, Vue composables, and development diagnostics in Nuxt. */
 export default defineNuxtModule<ModuleOptions>({
     meta: {
         name: 'nuxt-files-sdk',

@@ -13,13 +13,14 @@ export type {
     StorageRegistry,
 } from './runtime/registry'
 
-/** Project storage names are merged into this interface by the generated declaration. */
+/** Project storage names and plugin-extended Files clients supplied by generated declarations. */
 export interface NuxtFilesStorageRegistry {}
-/** Generated from the project's default-storage selection. */
+/** Project default Files client supplied by generated declarations. */
 export interface NuxtFilesDefaultStorage {}
 
 let registry: FilesRegistry | undefined
 
+/** Configure the process-local Files registry used by {@link useServerFiles}. */
 export const configureFiles = <const C extends FilesConfig>(
     config: C,
     options?: ConstructorParameters<typeof FilesRegistry<C>>[1],
@@ -29,6 +30,7 @@ export const configureFiles = <const C extends FilesConfig>(
     return value
 }
 
+/** Return secret-free diagnostics for the configured process-local Files registry. */
 export const inspectFiles = (): FilesDevtoolsSnapshot =>
     registry?.inspect() ?? {
         storages: [],
@@ -41,7 +43,9 @@ export const inspectFiles = (): FilesDevtoolsSnapshot =>
         ],
     }
 
+/** Return the project's default Files client, including its configured plugin extensions. */
 export function useServerFiles(): Promise<NuxtFilesDefaultStorage extends { value: infer Default } ? Default : Files>
+/** Return a named project Files client, including that storage's configured plugin extensions. */
 export function useServerFiles<Name extends Extract<keyof NuxtFilesStorageRegistry, string>>(
     name: Name,
 ): Promise<NuxtFilesStorageRegistry[Name]>
@@ -49,5 +53,5 @@ export function useServerFiles(name?: string): Promise<Files> {
     if (!registry) {
         throw new Error('[nuxt-files-sdk:not-configured] The Files registry has not been configured.')
     }
-    return registry.get(name)
+    return name === undefined ? registry.get() : registry.get(name)
 }
