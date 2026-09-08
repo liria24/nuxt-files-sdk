@@ -119,7 +119,6 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
     let buffer = Buffer.alloc(0)
     let stderr = ''
     let nextId = 0
-    const serverMessages: string[] = []
     let registrationReady: (() => void) | undefined
     const registration = new Promise<void>((resolveRegistration) => {
         const timer = setTimeout(resolveRegistration, 5_000)
@@ -151,7 +150,6 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             if (buffer.length < end) return
             const response = JSON.parse(buffer.subarray(headerEnd + 4, end).toString()) as Response
             buffer = buffer.subarray(end)
-            if (response.method) serverMessages.push(`${response.method}: ${JSON.stringify(response.params)}`)
             if (typeof response.id === 'number' && pending.has(response.id)) pending.get(response.id)?.(response)
             else if ((typeof response.id === 'number' || typeof response.id === 'string') && response.method) {
                 send({ jsonrpc: '2.0', id: response.id, result: null })
@@ -168,11 +166,7 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             const id = ++nextId
             const timer = setTimeout(() => {
                 pending.delete(id)
-                reject(
-                    new Error(
-                        `TypeScript language server timed out handling ${method}.\n${serverMessages.join('\n')}\n${stderr}`,
-                    ),
-                )
+                reject(new Error(`TypeScript language server timed out handling ${method}.\n${stderr}`))
             }, 30_000)
             pending.set(id, (response) => {
                 clearTimeout(timer)
@@ -223,11 +217,14 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
                 .join('\n')
             expect(documentation, marker).toContain(expected)
         }
-        await request('shutdown')
         send({ jsonrpc: '2.0', method: 'exit' })
+        child.stdin.end()
         if (child.exitCode === null) {
-            await new Promise<void>((resolveExit, reject) => {
-                const timer = setTimeout(() => reject(new Error('TypeScript language server did not exit.')), 5_000)
+            await new Promise<void>((resolveExit) => {
+                const timer = setTimeout(() => {
+                    child.kill()
+                    resolveExit()
+                }, 5_000)
                 child.once('exit', () => {
                     clearTimeout(timer)
                     resolveExit()
