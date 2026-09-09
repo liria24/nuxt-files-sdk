@@ -1,13 +1,16 @@
-import { FilesError, type ProviderSlug } from 'files-sdk'
+import { rm } from 'node:fs/promises'
+import { resolve } from 'node:path'
+
+import { FilesError } from 'files-sdk'
+import { fs } from 'files-sdk/fs'
 import { versioning } from 'files-sdk/versioning'
 import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
 import { configureFiles, useServerFiles } from '../../packages/nuxt-files-sdk/src/runtime'
-import { FilesRegistry } from '../../packages/nuxt-files-sdk/src/runtime/registry'
+import { FilesRegistry, type FilesProviderFactories } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
-const invalidProvider = 'not-a-provider' as ProviderSlug
-
+const factories: FilesProviderFactories = { fs }
 afterAll(async () => {
     for (const name of ['test-files', 'test-archive']) {
         await rm(resolve('.data', name), { recursive: true, force: true })
@@ -16,78 +19,82 @@ afterAll(async () => {
 
 describe('FilesRegistry', () => {
     test('[ERR-001] exposes stable invalid, unknown, and required-name error codes', () => {
-        expect(() => new FilesRegistry({ storage: {} })).toThrow('[nuxt-files-sdk:invalid-config]')
-        const registry = new FilesRegistry({
-            storage: {
-                archive: { adapter: 'fs' },
-                blob: { adapter: 'fs' },
+        expect(() => new FilesRegistry({ storage: {} }, { factories })).toThrow('[nuxt-files-sdk:invalid-config]')
+        const registry = new FilesRegistry(
+            {
+                storage: {
+                    archive: { adapter: 'fs', config: { root: '.data/test-archive' } },
+                    blob: { adapter: 'fs', config: { root: '.data/test-files' } },
+                },
             },
-        })
+            { factories },
+        )
         expect(() => registry.get('missing' as 'blob')).toThrow(
             '[nuxt-files-sdk:unknown-storage] Unknown storage "missing"',
         )
-        expect(() => registry.get()).toThrow('[nuxt-files-sdk:storage-name-required]')
+        expect(() => (registry.get as unknown as () => unknown)()).toThrow('[nuxt-files-sdk:storage-name-required]')
         for (const name of ['toString', '__proto__']) {
             expect(() => registry.get(name as 'blob')).toThrow('[nuxt-files-sdk:unknown-storage]')
         }
     })
 
-    test('[CFG-003][ERR-002] preserves native errors and never uses devStorage as a production fallback', async () => {
+    test('[CFG-003][ERR-002] preserves factory errors and never uses devStorage as a production fallback', () => {
+        const failure = new FilesError('Provider', 'Missing provider configuration')
         const registry = new FilesRegistry(
             defineFilesConfig({
-                storage: { blob: { adapter: invalidProvider } },
-                devStorage: { blob: { adapter: 'fs', root: '.data/test-files' } },
+                storage: { adapter: 's3', config: { bucket: 'missing' } },
+                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
+            {
+                factories: {
+                    s3: () => {
+                        throw failure
+                    },
+                    fs,
+                },
+            },
         )
-        await expect(registry.get('blob')).rejects.toBeInstanceOf(FilesError)
-        await expect(registry.get('blob')).rejects.toMatchObject({ code: 'Provider' })
+        expect(() => registry.get()).toThrow(failure)
     })
 
-    test('[CFG-004] preserves logical plugins and hooks with a development connection override', async () => {
+    test('[CFG-004] preserves plugins and hooks with a development provider override', async () => {
         const onAction = vi.fn<(event: unknown) => void>()
-        const files = await new FilesRegistry(
+        const files = new FilesRegistry(
             defineFilesConfig({
                 storage: {
-                    blob: {
-                        adapter: invalidProvider,
-                        plugins: [versioning()],
-                        hooks: { onAction },
-                    },
+                    adapter: 's3',
+                    config: { bucket: 'unused' },
+                    plugins: [versioning()],
+                    hooks: { onAction },
                 },
-                devStorage: { blob: { adapter: 'fs', root: '.data/test-files' } },
+                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
-            { development: true },
-        ).get('blob')
+            { development: true, factories },
+        ).get()
 
         expect(files.versions).toBeTypeOf('function')
         await files.upload('plugin-contract.txt', 'hello')
         expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'upload' }))
     })
 
-    test('[SEC-002] reports only a secret-free development snapshot', async () => {
+    test('[SEC-002] reports only a secret-free development snapshot', () => {
         const secret = 'NUXT_FILES_TEST_SECRET_123456'
         const registry = new FilesRegistry(
             defineFilesConfig({
                 storage: {
-                    blob: {
-                        adapter: 's3',
-                        bucket: 'secret-bucket',
-                        secretAccessKey: secret,
-                        plugins: [versioning()],
-                    },
+                    adapter: 's3',
+                    config: { bucket: 'secret-bucket', secretAccessKey: secret },
+                    plugins: [versioning()],
                 },
-                devStorage: { blob: { adapter: 'fs', root: '.data/test-files' } },
+                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
-            { development: true },
+            { development: true, factories },
         )
-        const first = registry.get('blob')
-        expect(first).toBe(registry.get('blob'))
-        await first
+        expect(registry.get()).toBe(registry.get())
 
         expect(registry.inspect()).toEqual({
             storages: [
                 {
-                    name: 'blob',
                     adapter: 'fs',
                     plugins: ['versioning'],
                     source: 'devStorage',
@@ -99,102 +106,111 @@ describe('FilesRegistry', () => {
         expect(JSON.stringify(registry.inspect())).not.toMatch(/secret-bucket|NUXT_FILES_TEST_SECRET_123456/)
     })
 
-    test('[CFG-002] uses explicit defaults and rejects ambiguous unnamed access', async () => {
-        const explicit = new FilesRegistry({
-            default: 'archive',
-            storage: {
-                archive: { adapter: 'fs', root: '.data/test-files' },
-                blob: { adapter: 'fs', root: '.data/test-files' },
-            },
-        })
-        await expect(explicit.get()).resolves.toMatchObject({ adapter: { name: 'fs' } })
+    test('[CFG-002] unnamed access is exclusive to a single storage', () => {
+        const single = new FilesRegistry(
+            { storage: { adapter: 'fs', config: { root: '.data/test-files' } } },
+            { factories },
+        )
+        expect(single.get()).toMatchObject({ adapter: { name: 'fs' } })
 
-        const ambiguous = new FilesRegistry({
-            storage: {
-                archive: { adapter: 'fs', root: '.data/test-files' },
-                blob: { adapter: 'fs', root: '.data/test-files' },
+        const named = new FilesRegistry(
+            {
+                storage: {
+                    archive: { adapter: 'fs', config: { root: '.data/test-archive' } },
+                    blob: { adapter: 'fs', config: { root: '.data/test-files' } },
+                },
             },
-        })
-        expect(() => ambiguous.get()).toThrow('storage-name-required')
+            { factories },
+        )
+        expect(() => (named.get as unknown as () => unknown)()).toThrow('storage-name-required')
     })
 
-    test('[API-001] public useServerFiles returns the memoized promise', async () => {
-        configureFiles({ storage: { blob: { adapter: 'fs', root: '.data/test-files' } } })
+    test('[API-001][RUNTIME-001] public access is synchronous and memoized', () => {
+        configureFiles({ storage: { adapter: 'fs', config: { root: '.data/test-files' } } }, { factories })
         const first = useServerFiles()
-        expect(first).toBeInstanceOf(Promise)
-        await expect(first).resolves.toBe(await useServerFiles())
+        expect(first).not.toBeInstanceOf(Promise)
+        expect(first).toBe(useServerFiles())
     })
 
-    test('[RUNTIME-001] initializes one instance for 100 concurrent same-storage calls', async () => {
-        const extend = vi.fn<() => Record<never, never>>(() => ({}))
-        const registry = new FilesRegistry({
-            storage: { blob: { adapter: 'fs', root: '.data/test-files', plugins: [{ name: 'counter', extend }] } },
-        })
-        const instances = await Promise.all(Array.from({ length: 100 }, () => registry.get('blob')))
-        expect(new Set(instances)).toHaveLength(1)
-        expect(extend).toHaveBeenCalledTimes(1)
-    })
-
-    test('[RUNTIME-002] isolates concurrent storage initialization and failures', async () => {
-        const registry = new FilesRegistry({
-            storage: {
-                archive: { adapter: 'fs', root: '.data/test-archive' },
-                backup: { adapter: invalidProvider },
-                blob: { adapter: 'fs', root: '.data/test-files' },
+    test('[RUNTIME-002] named storages initialize independently', () => {
+        const registry = new FilesRegistry(
+            {
+                storage: {
+                    archive: { adapter: 'fs', config: { root: '.data/test-archive' } },
+                    blob: { adapter: 'fs', config: { root: '.data/test-files' } },
+                },
             },
-        })
-        const [archive, backup, blob] = await Promise.allSettled([
-            registry.get('archive'),
-            registry.get('backup'),
-            registry.get('blob'),
-        ])
-        expect(archive.status).toBe('fulfilled')
-        expect(backup.status).toBe('rejected')
-        expect(blob.status).toBe('fulfilled')
-        await expect(registry.get('archive')).resolves.not.toBe(await registry.get('blob'))
+            { factories },
+        )
+        expect(registry.get('archive')).not.toBe(registry.get('blob'))
+        expect(registry.get('archive')).toBe(registry.get('archive'))
     })
 
-    test('[RUNTIME-003] evicts a rejected initialization so a later call can retry', async () => {
-        const config = { storage: { blob: { adapter: invalidProvider, root: '.data/test-files' } } }
-        const registry = new FilesRegistry(config)
-        await expect(registry.get('blob')).rejects.toBeInstanceOf(FilesError)
-        config.storage.blob.adapter = 'fs'
-        await expect(registry.get('blob')).resolves.toMatchObject({ adapter: { name: 'fs' } })
+    test('[RUNTIME-003] a construction failure is retried', () => {
+        let attempts = 0
+        const registry = new FilesRegistry(
+            { storage: { adapter: 'fs', config: { root: '.data/test-files' } } },
+            {
+                factories: {
+                    fs: (config) => {
+                        attempts += 1
+                        if (attempts === 1) throw new FilesError('Provider', 'first attempt failed')
+                        return fs({ root: (config as { root: string }).root })
+                    },
+                },
+            },
+        )
+        expect(() => registry.get()).toThrow('first attempt failed')
+        expect(registry.get()).toMatchObject({ adapter: { name: 'fs' } })
+        expect(attempts).toBe(2)
+    })
+
+    test('[RUNTIME-004] rejects async and circular config resolution', () => {
+        const asyncRegistry = new FilesRegistry(
+            { storage: { adapter: 'fs', config: (() => Promise.resolve({ root: '.data/test-files' })) as never } },
+            { factories },
+        )
+        expect(() => asyncRegistry.get()).toThrow('[nuxt-files-sdk:async-config]')
+
+        let circular!: FilesRegistry
+        circular = new FilesRegistry(
+            { storage: { adapter: 'fs', config: () => (circular.get(), { root: '.data/test-files' }) } },
+            { factories },
+        )
+        expect(() => circular.get()).toThrow('[nuxt-files-sdk:circular-initialization]')
     })
 
     test('[HOOK-001] runs user then bridge hooks without changing operation results', async () => {
         const order: string[] = []
         const bridgeCalled = Promise.withResolvers<void>()
-        const files = await new FilesRegistry(
+        const files = new FilesRegistry(
             {
                 storage: {
-                    blob: {
-                        adapter: 'fs',
-                        root: '.data/test-files',
-                        hooks: {
-                            onAction: async () => {
-                                order.push('user')
-                                throw new Error('ignored user hook failure')
-                            },
+                    adapter: 'fs',
+                    config: { root: '.data/test-files' },
+                    hooks: {
+                        onAction: async () => {
+                            order.push('user')
+                            throw new Error('ignored user hook failure')
                         },
                     },
                 },
             },
             {
+                factories,
                 hooks: {
-                    onAction: async () => {
+                    onAction: async (_event, storage) => {
+                        expect(storage).toBeUndefined()
                         order.push('bridge')
                         bridgeCalled.resolve()
                         throw new Error('ignored bridge hook failure')
                     },
                 },
             },
-        ).get('blob')
+        ).get()
 
         await expect(files.upload('hook-contract.txt', 'hello')).resolves.toMatchObject({ key: 'hook-contract.txt' })
         await bridgeCalled.promise
         expect(order).toEqual(['user', 'bridge'])
     })
 })
-import { rm } from 'node:fs/promises'
-import { resolve } from 'node:path'

@@ -19,6 +19,8 @@ export const nitroSuite = (
 
             expect(plugin).toContain("from 'nuxt-files-sdk/runtime'")
             expect(plugin).not.toContain("from 'nuxt-files-sdk'")
+            expect(plugin).toContain('from "files-sdk/fs"')
+            expect(plugin).not.toContain('files-sdk/loader')
             expect(types).toContain(`declare module "${hookModule}"`)
             expect(types).toContain("declare module 'nuxt-files-sdk/runtime'")
             expect(plugin).not.toMatch(/import config from "[A-Z]:\\\\/u)

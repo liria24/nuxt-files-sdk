@@ -12,13 +12,13 @@
 
 - Keep Nuxt and standalone Nitro wiring in `packages/nuxt-files-sdk/src/integration/nitro.ts`. Use native framework generation hooks for runtime plugins and per-project declarations; normalize generated import paths for Windows.
 - Preserve the public root/config/nitro/plugins/runtime entrypoints. Reuse native Files SDK methods, errors, provider names, plugin types, and factories instead of maintaining parallel implementations or a provider registry.
-- `useServerFiles` returns a storage-specific, memoized initialization Promise. Concurrent requests share one instance; failed initialization is evicted for retry, without poisoning other storages.
-- Unknown storage names and ambiguous defaults fail explicitly. Neither initialization nor native operation failures silently switch provider or use devStorage. Development overrides retain the base plugins and hooks.
-- Native environment keys and aliases take priority over NUXT aliases. Inject only the selected provider's declared keys, serialize temporary aliases within this module, and remove them on success and failure. This lock does not coordinate unrelated `process.env` users.
+- `useServerFiles` synchronously constructs and memoizes the selected native client. Failed construction is not cached; native file operations remain asynchronous.
+- Single-storage configuration is direct and supports unnamed access. Multiple storages are named and always require a name. Neither construction nor native operation failures switch provider or use devStorage. Development overrides retain the base plugins, hooks, and common options.
+- Native environment keys and aliases take priority over NUXT aliases. Inject only the selected provider's declared keys during synchronous construction and remove them on success and failure.
 - Keep native error identity and user-before-bridge hook order. A hook rejection must not replace a native operation result.
 - Generated declarations augment the public runtime entrypoint and the installed Nitro hook namespace. Standalone fixtures use their native prepare/typecheck/build commands without installing Nuxt; retain the fixture's explicit type dependencies.
 - Development uses one shared DevFrame UI and a metadata-only snapshot from the Nitro worker. Keep production, module opt-out, and disabled Nuxt DevTools paths inactive. Never expose storage config, credentials, or file contents in snapshots.
-- Inline generated plugins/config in development, while keeping the native Files SDK loader external there to preserve lazy provider loading. Production uses Nitro's native inline configuration for tree-shaking. Fixture minification is explicit; do not override a consuming app's Nitro minify setting.
+- Generate public static imports only for providers used by the active runtime mode. Keep credentials and provider construction lazy until `useServerFiles`; never restore the all-provider native loader as a runtime fallback. Fixture minification is explicit; do not override a consuming app's Nitro minify setting.
 
 ## Verification boundaries
 
@@ -27,7 +27,7 @@
 - The supported matrix and runner/toolchain choices are defined by CI and manifests. Locked integration fixtures, minimum/latest-supported packed consumers, and platform coverage are distinct evidence; nightly resolution does not prove support for a future stable release.
 - Release verifies successful push CI for the tagged commit, then tests the exact archive produced by `uppt/pack` through `NUXT_FILES_TARBALL`. Do not rebuild on that path. Only a successful artifact verification permits publishing the same uploaded archive; its SHA-256 must remain unchanged.
 - Package checks cover exports, declarations, dependency boundaries, publint/ATTW, permitted contents, fresh consumer compilation/build/HTTP routes, and secret absence. Root typecheck also checks the unit type assertions; generated declarations have positive and negative compiler checks.
-- Bundle checks exclude unused Vue, production DevFrame, standalone Nuxt Kit, unrelated native plugins, and external cloud SDK packages in fs-only apps. The native loader still retains unused provider code and optional import metadata. Do not describe this as a one-provider-only bundle.
+- Bundle checks exclude unused Vue, production DevFrame, standalone Nuxt Kit, unrelated native plugins, unused provider entrypoints, and external cloud SDK packages in fs-only apps. Provider entrypoints can retain their own optional internal engines, such as R2's AWS SDK path.
 - Sizes are complete fixture deployment outputs, not this package's isolated contribution. Keep budgets in executable bundle tests; do not loosen them to conceal regressions. Optional SDK warnings are not by themselves runtime failures, but real route and output checks must pass.
 - CI does not guarantee real cloud credentials/network access, every deploy preset, application authorization, unknown upstream changes, or complete interactive GUI coverage. File Explorer, gateway helpers, UI components, MCP, advanced telemetry, and a documentation website are outside the implemented scope.
 
@@ -39,6 +39,6 @@ That work replaced three shell harnesses with Vitest projects, shared the Nuxt/N
 
 The subsequent 2026-09-06 investigation found two separate failures: CI's unused path-filter job tried to fetch an unavailable pre-rewrite commit, and the local public-example check expected code snippets removed from the README. The fixes remove that job and compile canonical fixture examples instead. Bun setup follows the manifest, the SDK consumer matrix follows the declared supported range, and native minify is enabled only in fixtures. These changes still require CI on the eventual pushed commit; local success does not establish release environment/OIDC readiness.
 
-## Tracked TODO
+## Provider generation
 
-[Issue #5: prepare-time provider imports](https://github.com/liria24/nuxt-files-sdk/issues/5) tracks unused provider-code reduction. Generate public provider imports during `nuxt prepare` so development and production can share them; preserve runtime credentials, lazy initialization, and existing config semantics. This optimization is not implemented. The issue records diagnostic size measurements and acceptance criteria; it does not authorize an SDK-internal AST rewrite.
+[Issue #5: prepare-time provider imports](https://github.com/liria24/nuxt-files-sdk/issues/5) motivated the generated provider map. Nuxt/Nitro preparation evaluates only configuration structure, emits public imports for active providers, and leaves synchronous config resolvers untouched until runtime. Measure provider-owned optional engine imports separately from integration-wide provider inclusion.

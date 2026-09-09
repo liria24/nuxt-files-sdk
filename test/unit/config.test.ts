@@ -1,55 +1,59 @@
+import { fs } from 'files-sdk/fs'
 import { versioning } from 'files-sdk/versioning'
 import { describe, expect, expectTypeOf, test } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
 import {
-    type DefaultStorage,
-    type DefaultStorageName,
     FilesRegistry,
+    type SingleStorage,
+    type StorageRegistry,
 } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 describe('configuration types', () => {
-    test('[TYPE-001][API-002][API-003] preserves provider, named/default storage, and plugin types', () => {
-        const config = defineFilesConfig({
-            default: 'archive',
+    test('[TYPE-001][TYPE-013][API-002][API-003] preserves single, named, provider, and plugin types', () => {
+        const single = defineFilesConfig({
+            storage: { adapter: 'fs', config: { root: '.data/files' }, plugins: [versioning()] },
+        })
+        const named = defineFilesConfig({
             storage: {
-                archive: { adapter: 'fs', plugins: [versioning()] },
-                blob: { adapter: 'fs' },
+                archive: { adapter: 'fs', config: { root: '.data/archive' }, plugins: [versioning()] },
+                blob: { adapter: 'fs', config: { root: '.data/files' } },
             },
         })
 
-        expect(config.storage.blob.adapter).toBe('fs')
-        expectTypeOf<DefaultStorageName<typeof config>>().toEqualTypeOf<'archive'>()
-        expectTypeOf<DefaultStorage<typeof config>>().toHaveProperty('versions')
-        expectTypeOf(new FilesRegistry(config).get()).toEqualTypeOf<Promise<DefaultStorage<typeof config>>>()
+        expect(single.storage.config.root).toBe('.data/files')
+        expectTypeOf<SingleStorage<typeof single>>().toHaveProperty('versions')
+        expectTypeOf<StorageRegistry<typeof named>['archive']>().toHaveProperty('versions')
+        expectTypeOf(new FilesRegistry(single, { factories: { fs } }).get()).toEqualTypeOf<
+            SingleStorage<typeof single>
+        >()
+        const namedRegistry = new FilesRegistry(named, { factories: { fs } })
+        expectTypeOf(namedRegistry.get('blob')).toEqualTypeOf<StorageRegistry<typeof named>['blob']>()
+        const assertNamedRequiresName = (): void => {
+            // @ts-expect-error named registries require a storage name
+            namedRegistry.get()
+        }
+        void assertNamedRequiresName
     })
 
-    test('[CFG-005] infers only unambiguous implicit defaults', () => {
-        const single = defineFilesConfig({ storage: { blob: { adapter: 'fs' } } })
-        const conventional = defineFilesConfig({
-            storage: { default: { adapter: 'fs' }, blob: { adapter: 'fs' } },
-        })
-        const ambiguous = defineFilesConfig({
-            storage: { archive: { adapter: 'fs' }, blob: { adapter: 'fs' } },
+    test('[CFG-005] accepts provider config objects and synchronous resolvers', () => {
+        const direct = defineFilesConfig({ storage: { adapter: 'fs', config: { root: '.data/files' } } })
+        const resolved = defineFilesConfig({
+            storage: { adapter: 'fs', config: () => ({ root: '.data/files', urlBaseUrl: 'https://files.test' }) },
+            devStorage: { adapter: 'memory' },
         })
 
-        expectTypeOf<DefaultStorageName<typeof single>>().toEqualTypeOf<'blob'>()
-        expectTypeOf<DefaultStorageName<typeof conventional>>().toEqualTypeOf<'default'>()
-        expectTypeOf<DefaultStorageName<typeof ambiguous>>().toEqualTypeOf<never>()
+        expect(direct.storage.adapter).toBe('fs')
+        expect(typeof resolved.storage.config).toBe('function')
     })
 
-    test('[TYPE-007][TYPE-008] constrains default and devStorage to declared storage names', () => {
+    test('[TYPE-008] rejects unmatched development names', () => {
         expect.assertions(0)
         defineFilesConfig({
-            // @ts-expect-error default must name a declared storage
-            default: 'missing',
-            storage: { blob: { adapter: 'fs' } },
-        })
-        defineFilesConfig({
-            storage: { blob: { adapter: 'fs' } },
+            storage: { blob: { adapter: 'fs', config: { root: '.data/files' } } },
             devStorage: {
-                // @ts-expect-error devStorage keys must name declared storages
-                missing: { adapter: 'fs' },
+                // @ts-expect-error devStorage keys must name a declared storage
+                missing: { adapter: 'fs', config: { root: '.data/missing' } },
             },
         })
     })

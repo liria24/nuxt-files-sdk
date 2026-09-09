@@ -1,3 +1,3 @@
 import { defineFilesConfig } from 'nuxt-files-sdk/config'
 
-export default defineFilesConfig({ storage: { blob: { adapter: 'fs', root: '.data/files' } } })
+export default defineFilesConfig({ storage: { adapter: 'fs', config: { root: '.data/files' } } })

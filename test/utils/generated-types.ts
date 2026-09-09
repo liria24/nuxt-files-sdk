@@ -16,8 +16,14 @@ export const cleanTypeContracts = async (directory: string): Promise<void> => {
 
 export const checkGeneratedTypes = async (directory: string): Promise<void> => {
     const generated = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/storage-registry.d.ts'), 'utf8')
+    const imports = await readFile(resolve(directory, '.nuxt/types/nitro-imports.d.ts'), 'utf8')
+    const plugin = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/plugin.mjs'), 'utf8')
     expect(generated).toContain("declare module 'nuxt-files-sdk/runtime'")
-    expect(generated).toContain('DefaultStorage<typeof config>')
+    expect(generated).toContain('StorageRegistry<typeof config>')
+    expect(imports).toContain("typeof import('nuxt-files-sdk/runtime').useServerFiles")
+    expect(imports).not.toMatch(/node_modules\/nuxt-files-sdk\/runtime/u)
+    expect(plugin).toContain('from "files-sdk/fs"')
+    expect(plugin).not.toContain('files-sdk/loader')
 }
 
 export const checkInvalidType = async (
@@ -66,25 +72,22 @@ export const checkPublicExamples = async (directory: string): Promise<void> => {
 }
 
 const hoverSource = `import module, { type ModuleOptions } from 'nuxt-files-sdk'
-import { defineFilesConfig, type FilesConfig, type StorageConfig } from 'nuxt-files-sdk/config'
+import { defineFilesConfig, type SingleFilesConfig, type StorageConfig } from 'nuxt-files-sdk/config'
 import { FilesRegistry, useServerFiles as importedUseServerFiles } from 'nuxt-files-sdk/runtime'
 import { useServerFiles as aliasedUseServerFiles } from '#imports'
 
 void /*module*/module
 const config = /*define*/defineFilesConfig({
-  default: 'archive',
-  storage: {
-    archive: { adapter: 'fs' },
-  },
-  devStorage: { archive: { adapter: 'fs' } },
+  storage: { adapter: 'fs', config: { root: '.data/files' } },
+  devStorage: { adapter: 'memory' },
 })
-declare const documentedConfig: FilesConfig
-void documentedConfig./*default*/default
+declare const documentedConfig: SingleFilesConfig
 void documentedConfig./*storage*/storage
 void documentedConfig./*devStorage*/devStorage
 declare const documentedStorage: StorageConfig
 void documentedStorage./*adapter*/adapter
-void new /*registry*/FilesRegistry(config)./*get*/get()
+void documentedStorage./*providerConfig*/config
+void new /*registry*/FilesRegistry(config, { factories: {} })./*get*/get()
 void /*imported*/importedUseServerFiles()
 void /*aliased*/aliasedUseServerFiles()
 void /*global*/useServerFiles()
@@ -192,16 +195,16 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
         })
         for (const [marker, expected] of Object.entries({
             module: 'Install Files SDK storage configuration',
-            define: 'Define a Files SDK configuration',
-            default: 'Storage used by',
-            storage: 'Named storages',
+            define: 'Define one unnamed Files SDK storage',
+            storage: 'Files SDK storage configuration',
             adapter: 'Files SDK provider slug',
-            devStorage: 'Development-only connection overrides',
-            registry: 'Create a registry and validate storage references',
-            get: 'Return the default storage',
-            imported: "Return the project's default Files client",
-            aliased: "Return the project's default Files client",
-            global: "Return the project's default Files client",
+            providerConfig: 'Native provider factory options',
+            devStorage: 'Development-only provider settings',
+            registry: 'Create a registry without constructing a provider',
+            get: 'Return the client from an unnamed single-storage configuration',
+            imported: "Return the project's unnamed Files client",
+            aliased: "Return the project's unnamed Files client",
+            global: "Return the project's Files client",
             moduleConfig: 'Path to the Files configuration module',
             devtools: 'Enable Files SDK development diagnostics',
         })) {

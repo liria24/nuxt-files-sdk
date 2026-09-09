@@ -2,7 +2,7 @@ import { inspectFiles } from '../runtime'
 
 export interface FilesDevtoolsSnapshot {
     storages: Array<{
-        name: string
+        name?: string
         adapter: string
         plugins: string[]
         source: 'storage' | 'devStorage'

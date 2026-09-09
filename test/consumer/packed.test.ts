@@ -64,6 +64,8 @@ describe('Packed consumer', () => {
             'package/dist/nitro.d.ts',
             'package/dist/plugins.js',
             'package/dist/plugins.d.ts',
+            'package/dist/plugins/versioning.js',
+            'package/dist/plugins/versioning.d.ts',
             'package/dist/runtime.js',
             'package/dist/runtime.d.ts',
         ]) {
@@ -87,6 +89,7 @@ describe('Packed consumer', () => {
             './config',
             './nitro',
             './plugins',
+            './plugins/versioning',
             './runtime',
             './package.json',
         ])

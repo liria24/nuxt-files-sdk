@@ -84,7 +84,7 @@
                 ...snapshot.storages.map((storage) => {
                     const row = document.createElement('tr')
                     for (const value of [
-                        storage.name,
+                        storage.name ?? 'Single storage',
                         storage.adapter,
                         storage.plugins.join(', ') || '—',
                         storage.source,

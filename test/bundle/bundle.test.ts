@@ -42,8 +42,13 @@ describe('Bundle contract', () => {
     })
 
     test('[BUNDLE-003] fs-only output excludes unrelated native SDKs', () => {
-        // The native loader retains optional provider imports/metadata, not their SDK packages.
         expect(paths.filter((path) => /node_modules\/(?:@aws-sdk|@azure|@google-cloud)\//u.test(path))).toEqual([])
+        expect(generatedOutput).toContain('from "files-sdk/fs"')
+        for (const provider of ['appwrite', 'azure', 'gcs', 'google-drive', 'r2', 's3']) {
+            expect(generatedOutput).not.toContain(`files-sdk/${provider}`)
+        }
+        expect(nuxtOutput).not.toContain('files-sdk/loader')
+        expect(nitroOutput).not.toContain('files-sdk/loader')
     })
 
     test('[BUNDLE-004] versioning-only import excludes unrelated built-in plugins', () => {
