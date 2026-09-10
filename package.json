@@ -30,8 +30,8 @@
     "devDependencies": {
         "@nuxt/schema": "^4.5.2",
         "@nuxt/test-utils": "^4.3.2",
-        "files-sdk": "^2.4.0",
-        "knip": "^6.34.0",
+        "files-sdk": "^2.4.1",
+        "knip": "^6.35.1",
         "oxfmt": "^0.67.0",
         "oxlint": "^1.82.0",
         "oxlint-tsgolint": "^7.0.2001",
