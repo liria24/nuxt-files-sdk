@@ -146,7 +146,7 @@ export const setupNitroFilesIntegration = async (
     // Nitro's single-file dev build would eagerly import every native provider SDK.
     if (!nitro.options.dev) externals.inline.push('files-sdk')
     const directory = resolve(nitro.options.buildDir, 'nuxt-files-sdk')
-    const pluginPath = resolve(directory, 'plugin.mjs')
+    const pluginPath = resolve(directory, options.development ? 'plugin.dev.mjs' : 'plugin.mjs')
     const typesPath = resolve(directory, 'storage-registry.d.ts')
     // Development also externalizes local .mjs files unless explicitly inlined.
     externals.inline.push(pluginPath.replaceAll('\\', '/'), configPath)
