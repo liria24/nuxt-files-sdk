@@ -247,7 +247,7 @@ export const contracts = [
     },
     {
         id: 'DEV-001',
-        guarantee: 'Production, module opt-out, and disabled Nuxt DevTools disable the DevFrame',
+        guarantee: 'Nuxt DevTools defaults enable DevFrame while explicit opt-outs disable it',
         source: 'test/nuxt/devtools.test.ts',
         job: 'test-nuxt4',
     },
@@ -265,7 +265,13 @@ export const contracts = [
     },
     {
         id: 'DEV-004',
-        guarantee: 'The development host serves the shared UI and the actual configured registry snapshot',
+        guarantee: 'A real development host registers the Files tab and serves its UI and registry snapshot',
+        source: 'test/nuxt/nuxt4-devframe.test.ts',
+        job: 'test-nuxt4',
+    },
+    {
+        id: 'DEV-005',
+        guarantee: 'The development file browser uses the native gateway for list, upload, download, and delete',
         source: 'test/nuxt/nuxt4-devframe.test.ts',
         job: 'test-nuxt4',
     },
@@ -322,6 +328,12 @@ export const contracts = [
         guarantee: 'The packed artifact contains no dummy secret',
         source: 'test/consumer/packed.test.ts',
         job: 'test-consumer',
+    },
+    {
+        id: 'SEC-004',
+        guarantee: 'Development file writes stay disabled until explicitly enabled by module configuration',
+        source: 'test/nuxt/devtools.test.ts',
+        job: 'test-nuxt4',
     },
     {
         id: 'PKG-001',

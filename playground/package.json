@@ -1,0 +1,16 @@
+{
+    "name": "nuxt-files-sdk-playground",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "nuxt dev",
+        "typecheck": "nuxt prepare && tsc --noEmit"
+    },
+    "dependencies": {
+        "nuxt": "^4.0.0",
+        "nuxt-files-sdk": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^7.0.2"
+    }
+}

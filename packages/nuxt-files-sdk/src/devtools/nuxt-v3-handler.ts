@@ -1,9 +1,24 @@
 import { readFile } from 'node:fs/promises'
 
-const html = readFile(new URL('./client/index.html', import.meta.url), 'utf8')
+const html = {
+    contentType: 'text/html; charset=utf-8',
+    content: readFile(new URL('./client/index.html', import.meta.url), 'utf8'),
+}
+const assets = new Map([
+    ['/', html],
+    ['/index.html', html],
+    [
+        '/app.js',
+        {
+            contentType: 'text/javascript; charset=utf-8',
+            content: readFile(new URL('./client/app.js', import.meta.url), 'utf8'),
+        },
+    ],
+])
 
 export default async (event: { path: string; node: { res: { setHeader(name: string, value: string): void } } }) => {
-    if (event.path !== '/' && event.path !== '/index.html') return undefined
-    event.node.res.setHeader('content-type', 'text/html; charset=utf-8')
-    return html
+    const asset = assets.get(event.path)
+    if (!asset) return undefined
+    event.node.res.setHeader('content-type', asset.contentType)
+    return asset.content
 }

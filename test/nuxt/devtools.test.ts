@@ -1,7 +1,10 @@
 import type { Nuxt } from '@nuxt/schema'
 import { describe, expect, test, vi } from 'vitest'
 
-import { shouldEnableFilesDevtools } from '../../packages/nuxt-files-sdk/src/devtools/enabled'
+import {
+    filesDevtoolsWriteEnabled,
+    shouldEnableFilesDevtools,
+} from '../../packages/nuxt-files-sdk/src/devtools/enabled'
 import { setupNuxtV3Devtools } from '../../packages/nuxt-files-sdk/src/devtools/nuxt-v3'
 import { setupNuxtV4Devtools } from '../../packages/nuxt-files-sdk/src/devtools/nuxt-v4'
 
@@ -18,10 +21,20 @@ const fakeNuxt = () => {
 }
 
 describe('Nuxt DevTools integration', () => {
-    test('[DEV-001] disables DevFrame for production, module opt-out, or disabled Nuxt DevTools', () => {
+    test('[DEV-001][SEC-004] follows Nuxt defaults while file writes require explicit opt-in', () => {
+        expect(shouldEnableFilesDevtools(true, true, undefined)).toBe(true)
+        expect(shouldEnableFilesDevtools(true, {}, undefined)).toBe(true)
+        expect(shouldEnableFilesDevtools(true, true, {})).toBe(true)
+        expect(shouldEnableFilesDevtools(true, true, true)).toBe(true)
+        expect(shouldEnableFilesDevtools(true, true, { enabled: true })).toBe(true)
         expect(shouldEnableFilesDevtools(false, true, { enabled: true })).toBe(false)
         expect(shouldEnableFilesDevtools(true, false, { enabled: true })).toBe(false)
         expect(shouldEnableFilesDevtools(true, true, false)).toBe(false)
+        expect(shouldEnableFilesDevtools(true, true, { enabled: false })).toBe(false)
+        expect(shouldEnableFilesDevtools(true, { enabled: false }, true)).toBe(false)
+        expect(filesDevtoolsWriteEnabled(true)).toBe(false)
+        expect(filesDevtoolsWriteEnabled({})).toBe(false)
+        expect(filesDevtoolsWriteEnabled({ write: true })).toBe(true)
     })
 
     test('[DEV-002] v3 registers one legacy iframe tab for the shared UI', () => {

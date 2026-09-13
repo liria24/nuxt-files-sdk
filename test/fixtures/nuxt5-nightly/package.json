@@ -2,6 +2,7 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "dev": "nuxt dev",
         "prepare": "nuxt prepare",
         "typecheck": "nuxt typecheck",
         "build": "nuxt build"
@@ -13,5 +14,8 @@
     "devDependencies": {
         "typescript": "^6.0.3",
         "vue-tsc": "^3.2.0"
+    },
+    "overrides": {
+        "@nuxt/devtools": "npm:@nuxt/devtools-nightly@latest"
     }
 }

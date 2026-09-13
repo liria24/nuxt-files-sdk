@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { addImports, addServerImports, defineNuxtModule, getNuxtModuleVersion } from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
 
-import { shouldEnableFilesDevtools } from './devtools/enabled'
+import { filesDevtoolsWriteEnabled, shouldEnableFilesDevtools, type FilesDevtoolsOptions } from './devtools/enabled'
 import { setupNitroFilesIntegration, type NitroIntegration } from './integration/nitro'
 
 declare module '@nuxt/schema' {
@@ -16,8 +16,8 @@ declare module '@nuxt/schema' {
 export interface ModuleOptions {
     /** Path to the Files configuration module, relative to the Nuxt root directory. */
     config: string
-    /** Enable Files SDK development diagnostics when Nuxt DevTools is available. */
-    devtools: boolean
+    /** Enable Files SDK development tools, optionally allowing file writes. */
+    devtools: boolean | FilesDevtoolsOptions
 }
 
 /** Install Files SDK storage configuration, server utilities, Vue composables, and development diagnostics in Nuxt. */
@@ -51,10 +51,11 @@ export default defineNuxtModule<ModuleOptions>({
         if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
             const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
             const { setupFilesDevtools } = await import('./devtools')
-            setupFilesDevtools(nuxt, version || '3')
+            setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools))
         }
     },
 })
 
+export type { FilesDevtoolsOptions } from './devtools/enabled'
 export * from 'files-sdk'
 export * from './runtime'

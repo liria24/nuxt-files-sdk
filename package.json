@@ -2,13 +2,16 @@
     "name": "nuxt-files-sdk-workspace",
     "private": true,
     "workspaces": [
-        "packages/*"
+        "packages/*",
+        "playground"
     ],
     "type": "module",
     "scripts": {
         "build": "bun --filter nuxt-files-sdk build",
         "check": "bun run format:check && bun run lint && bun run workspace:check && bun run unused && bun run typecheck && bun run test && bun run build",
         "deps:update": "taze",
+        "dev": "bun run build && bun --filter nuxt-files-sdk-playground dev",
+        "dev:devtools-v4": "bun run build && bun --cwd=test/fixtures/nuxt5-nightly install --ignore-scripts && bun --cwd=test/fixtures/nuxt5-nightly run dev",
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
         "lint": "oxlint .",
@@ -16,7 +19,7 @@
         "preview:package": "pkg-pr-new publish ./packages/nuxt-files-sdk --bun --compact --previewVersion",
         "test": "vitest run",
         "test:unit": "vitest run --project unit",
-        "typecheck": "bun --filter nuxt-files-sdk typecheck && tsc --noEmit -p test/tsconfig.json",
+        "typecheck": "bun --filter nuxt-files-sdk typecheck && bun --filter nuxt-files-sdk-playground typecheck && tsc --noEmit -p test/tsconfig.json",
         "unused": "knip && knip --production",
         "workspace:check": "sherif",
         "test:nuxt4": "vitest run --project nuxt4",

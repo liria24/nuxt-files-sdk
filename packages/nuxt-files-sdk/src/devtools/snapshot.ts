@@ -17,5 +17,6 @@ export interface FilesDevtoolsSnapshot {
 
 export const FILES_DEVTOOLS_PATH = '/__nuxt-files-sdk/'
 export const FILES_SNAPSHOT_PATH = `${FILES_DEVTOOLS_PATH}snapshot`
+export const FILES_GATEWAY_PATH = `${FILES_DEVTOOLS_PATH}files`
 
 export default () => inspectFiles()

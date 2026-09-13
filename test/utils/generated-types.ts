@@ -93,7 +93,7 @@ void /*aliased*/aliasedUseServerFiles()
 void /*global*/useServerFiles()
 const options: ModuleOptions = {
   /*moduleConfig*/config: 'files.config.ts',
-  /*devtools*/devtools: true,
+  /*devtools*/devtools: { write: true },
 }
 void options
 `
@@ -206,7 +206,7 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             aliased: "Return the project's unnamed Files client",
             global: "Return the project's Files client",
             moduleConfig: 'Path to the Files configuration module',
-            devtools: 'Enable Files SDK development diagnostics',
+            devtools: 'Enable Files SDK development tools',
         })) {
             const offset = hoverSource.indexOf(`/*${marker}*/`) + marker.length + 4
             const lines = hoverSource.slice(0, offset).split('\n')

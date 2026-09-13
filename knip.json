@@ -14,6 +14,10 @@
                 "package.json": ["optionalPeerDependencies"]
             },
             "project": ["src/**/*.ts!", "test/benchmark.ts", "*.config.ts"]
+        },
+        "playground": {
+            "entry": ["nuxt.config.ts", "files.config.ts", "server/**/*.ts"],
+            "project": ["**/*.ts"]
         }
     }
 }
