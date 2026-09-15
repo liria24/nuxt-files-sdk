@@ -28,6 +28,7 @@ test('documentation pages and internal links stay complete', async () => {
 
     const content = pages.join('\n')
     for (const example of [
+        "from 'files-sdk/versioning'",
         'useServerFiles()',
         "useServerFiles('archive')",
         'devStorage',
@@ -38,6 +39,7 @@ test('documentation pages and internal links stay complete', async () => {
     ]) {
         expect(content, example).toContain(example)
     }
+    expect(content).not.toContain('nuxt-files-sdk/plugins')
 })
 
 test('documentation dependencies and local storage stay isolated from the public package', async () => {

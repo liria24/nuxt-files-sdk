@@ -62,10 +62,6 @@ describe('Packed consumer', () => {
             'package/dist/config.d.ts',
             'package/dist/nitro.js',
             'package/dist/nitro.d.ts',
-            'package/dist/plugins.js',
-            'package/dist/plugins.d.ts',
-            'package/dist/plugins/versioning.js',
-            'package/dist/plugins/versioning.d.ts',
             'package/dist/runtime.js',
             'package/dist/runtime.d.ts',
         ]) {
@@ -82,17 +78,16 @@ describe('Packed consumer', () => {
             await readFile(resolve(packed.directory, 'extracted/package/package.json'), 'utf8'),
         ) as {
             dependencies: Record<string, string>
+            devDependencies: Record<string, string>
             exports: Record<string, unknown>
+            peerDependencies: Record<string, string>
+            peerDependenciesMeta: Record<string, { optional?: boolean }>
         }
-        expect(Object.keys(packageJson.exports)).toEqual([
-            '.',
-            './config',
-            './nitro',
-            './plugins',
-            './plugins/versioning',
-            './runtime',
-            './package.json',
-        ])
+        expect(Object.keys(packageJson.exports)).toEqual(['.', './config', './nitro', './runtime', './package.json'])
+        expect(packageJson.dependencies['files-sdk']).toBeUndefined()
+        expect(packageJson.devDependencies['files-sdk']).toBe('^2.4.1')
+        expect(packageJson.peerDependencies['files-sdk']).toBe('^2.4.1')
+        expect(packageJson.peerDependenciesMeta['files-sdk']).toBeUndefined()
         expect(JSON.stringify(packageJson.dependencies)).not.toMatch(/@aws-sdk|@azure|@google-cloud/u)
     })
 
@@ -111,6 +106,10 @@ describe('Packed consumer', () => {
         '[PKG-004] %s installs the exact tarball and passes public contracts',
         async (name) => {
             const consumer = await copyPackedConsumer(name, packed.directory, packed.tarball)
+            const consumerPackage = JSON.parse(await readFile(resolve(consumer, 'package.json'), 'utf8')) as {
+                dependencies: Record<string, string>
+            }
+            expect(consumerPackage.dependencies['files-sdk']).toBeUndefined()
             await runCommand('bun', ['install', '--ignore-scripts'], { cwd: consumer })
             for (const script of ['prepare', 'typecheck', 'build']) {
                 const log = await runCommand('bun', ['run', script], {
@@ -151,6 +150,7 @@ describe('Packed consumer', () => {
                 [],
             )
             const dependencies = await outputPaths(resolve(consumer, 'node_modules'))
+            expect(dependencies).toContain('files-sdk/package.json')
             expect(dependencies.some((path) => /(?:^|\/)nuxt\/package.json$/u.test(path))).toBe(name === 'nuxt4')
             const server = await startFixtureServer(consumer)
             try {

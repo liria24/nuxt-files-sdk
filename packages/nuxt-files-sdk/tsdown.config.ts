@@ -28,8 +28,6 @@ export default defineConfig([
             config: 'src/config.ts',
             module: 'src/module.ts',
             nitro: 'src/nitro.ts',
-            plugins: 'src/plugins.ts',
-            'plugins/versioning': 'src/plugin-versioning.ts',
             runtime: 'src/runtime.ts',
             'devtools/files-read': 'src/devtools/files-read.ts',
             'devtools/files-write': 'src/devtools/files-write.ts',

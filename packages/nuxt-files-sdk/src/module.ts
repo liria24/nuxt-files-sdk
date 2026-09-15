@@ -34,6 +34,10 @@ export default defineNuxtModule<ModuleOptions>({
     async setup(options, nuxt: Nuxt) {
         const configPath = resolve(nuxt.options.rootDir, options.config)
         ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
+        const filesSdkTypes = resolve(nuxt.options.rootDir, 'node_modules/files-sdk/dist').replaceAll('\\', '/')
+        const paths = ((nuxt.options.typescript.tsConfig.compilerOptions ??= {}).paths ??= {})
+        paths['files-sdk'] ??= [`${filesSdkTypes}/index.d.ts`]
+        paths['files-sdk/*'] ??= [`${filesSdkTypes}/*/index.d.ts`]
         nuxt.hook('nitro:init', (nitro) =>
             setupNitroFilesIntegration(nitro, {
                 configPath,

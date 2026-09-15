@@ -356,7 +356,7 @@ export const contracts = [
     },
     {
         id: 'PKG-003',
-        guarantee: 'Exports and dependency/optional-peer boundaries are explicit',
+        guarantee: 'Exports and required peer dependency boundaries are explicit',
         source: 'test/consumer/packed.test.ts',
         job: 'test-consumer',
     },

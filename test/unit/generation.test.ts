@@ -92,7 +92,17 @@ describe('provider generation', () => {
                 hooks: { hook: (_name, callback) => (extendTypes = callback) },
             } as NitroIntegration
             await setupNitroFilesIntegration(nitro, { configPath, development })
-            await extendTypes({})
+            const types = {
+                tsConfig: {
+                    include: [] as string[],
+                    compilerOptions: { paths: {} as Record<string, string[]> },
+                },
+            }
+            await extendTypes(types)
+            expect(types.tsConfig.compilerOptions.paths['files-sdk']?.[0]).toMatch(/files-sdk\/dist\/index\.d\.ts$/u)
+            expect(types.tsConfig.compilerOptions.paths['files-sdk/*']?.[0]).toMatch(
+                /files-sdk\/dist\/\*\/index\.d\.ts$/u,
+            )
             return nitro.options.plugins[0]!
         }
 

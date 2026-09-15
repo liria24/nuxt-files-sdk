@@ -12,7 +12,7 @@
 ## Architecture and invariants
 
 - Keep Nuxt and standalone Nitro wiring in `packages/nuxt-files-sdk/src/integration/nitro.ts`. Use native framework generation hooks for runtime plugins and per-project declarations; normalize generated import paths for Windows.
-- Preserve the public root/config/nitro/plugins/runtime entrypoints. Reuse native Files SDK methods, errors, provider names, plugin types, and factories instead of maintaining parallel implementations or a provider registry.
+- Preserve the public root/config/nitro/runtime entrypoints. Import native plugins from `files-sdk/*`; reuse native Files SDK methods, errors, provider names, plugin types, and factories instead of maintaining parallel implementations or a provider registry.
 - `useServerFiles` synchronously constructs and memoizes the selected native client. Failed construction is not cached; native file operations remain asynchronous.
 - Single-storage configuration is direct and supports unnamed access. Multiple storages are named and always require a name. Neither construction nor native operation failures switch provider or use devStorage. Development overrides retain the base plugins, hooks, and common options.
 - A configuration containing only `devStorage` installs a complete registry in development and no runtime plugin or provider import in production.

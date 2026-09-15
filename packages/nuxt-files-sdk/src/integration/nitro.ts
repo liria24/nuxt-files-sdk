@@ -29,7 +29,12 @@ export interface NitroIntegration {
     hooks: {
         hook(
             name: 'types:extend',
-            callback: (types: { tsConfig?: { include?: string[] } }) => void | Promise<void>,
+            callback: (types: {
+                tsConfig?: {
+                    include?: string[]
+                    compilerOptions?: { paths?: Record<string, string[]> }
+                }
+            }) => void | Promise<void>,
         ): void
     }
 }
@@ -169,6 +174,7 @@ export const setupNitroFilesIntegration = async (
     const directory = resolve(nitro.options.buildDir, 'nuxt-files-sdk')
     const pluginPath = resolve(directory, options.development ? 'plugin.dev.mjs' : 'plugin.mjs')
     const typesPath = resolve(directory, 'storage-registry.d.ts')
+    const filesSdkTypes = resolve(nitro.options.rootDir, 'node_modules/files-sdk/dist').replaceAll('\\', '/')
     // Development also externalizes local .mjs files unless explicitly inlined.
     externals.inline.push(pluginPath.replaceAll('\\', '/'), configPath)
     nitro.options.plugins.push(pluginPath.replaceAll('\\', '/'))
@@ -198,6 +204,10 @@ export default (nitroApp) => configureFiles(${runtimeConfig}, {
                 storageTypes(configPath, nitro.meta?.majorVersion ?? ('routing' in nitro ? 3 : 2), single),
             ),
         ])
-        types.tsConfig?.include?.push(typesPath)
+        const tsConfig = (types.tsConfig ??= {})
+        ;(tsConfig.include ??= []).push(typesPath)
+        const paths = ((tsConfig.compilerOptions ??= {}).paths ??= {})
+        paths['files-sdk'] ??= [`${filesSdkTypes}/index.d.ts`]
+        paths['files-sdk/*'] ??= [`${filesSdkTypes}/*/index.d.ts`]
     })
 }

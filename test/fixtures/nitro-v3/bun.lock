@@ -617,7 +617,7 @@
 
     "nostics": ["nostics@1.2.0", "", {}, "sha512-FGqEfhQjrvo1lL8KFifdTQiNwwQHJxC1jtYE1Rc54qF/jxONUNL+kC9gS1krX8Q65PgrQ5fCqH/I4NhWBvdSqg=="],
 
-    "nuxt-files-sdk": ["nuxt-files-sdk@file:../../../packages/nuxt-files-sdk", { "dependencies": { "@nuxt/devtools-kit": "4.0.0-alpha.19", "@nuxt/kit": "^4.5.2", "devframe": "^0.9.19", "files-sdk": "^2.4.1", "jiti": "^2.7.0" }, "devDependencies": { "@arethetypeswrong/cli": "^0.18.5", "@nuxt/schema": "^4.5.2", "@types/node": "^26.5.1", "@vitejs/devtools-kit": "^0.7.3", "publint": "^0.3.24", "tsdown": "^0.23.0", "typescript": "^7.0.2", "vue": "^3.5.42" }, "peerDependencies": { "nuxt": "^4.0.0 || ^5.0.0" }, "optionalPeers": ["nuxt"] }],
+    "nuxt-files-sdk": ["nuxt-files-sdk@file:../../../packages/nuxt-files-sdk", { "dependencies": { "@nuxt/devtools-kit": "4.0.0-alpha.19", "@nuxt/kit": "^4.5.2", "devframe": "^0.9.19", "jiti": "^2.7.0" }, "devDependencies": { "@arethetypeswrong/cli": "^0.18.5", "@nuxt/schema": "^4.5.2", "@types/node": "^26.5.1", "@vitejs/devtools-kit": "^0.7.3", "files-sdk": "^2.4.1", "publint": "^0.3.24", "tsdown": "^0.23.0", "typescript": "^7.0.2", "vue": "^3.5.42" }, "peerDependencies": { "files-sdk": "^2.4.1", "nuxt": "^4.0.0 || ^5.0.0" }, "optionalPeers": ["nuxt"] }],
 
     "nypm": ["nypm@0.6.10", "", { "dependencies": { "citty": "^0.2.2", "pathe": "^2.0.3", "tinyexec": "^1.3.1" }, "bin": { "nypm": "./dist/cli.mjs" } }, "sha512-W72Hrj1petq+b3Hk2aAC+9zswetlIFTnDW4s5djseZh2nYqBbyQLOtj472HwcbcWykPBUW1WpWpjOd4nK6gMRw=="],
 

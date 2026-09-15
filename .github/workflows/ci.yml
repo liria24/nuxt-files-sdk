@@ -125,7 +125,7 @@ jobs:
             matrix:
                 include:
                     - compatibility: minimum
-                      sdk: '2.3.1'
+                      sdk: '2.4.1'
                       nuxt: '4.0.0'
                       nitro2: '2.13.0'
                     - compatibility: latest-supported

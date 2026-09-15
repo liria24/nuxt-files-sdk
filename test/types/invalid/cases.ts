@@ -15,7 +15,7 @@ export const invalidTypeCases = [
         id: 'TYPE-004',
         name: 'devStorage plugins',
         diagnostic: /error TS2769:/u,
-        source: `import { defineFilesConfig } from 'nuxt-files-sdk/config'\nimport { versioning } from 'nuxt-files-sdk/plugins/versioning'\n\ndefineFilesConfig({\n  storage: { adapter: 'fs', config: { root: '.data/files' }, plugins: [versioning()] },\n  devStorage: { adapter: 'fs', config: { root: '.data/dev' }, plugins: [versioning()] },\n})\n`,
+        source: `import { versioning } from 'files-sdk/versioning'\nimport { defineFilesConfig } from 'nuxt-files-sdk/config'\n\ndefineFilesConfig({\n  storage: { adapter: 'fs', config: { root: '.data/files' }, plugins: [versioning()] },\n  devStorage: { adapter: 'fs', config: { root: '.data/dev' }, plugins: [versioning()] },\n})\n`,
     },
     {
         id: 'TYPE-005',
