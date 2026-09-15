@@ -16,6 +16,6 @@
         "vue-tsc": "^3.2.0"
     },
     "overrides": {
-        "@nuxt/devtools": "npm:@nuxt/devtools-nightly@latest"
+        "@nuxt/devtools": "4.0.0-alpha.19"
     }
 }

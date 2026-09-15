@@ -1,16 +1,9 @@
+import { connectDevframe } from 'devframe/client'
 import type { AdapterCapabilities, StoredFile } from 'files-sdk'
 import { createFilesClient, type FilesClient } from 'files-sdk/client'
 
-interface Snapshot {
-    storages: Array<{
-        name?: string
-        adapter: string
-        plugins: string[]
-        source: 'storage' | 'devStorage'
-        initialized: boolean
-    }>
-    diagnostics: Array<{ code: string; level: 'info' | 'warning' | 'error'; message: string }>
-}
+import { isFilesDevtoolsDiagnostic, type FilesDevtoolsFailure } from '../diagnostics'
+import type { FilesDevtoolsSnapshot as Snapshot } from '../snapshot'
 
 interface Access {
     write: boolean
@@ -38,6 +31,8 @@ let access: Access
 let storage: string | undefined
 let prefix = ''
 let loadId = 0
+let devframe: Awaited<ReturnType<typeof connectDevframe>> | undefined
+let bridgeReady: Promise<void>
 const capabilities = new Map<string, AdapterCapabilities>()
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object'
@@ -55,13 +50,7 @@ const isSnapshot = (value: unknown): value is Snapshot =>
             typeof item.initialized === 'boolean',
     ) &&
     Array.isArray(value.diagnostics) &&
-    value.diagnostics.every(
-        (item) =>
-            isRecord(item) &&
-            typeof item.code === 'string' &&
-            (item.level === 'info' || item.level === 'warning' || item.level === 'error') &&
-            typeof item.message === 'string',
-    )
+    value.diagnostics.every(isFilesDevtoolsDiagnostic)
 const isAccess = (value: unknown): value is Access =>
     isRecord(value) && typeof value.write === 'boolean' && typeof value.maxUploadSize === 'number'
 const fetchJson = async (url: string): Promise<unknown> => {
@@ -77,6 +66,16 @@ const storageKey = (): string => storage ?? ''
 const showStatus = (message: string, error = false): void => {
     browserStatus.textContent = message
     browserStatus.classList.toggle('error-text', error)
+}
+
+const reportFailure = async (failure: FilesDevtoolsFailure): Promise<void> => {
+    await bridgeReady
+    devframe?.scope('nuxt-files-sdk').rpc.callEvent('report-failure', failure)
+}
+
+const publishDiagnostics = async (): Promise<void> => {
+    await bridgeReady
+    devframe?.scope('nuxt-files-sdk').rpc.callEvent('report-diagnostics', snapshot.diagnostics)
 }
 
 const formatBytes = (bytes: number): string => {
@@ -167,6 +166,7 @@ const folderRow = (folder: string): HTMLTableRowElement => {
 
 const loadFiles = async (): Promise<void> => {
     const requestId = ++loadId
+    const initializing = !capabilities.has(storageKey())
     renderBreadcrumbs()
     filesBody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading files…</td></tr>'
     showStatus('Loading…')
@@ -193,7 +193,21 @@ const loadFiles = async (): Promise<void> => {
     } catch (error) {
         if (requestId !== loadId) return
         filesBody.innerHTML = '<tr><td colspan="5" class="empty-state">Unable to load files.</td></tr>'
-        showStatus(error instanceof Error ? error.message : String(error), true)
+        const message = error instanceof Error ? error.message : String(error)
+        showStatus(message, true)
+        void reportFailure({
+            kind: initializing ? 'initialization' : 'gateway',
+            message,
+            ...(storage === undefined ? {} : { target: storage }),
+        })
+        try {
+            const nextSnapshot = await fetchJson('./snapshot')
+            if (isSnapshot(nextSnapshot)) {
+                snapshot = nextSnapshot
+                renderSnapshot()
+                void publishDiagnostics()
+            }
+        } catch {}
     }
 }
 
@@ -220,14 +234,18 @@ const deleteFile = async (key: string): Promise<void> => {
         await client().delete(key)
         await loadFiles()
     } catch (error) {
-        showStatus(error instanceof Error ? error.message : String(error), true)
+        const message = error instanceof Error ? error.message : String(error)
+        showStatus(message, true)
+        void reportFailure({ kind: 'delete', message, target: key })
     }
 }
 
 const uploadFile = async (file: File): Promise<void> => {
     const key = `${prefix}${file.name}`
     if (file.size > access.maxUploadSize) {
-        showStatus(`${file.name} exceeds the ${formatBytes(access.maxUploadSize)} development upload limit.`, true)
+        const message = `${file.name} exceeds the ${formatBytes(access.maxUploadSize)} development upload limit.`
+        showStatus(message, true)
+        void reportFailure({ kind: 'upload', message, target: key })
         return
     }
     const files = client()
@@ -237,7 +255,9 @@ const uploadFile = async (file: File): Promise<void> => {
         await files.upload(key, file, { contentType: file.type || 'application/octet-stream' })
         await loadFiles()
     } catch (error) {
-        showStatus(error instanceof Error ? error.message : String(error), true)
+        const message = error instanceof Error ? error.message : String(error)
+        showStatus(message, true)
+        void reportFailure({ kind: 'upload', message, target: key })
     }
 }
 
@@ -272,7 +292,18 @@ const renderSnapshot = (): void => {
             ...snapshot.diagnostics.map((item) => {
                 const message = document.createElement('p')
                 message.className = item.level
-                message.textContent = `${item.code}: ${item.message}`
+                const diagnosticTitle = document.createElement('strong')
+                diagnosticTitle.textContent = `${item.code}: ${item.message}`
+                message.append(diagnosticTitle)
+                if (item.hint) message.append(document.createElement('br'), item.hint)
+                if (item.docs) {
+                    const link = document.createElement('a')
+                    link.href = item.docs
+                    link.target = '_blank'
+                    link.rel = 'noreferrer'
+                    link.textContent = 'Troubleshooting'
+                    message.append(document.createElement('br'), link)
+                }
                 return message
             }),
         )
@@ -290,6 +321,8 @@ const initialize = async (): Promise<void> => {
         snapshot = snapshotResponse
         access = accessResponse
         renderSnapshot()
+        void publishDiagnostics()
+        const previousStorage = storage
         storageSelect.replaceChildren(
             ...snapshot.storages.map((item) => {
                 const option = document.createElement('option')
@@ -299,7 +332,10 @@ const initialize = async (): Promise<void> => {
             }),
         )
         storageSelect.hidden = snapshot.storages.length < 2
-        storage = snapshot.storages[0]?.name
+        storage = snapshot.storages.some(({ name }) => name === previousStorage)
+            ? previousStorage
+            : snapshot.storages[0]?.name
+        storageSelect.value = storage ?? ''
         accessBadge.textContent = access.write ? 'Read & write' : 'Read only'
         accessBadge.className = `access-badge ${access.write ? 'write' : ''}`
         uploadInput.disabled = !access.write
@@ -308,8 +344,41 @@ const initialize = async (): Promise<void> => {
         else showStatus('No configured storage.', true)
     } catch (error) {
         summary.textContent = 'Unable to load Files development tools'
+        const message = error instanceof Error ? error.message : String(error)
+        showStatus(message, true)
+        void reportFailure({ kind: 'gateway', message })
+    }
+}
+
+const copyDiagnostics = async (): Promise<void> => {
+    try {
+        const text = snapshot.diagnostics.length
+            ? snapshot.diagnostics
+                  .map((item) =>
+                      [
+                          `${item.code} [${item.level}]: ${item.message}`,
+                          item.hint ? `Hint: ${item.hint}` : '',
+                          item.docs ? `Docs: ${item.docs}` : '',
+                      ]
+                          .filter(Boolean)
+                          .join('\n'),
+                  )
+                  .join('\n\n')
+            : 'No integration diagnostics.'
+        await navigator.clipboard.writeText(text)
+        showStatus('Copied diagnostics.')
+    } catch (error) {
         showStatus(error instanceof Error ? error.message : String(error), true)
     }
+}
+
+const initializeBridge = async (): Promise<void> => {
+    try {
+        devframe = await connectDevframe({ simpleAuth: false })
+        const rpc = devframe.scope('nuxt-files-sdk').rpc
+        rpc.register({ name: 'refresh', type: 'event', handler: () => void initialize() })
+        rpc.register({ name: 'copy-diagnostics', type: 'event', handler: () => void copyDiagnostics() })
+    } catch {}
 }
 
 storageSelect.addEventListener('change', () => {
@@ -317,11 +386,12 @@ storageSelect.addEventListener('change', () => {
     prefix = ''
     void loadFiles()
 })
-refreshButton.addEventListener('click', () => void loadFiles())
+refreshButton.addEventListener('click', () => void initialize())
 uploadInput.addEventListener('change', () => {
     const file = uploadInput.files?.[0]
     uploadInput.value = ''
     if (file) void uploadFile(file)
 })
 
+bridgeReady = initializeBridge()
 void initialize()

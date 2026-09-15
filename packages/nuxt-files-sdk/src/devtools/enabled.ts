@@ -1,7 +1,7 @@
 export interface FilesDevtoolsOptions {
     /** Enable Files SDK development tools when Nuxt DevTools is available. */
     enabled?: boolean
-    /** Allow uploads and deletes from the development-only file browser. */
+    /** Allow uploads and deletes from the development-only file browser. Defaults to true. */
     write?: boolean
 }
 
@@ -17,4 +17,4 @@ export const shouldEnableFilesDevtools = (
     (typeof nuxtDevtools === 'boolean' ? nuxtDevtools : nuxtDevtools?.enabled !== false)
 
 export const filesDevtoolsWriteEnabled = (setting: FilesDevtoolsSetting): boolean =>
-    typeof setting === 'object' && setting.write === true
+    typeof setting === 'boolean' ? setting : setting.enabled !== false && setting.write !== false

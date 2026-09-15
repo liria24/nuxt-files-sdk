@@ -11,6 +11,7 @@ import {
 import { getProvider, listEnvVars } from 'files-sdk/providers'
 
 import type { FilesConfig, NamedFilesConfig, SingleFilesConfig, StorageConfig } from '../config'
+import { createFilesDevtoolsDiagnostic, type FilesDevtoolsDiagnostic } from '../devtools/diagnostics'
 import type { FilesDevtoolsSnapshot } from '../devtools/snapshot'
 
 /** Native Files client plus the methods contributed by a storage's plugins. */
@@ -66,6 +67,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     readonly #hooks: FilesRuntimeHooks
     readonly #instances = new Map<string, Files>()
     readonly #initializing = new Set<string>()
+    readonly #diagnostics = new Map<string, FilesDevtoolsDiagnostic>()
 
     /** Create a registry without constructing a provider. */
     constructor(
@@ -118,7 +120,18 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         try {
             const files = this.#create(entry)
             this.#instances.set(key, files)
+            this.#diagnostics.delete(key)
             return files
+        } catch (error) {
+            const label = entry.name === undefined ? 'The single storage' : `Storage "${entry.name}"`
+            this.#diagnostics.set(
+                key,
+                createFilesDevtoolsDiagnostic(
+                    'NUXT_FILES_ADAPTER_INIT_FAILED',
+                    `${label} (${entry.override?.adapter ?? entry.storage.adapter}) could not be initialized.`,
+                ),
+            )
+            throw error
         } finally {
             this.#initializing.delete(key)
         }
@@ -134,7 +147,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
                 source: override ? 'devStorage' : 'storage',
                 initialized: this.#instances.has(name ?? ''),
             })),
-            diagnostics: [],
+            diagnostics: [...this.#diagnostics.values()],
         }
     }
 

@@ -27,6 +27,8 @@ describe('Nuxt DevTools v4 nightly integration', async () => {
         const html = await response.text()
         expect(response.status, html).toBe(200)
         expect(html).toContain('<title>Files</title>')
+        const connection = await fetch(url('/__nuxt-files-sdk/__connection.json'))
+        expect(connection.status, await connection.text()).toBe(200)
         const snapshot = await $fetch<FilesDevtoolsSnapshot>('/__nuxt-files-sdk/snapshot')
         expect(snapshot.storages).toEqual([
             { adapter: 'fs', plugins: ['versioning'], source: 'storage', initialized: true },

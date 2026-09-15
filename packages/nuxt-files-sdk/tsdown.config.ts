@@ -13,6 +13,7 @@ export default defineConfig([
             neverBundle: true,
             onlyImport: [
                 '@nuxt/kit',
+                '@nuxt/devtools-kit',
                 'devframe',
                 'files-sdk',
                 'jiti',

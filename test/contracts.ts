@@ -259,7 +259,8 @@ export const contracts = [
     },
     {
         id: 'DEV-003',
-        guarantee: 'DevTools v4 registers the native DevFrame-ready host',
+        guarantee:
+            'DevTools v4 registers the DevFrame dock, diagnostics, messages, and commands through the official kit',
         source: 'test/nuxt/devtools.test.ts',
         job: 'test-nuxt4',
     },
@@ -313,7 +314,7 @@ export const contracts = [
     },
     {
         id: 'SEC-001',
-        guarantee: 'Dummy secrets are absent from production and generated outputs',
+        guarantee: 'Dummy secrets and development storage settings are absent from production outputs',
         source: 'test/bundle/bundle.test.ts',
         job: 'test-size',
     },
@@ -331,7 +332,7 @@ export const contracts = [
     },
     {
         id: 'SEC-004',
-        guarantee: 'Development file writes stay disabled until explicitly enabled by module configuration',
+        guarantee: 'Development file writes are enabled by default and can be explicitly disabled',
         source: 'test/nuxt/devtools.test.ts',
         job: 'test-nuxt4',
     },

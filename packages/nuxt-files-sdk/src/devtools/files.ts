@@ -3,11 +3,12 @@ import { createFilesRouter, type FilesOperation } from 'files-sdk/api'
 import { createRouteHandler } from 'files-sdk/nitro'
 
 import { inspectFiles, useServerFiles } from '../runtime'
-
-export const FILES_DEVTOOLS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+import { FILES_DEVTOOLS_MAX_UPLOAD_SIZE } from './snapshot'
 
 const readOperations = ['capabilities', 'list', 'exists', 'download'] as const satisfies readonly FilesOperation[]
 const writeOperations = [...readOperations, 'upload', 'delete'] as const satisfies readonly FilesOperation[]
+export const filesDevtoolsOperations = (write: boolean): readonly FilesOperation[] =>
+    write ? writeOperations : readOperations
 const getFiles: (name?: string) => Files = useServerFiles
 
 const resolveFiles = (request: Request): Files => {
@@ -27,7 +28,7 @@ export const createFilesDevtoolsHandler = (write: boolean) => {
     const handleFiles = createRouteHandler(
         createFilesRouter({
             files: resolveFiles,
-            operations: write ? writeOperations : readOperations,
+            operations: filesDevtoolsOperations(write),
             maxUploadSize: FILES_DEVTOOLS_MAX_UPLOAD_SIZE,
             secret: crypto.randomUUID(),
         }),

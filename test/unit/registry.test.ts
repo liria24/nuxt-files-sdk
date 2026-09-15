@@ -161,7 +161,11 @@ describe('FilesRegistry', () => {
             },
         )
         expect(() => registry.get()).toThrow('first attempt failed')
+        expect(registry.inspect().diagnostics).toEqual([
+            expect.objectContaining({ code: 'NUXT_FILES_ADAPTER_INIT_FAILED', level: 'error' }),
+        ])
         expect(registry.get()).toMatchObject({ adapter: { name: 'fs' } })
+        expect(registry.inspect().diagnostics).toEqual([])
         expect(attempts).toBe(2)
     })
 

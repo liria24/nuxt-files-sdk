@@ -1,6 +1,7 @@
 import type { Files } from 'files-sdk'
 
 import type { FilesConfig } from './config'
+import { createFilesDevtoolsDiagnostic, type FilesDevtoolsDiagnostic } from './devtools/diagnostics'
 import type { FilesDevtoolsSnapshot } from './devtools/snapshot'
 import { FilesRegistry } from './runtime/registry'
 
@@ -20,28 +21,30 @@ export interface NuxtFilesStorageRegistry {}
 export interface NuxtFilesSingleStorage {}
 
 let registry: FilesRegistry | undefined
+let registryDiagnostic: FilesDevtoolsDiagnostic | undefined
 
 /** Configure the process-local Files registry used by {@link useServerFiles}. */
 export const configureFiles = <const C extends FilesConfig>(
     config: C,
     options: ConstructorParameters<typeof FilesRegistry<C>>[1],
 ): FilesRegistry<C> => {
-    const value = new FilesRegistry(config, options)
-    registry = value
-    return value
+    try {
+        const value = new FilesRegistry(config, options)
+        registry = value
+        registryDiagnostic = undefined
+        return value
+    } catch (error) {
+        registry = undefined
+        registryDiagnostic = createFilesDevtoolsDiagnostic('NUXT_FILES_INVALID_CONFIG')
+        throw error
+    }
 }
 
 /** Return secret-free diagnostics for the configured process-local Files registry. */
 export const inspectFiles = (): FilesDevtoolsSnapshot =>
     registry?.inspect() ?? {
         storages: [],
-        diagnostics: [
-            {
-                code: 'NUXT_FILES_NOT_CONFIGURED',
-                level: 'warning',
-                message: 'The Files registry has not been configured.',
-            },
-        ],
+        diagnostics: [registryDiagnostic ?? createFilesDevtoolsDiagnostic('NUXT_FILES_NOT_CONFIGURED')],
     }
 
 /** Return the project's unnamed Files client, including its configured plugin extensions. */

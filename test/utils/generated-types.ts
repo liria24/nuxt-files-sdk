@@ -93,7 +93,7 @@ void /*aliased*/aliasedUseServerFiles()
 void /*global*/useServerFiles()
 const options: ModuleOptions = {
   /*moduleConfig*/config: 'files.config.ts',
-  /*devtools*/devtools: { write: true },
+  /*devtools*/devtools: { write: false },
 }
 void options
 `
