@@ -37,6 +37,39 @@ describe('provider generation', () => {
         expect(generated.factories).toBe('"r2": provider0')
     })
 
+    test('[CFG-011] omits development-only storage from production integration', async () => {
+        const config = defineFilesConfig({ devStorage: { adapter: 'memory' } })
+        expect(selectedAdapters(config, true)).toEqual({ adapters: ['memory'], single: true })
+        expect(selectedAdapters(config, false)).toBeUndefined()
+        expect(
+            selectedAdapters(
+                defineFilesConfig({
+                    devStorage: {
+                        cache: { adapter: 'memory' },
+                        uploads: { adapter: 'fs', config: { root: '.data/uploads' } },
+                    },
+                }),
+                true,
+            ),
+        ).toEqual({ adapters: ['fs', 'memory'], single: false })
+
+        const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-development-only-'))
+        temporaryDirectories.push(directory)
+        const configPath = resolve(directory, 'files.config.mjs')
+        await writeFile(configPath, `export default { devStorage: { adapter: 'memory' } }`)
+        const hook = vi.fn<NitroIntegration['hooks']['hook']>()
+        const nitro: NitroIntegration = {
+            options: { rootDir: directory, buildDir: directory, dev: false, plugins: [] },
+            hooks: { hook },
+        }
+
+        await setupNitroFilesIntegration(nitro, { configPath, development: false })
+
+        expect(nitro.options.plugins).toEqual([])
+        expect(nitro.options.externals).toBeUndefined()
+        expect(hook).not.toHaveBeenCalled()
+    })
+
     test('[CFG-010] prepare cannot overwrite a running development plugin', async () => {
         const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-generation-'))
         temporaryDirectories.push(directory)
@@ -63,10 +96,13 @@ describe('provider generation', () => {
         const developmentPlugin = await generate(true)
         const developmentSource = await readFile(developmentPlugin, 'utf8')
         const productionPlugin = await generate(false)
+        const productionSource = await readFile(productionPlugin, 'utf8')
 
         expect(productionPlugin).not.toBe(developmentPlugin)
         expect(await readFile(developmentPlugin, 'utf8')).toBe(developmentSource)
         expect(developmentSource).toContain('from "files-sdk/fs"')
-        expect(await readFile(productionPlugin, 'utf8')).toContain('from "files-sdk/r2"')
+        expect(developmentSource).toContain('configureFiles(config,')
+        expect(productionSource).toContain('from "files-sdk/r2"')
+        expect(productionSource).toContain('configureFiles({ storage: config.storage },')
     })
 })

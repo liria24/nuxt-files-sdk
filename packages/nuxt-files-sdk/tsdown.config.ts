@@ -46,8 +46,8 @@ export default defineConfig([
     {
         clean: false,
         deps: {
-            alwaysBundle: [/^files-sdk(?:\/|$)/u, /^p-map$/u],
-            onlyBundle: [/^files-sdk(?:\/|$)/u, /^p-map$/u],
+            alwaysBundle: [/^(?:birpc|devframe|files-sdk|nostics|p-map|ufo)(?:\/|$)/u],
+            onlyBundle: [/^(?:birpc|devframe|files-sdk|nostics|p-map|ufo)(?:\/|$)/u],
         },
         dts: false,
         entry: { app: 'src/devtools/client/app.ts' },

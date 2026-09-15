@@ -66,6 +66,12 @@ export const contracts = [
         job: 'unit',
     },
     {
+        id: 'CFG-011',
+        guarantee: 'Development-only storage is available in development and omitted from production integration',
+        source: 'test/unit/generation.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'API-001',
         guarantee: 'useServerFiles synchronously returns the cached Files client',
         source: 'test/unit/registry.test.ts',

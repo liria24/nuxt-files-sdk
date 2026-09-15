@@ -100,8 +100,26 @@ export interface NamedFilesConfig<Storages extends Record<string, StorageConfig>
     devStorage?: Partial<{ [Name in keyof Storages]: DevStorageConfig }>
 }
 
+/** One unnamed storage that exists only while the development server is running. */
+export interface DevelopmentOnlySingleFilesConfig<Storage extends StorageConfig = StorageConfig> {
+    storage?: never
+    devStorage: Storage
+}
+
+/** Named storages that exist only while the development server is running. */
+export interface DevelopmentOnlyNamedFilesConfig<
+    Storages extends Record<string, StorageConfig> = Record<string, StorageConfig>,
+> {
+    storage?: never
+    devStorage: Storages
+}
+
 /** Files SDK configuration used by the Nuxt/Nitro integration. */
-export type FilesConfig = SingleFilesConfig | NamedFilesConfig
+export type FilesConfig =
+    | SingleFilesConfig
+    | NamedFilesConfig
+    | DevelopmentOnlySingleFilesConfig
+    | DevelopmentOnlyNamedFilesConfig
 
 /** Define one unnamed Files SDK storage while preserving its provider and plugin types. */
 export function defineFilesConfig<const Storage extends StorageConfig>(
@@ -111,6 +129,15 @@ export function defineFilesConfig<const Storage extends StorageConfig>(
 export function defineFilesConfig<const Storages extends Record<string, StorageConfig>>(
     config: NamedFilesConfig<Storages>,
 ): NamedFilesConfig<Storages>
-export function defineFilesConfig(config: FilesConfig): FilesConfig {
-    return config
+/** Define one unnamed development-only storage. */
+export function defineFilesConfig<const Storage extends StorageConfig>(
+    config: DevelopmentOnlySingleFilesConfig<Storage>,
+): DevelopmentOnlySingleFilesConfig<Storage>
+/** Define named development-only storages. */
+export function defineFilesConfig<const Storages extends Record<string, StorageConfig>>(
+    config: DevelopmentOnlyNamedFilesConfig<Storages>,
+): DevelopmentOnlyNamedFilesConfig<Storages>
+export function defineFilesConfig(config: FilesConfig): FilesConfig | { storage: FilesConfig['storage'] } {
+    if (process.env.NODE_ENV !== 'production') return config
+    return { storage: config.storage }
 }

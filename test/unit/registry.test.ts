@@ -77,6 +77,24 @@ describe('FilesRegistry', () => {
         expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'upload' }))
     })
 
+    test('[CFG-011] supports a complete development-only storage', () => {
+        const registry = new FilesRegistry(
+            defineFilesConfig({
+                devStorage: {
+                    adapter: 'fs',
+                    config: { root: '.data/test-files' },
+                    plugins: [versioning()],
+                },
+            }),
+            { development: true, factories },
+        )
+
+        expect(registry.get().versions).toBeTypeOf('function')
+        expect(registry.inspect().storages).toEqual([
+            { adapter: 'fs', plugins: ['versioning'], source: 'devStorage', initialized: true },
+        ])
+    })
+
     test('[SEC-002] reports only a secret-free development snapshot', () => {
         const secret = 'NUXT_FILES_TEST_SECRET_123456'
         const registry = new FilesRegistry(

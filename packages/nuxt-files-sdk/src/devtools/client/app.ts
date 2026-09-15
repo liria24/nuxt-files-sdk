@@ -338,6 +338,7 @@ const initialize = async (): Promise<void> => {
         storageSelect.value = storage ?? ''
         accessBadge.textContent = access.write ? 'Read & write' : 'Read only'
         accessBadge.className = `access-badge ${access.write ? 'write' : ''}`
+        accessBadge.hidden = false
         uploadInput.disabled = !access.write
         uploadButton.hidden = !access.write
         if (snapshot.storages.length) await loadFiles()

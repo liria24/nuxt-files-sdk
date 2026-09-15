@@ -39,16 +39,18 @@ describe('Nuxt DevFrame development endpoint', async () => {
         expect(html).toContain('<title>Files</title>')
         expect(html).toContain('File browser')
         expect(html).toContain('src="./app.js"')
+        expect(html).toContain('id="access-badge" class="access-badge" hidden')
+        expect(html).toContain('id="storage-select" aria-label="Storage" hidden')
         const script = await fetch(url('/__nuxt-files-sdk/app.js'))
         const javascript = await script.text()
         expect(script.status, javascript).toBe(200)
         expect(script.headers.get('content-type')).toContain('javascript')
         expect(javascript.length).toBeGreaterThan(10_000)
-        expect(javascript).not.toMatch(/from\s*["']files-sdk/u)
+        expect(javascript).not.toMatch(/from\s*["'](?:devframe|files-sdk)/u)
         const snapshot = await $fetch<FilesDevtoolsSnapshot>('/__nuxt-files-sdk/snapshot')
         expect(snapshot.storages).toEqual([
             { name: 'archive', adapter: 'fs', plugins: ['versioning'], source: 'storage', initialized: true },
-            { name: 'blob', adapter: 'fs', plugins: [], source: 'storage', initialized: true },
+            { name: 'blob', adapter: 'fs', plugins: [], source: 'devStorage', initialized: true },
         ])
         expect(snapshot.diagnostics).toEqual([])
     })

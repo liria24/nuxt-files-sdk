@@ -77,6 +77,7 @@ describe('Bundle contract', () => {
 
     test('[SEC-001] production and generated outputs contain no fixture secret', () => {
         expect(nuxtOutput).not.toContain(secret)
+        expect(nuxtOutput).not.toContain('NUXT_FILES_DEV_ONLY')
         expect(nitroOutput).not.toContain(secret)
         expect(generatedOutput).not.toContain(secret)
     })

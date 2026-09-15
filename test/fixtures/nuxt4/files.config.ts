@@ -15,4 +15,7 @@ export default defineFilesConfig({
             prefix: '.data/files/',
         },
     },
+    devStorage: {
+        blob: { adapter: 'fs', config: { root: '.', urlBaseUrl: 'NUXT_FILES_DEV_ONLY' } },
+    },
 })

@@ -20,9 +20,20 @@ describe('configuration types', () => {
                 blob: { adapter: 'fs', config: { root: '.data/files' } },
             },
         })
+        const developmentOnly = defineFilesConfig({
+            devStorage: { adapter: 'fs', config: { root: '.data/development' }, plugins: [versioning()] },
+        })
+        const namedDevelopmentOnly = defineFilesConfig({
+            devStorage: {
+                archive: { adapter: 'fs', config: { root: '.data/development-archive' } },
+                blob: { adapter: 'fs', config: { root: '.data/development' } },
+            },
+        })
 
         expect(single.storage.config.root).toBe('.data/files')
         expectTypeOf<SingleStorage<typeof single>>().toHaveProperty('versions')
+        expectTypeOf<SingleStorage<typeof developmentOnly>>().toHaveProperty('versions')
+        expectTypeOf<StorageRegistry<typeof namedDevelopmentOnly>>().toHaveProperty('archive')
         expectTypeOf<StorageRegistry<typeof named>['archive']>().toHaveProperty('versions')
         expectTypeOf(new FilesRegistry(single, { factories: { fs } }).get()).toEqualTypeOf<
             SingleStorage<typeof single>
@@ -50,9 +61,9 @@ describe('configuration types', () => {
     test('[TYPE-008] rejects unmatched development names', () => {
         expect.assertions(0)
         defineFilesConfig({
+            // @ts-expect-error devStorage keys must name a declared storage
             storage: { blob: { adapter: 'fs', config: { root: '.data/files' } } },
             devStorage: {
-                // @ts-expect-error devStorage keys must name a declared storage
                 missing: { adapter: 'fs', config: { root: '.data/missing' } },
             },
         })

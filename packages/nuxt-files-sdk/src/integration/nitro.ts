@@ -46,15 +46,23 @@ const isStorageRecord = (value: unknown): value is Record<string, StorageConfig>
 export const selectedAdapters = (
     config: FilesConfig,
     development: boolean,
-): { adapters: ProviderSlug[]; single: boolean } => {
+): { adapters: ProviderSlug[]; single: boolean } | undefined => {
     const storage = config.storage
     const devStorage = config.devStorage
-    if (!storage || (!isStorageConfig(storage) && (!isStorageRecord(storage) || Object.keys(storage).length === 0))) {
+    if (!storage && !development) return undefined
+    if (!storage && !devStorage) {
         throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
     }
     const selected: StorageConfig[] = []
-    const single = isStorageConfig(storage)
-    if (single) {
+    const single = isStorageConfig(storage ?? devStorage)
+    if (!storage) {
+        if (isStorageConfig(devStorage)) selected.push(devStorage)
+        else if (isStorageRecord(devStorage) && Object.keys(devStorage).length > 0)
+            selected.push(...Object.values(devStorage))
+        else throw new Error('[nuxt-files-sdk:invalid-config] At least one development storage is required.')
+    } else if (!isStorageConfig(storage) && (!isStorageRecord(storage) || Object.keys(storage).length === 0)) {
+        throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
+    } else if (isStorageConfig(storage)) {
         if (devStorage && !isStorageConfig(devStorage)) {
             throw new Error('[nuxt-files-sdk:invalid-config] A single storage requires a single devStorage override.')
         }
@@ -130,8 +138,11 @@ export const setupNitroFilesIntegration = async (
         interopDefault: true,
         moduleCache: false,
     }).import<FilesConfig>(configPath, { default: true })
-    const { adapters, single } = selectedAdapters(config, options.development)
+    const selected = selectedAdapters(config, options.development)
+    if (!selected) return
+    const { adapters, single } = selected
     const providers = providerCode(adapters)
+    const runtimeConfig = options.development ? 'config' : '{ storage: config.storage }'
     nitro.unimport?.getInternalContext().addons.push({
         name: 'nuxt-files-sdk-jsdoc',
         declaration: (declarations) =>
@@ -160,7 +171,7 @@ export const setupNitroFilesIntegration = async (
 ${providers.imports}
 import { configureFiles } from 'nuxt-files-sdk/runtime'
 
-export default (nitroApp) => configureFiles(config, {
+export default (nitroApp) => configureFiles(${runtimeConfig}, {
   development: ${JSON.stringify(options.development)},
   factories: { ${providers.factories} },
   hooks: {

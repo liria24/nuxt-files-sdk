@@ -10,7 +10,14 @@ import {
 } from 'files-sdk'
 import { getProvider, listEnvVars } from 'files-sdk/providers'
 
-import type { FilesConfig, NamedFilesConfig, SingleFilesConfig, StorageConfig } from '../config'
+import type {
+    DevelopmentOnlyNamedFilesConfig,
+    DevelopmentOnlySingleFilesConfig,
+    FilesConfig,
+    NamedFilesConfig,
+    SingleFilesConfig,
+    StorageConfig,
+} from '../config'
 import { createFilesDevtoolsDiagnostic, type FilesDevtoolsDiagnostic } from '../devtools/diagnostics'
 import type { FilesDevtoolsSnapshot } from '../devtools/snapshot'
 
@@ -21,11 +28,17 @@ export type FilesForStorage<T extends StorageConfig> = Files & ExtensionsOf<NonN
 export type StorageRegistry<C extends FilesConfig> =
     C extends NamedFilesConfig<infer Storages>
         ? { [Name in keyof Storages]: FilesForStorage<Storages[Name]> }
-        : Record<never, never>
+        : C extends DevelopmentOnlyNamedFilesConfig<infer Storages>
+          ? { [Name in keyof Storages]: FilesForStorage<Storages[Name]> }
+          : Record<never, never>
 
 /** Files client returned by an unnamed single-storage configuration. */
 export type SingleStorage<C extends FilesConfig> =
-    C extends SingleFilesConfig<infer Storage> ? FilesForStorage<Storage> : never
+    C extends SingleFilesConfig<infer Storage>
+        ? FilesForStorage<Storage>
+        : C extends DevelopmentOnlySingleFilesConfig<infer Storage>
+          ? FilesForStorage<Storage>
+          : never
 
 /** Hooks emitted by the Nuxt/Nitro bridge after the storage's native hooks. */
 export interface FilesRuntimeHooks {
@@ -57,7 +70,12 @@ const isStorageConfig = (value: unknown): value is StorageConfig =>
 const isStorageRecord = (value: unknown): value is Record<string, StorageConfig> =>
     Boolean(value && typeof value === 'object' && Object.values(value).every(isStorageConfig))
 
-type StorageEntry = { name: string | undefined; storage: StorageConfig; override: StorageConfig | undefined }
+type StorageEntry = {
+    name: string | undefined
+    storage: StorageConfig
+    override: StorageConfig | undefined
+    source: 'storage' | 'devStorage'
+}
 
 /** Lazily construct and memoize native Files clients for a validated project configuration. */
 export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
@@ -81,14 +99,22 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         if ('default' in config) {
             throw new Error('[nuxt-files-sdk:invalid-config] The default option has been removed.')
         }
+        const development = options.development ?? false
+        if (!config.storage && (!development || !config.devStorage)) {
+            throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
+        }
         if (
-            !config.storage ||
-            (!isStorageConfig(config.storage) &&
-                (!isStorageRecord(config.storage) || Object.keys(config.storage).length === 0))
+            config.storage &&
+            !isStorageConfig(config.storage) &&
+            (!isStorageRecord(config.storage) || Object.keys(config.storage).length === 0)
         ) {
             throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
         }
-        if (!isStorageConfig(config.storage)) {
+        if (!config.storage && !isStorageConfig(config.devStorage)) {
+            if (!isStorageRecord(config.devStorage) || Object.keys(config.devStorage).length === 0) {
+                throw new Error('[nuxt-files-sdk:invalid-config] At least one development storage is required.')
+            }
+        } else if (config.storage && !isStorageConfig(config.storage)) {
             if (config.devStorage && !isStorageRecord(config.devStorage)) {
                 throw new Error('[nuxt-files-sdk:invalid-config] Named storage requires named devStorage overrides.')
             }
@@ -99,13 +125,13 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             }
         }
         this.#config = config
-        this.#development = options.development ?? false
+        this.#development = development
         this.#factories = options.factories
         this.#hooks = options.hooks ?? {}
     }
 
     /** Return the client from an unnamed single-storage configuration. */
-    get(...args: C extends SingleFilesConfig ? [] : [name: never]): SingleStorage<C>
+    get(...args: C extends SingleFilesConfig | DevelopmentOnlySingleFilesConfig ? [] : [name: never]): SingleStorage<C>
     /** Return one named storage client. */
     get<Name extends Extract<keyof StorageRegistry<C>, string>>(name: Name): StorageRegistry<C>[Name]
     get(name?: string): Files {
@@ -140,11 +166,11 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     /** Return secret-free storage metadata and initialization state for development diagnostics. */
     inspect(): FilesDevtoolsSnapshot {
         return {
-            storages: this.#entries().map(({ name, storage, override }) => ({
+            storages: this.#entries().map(({ name, storage, override, source }) => ({
                 ...(name === undefined ? {} : { name }),
                 adapter: override?.adapter ?? storage.adapter,
                 plugins: storage.plugins?.map((plugin) => plugin.name) ?? [],
-                source: override ? 'devStorage' : 'storage',
+                source,
                 initialized: this.#instances.has(name ?? ''),
             })),
             diagnostics: [...this.#diagnostics.values()],
@@ -154,29 +180,42 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     #entries(): StorageEntry[] {
         const storage = this.#config.storage
         const devStorage = this.#config.devStorage
+        if (!storage) {
+            if (isStorageConfig(devStorage)) {
+                return [{ name: undefined, storage: devStorage, override: undefined, source: 'devStorage' }]
+            }
+            return Object.entries(devStorage ?? {}).map(([name, developmentStorage]) => ({
+                name,
+                storage: developmentStorage,
+                override: undefined,
+                source: 'devStorage',
+            }))
+        }
         if (isStorageConfig(storage)) {
             const override = this.#development && isStorageConfig(devStorage) ? devStorage : undefined
-            return [{ name: undefined, storage, override }]
+            return [{ name: undefined, storage, override, source: override ? 'devStorage' : 'storage' }]
         }
         const overrides = this.#development && isStorageRecord(devStorage) ? devStorage : undefined
         return Object.entries(storage).map(([name, namedStorage]) => ({
             name,
             storage: namedStorage,
             override: overrides?.[name],
+            source: overrides?.[name] ? 'devStorage' : 'storage',
         }))
     }
 
     #entry(name?: string): StorageEntry {
-        if (isStorageConfig(this.#config.storage)) {
+        const entries = this.#entries()
+        if (entries.length === 1 && entries[0]?.name === undefined) {
             if (name !== undefined) {
                 throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
             }
-            return this.#entries()[0]!
+            return entries[0]!
         }
         if (name === undefined) {
             throw new Error('[nuxt-files-sdk:storage-name-required] A storage name is required.')
         }
-        const entry = this.#entries().find((candidate) => candidate.name === name)
+        const entry = entries.find((candidate) => candidate.name === name)
         if (!entry) throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
         return entry
     }
