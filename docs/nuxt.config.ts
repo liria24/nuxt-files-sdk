@@ -1,7 +1,9 @@
 import { fileURLToPath } from 'node:url'
 
 const deployedSiteUrl = process.env.NUXT_PUBLIC_SITE_URL
-const siteUrl = deployedSiteUrl || 'http://localhost:3000'
+const siteUrl =
+    deployedSiteUrl ||
+    (process.env.NODE_ENV === 'production' ? 'https://nuxt-files-sdk.liria.me' : 'http://localhost:3000')
 
 export default defineNuxtConfig({
     compatibilityDate: '2026-09-04',
@@ -39,20 +41,17 @@ export default defineNuxtConfig({
     nitro: {
         preset: 'cloudflare-module',
         cloudflare: {
+            deployConfig: true,
             wrangler: {
                 name: 'nuxt-files-sdk-docs',
-                main: '.output/server/index.mjs',
                 compatibility_date: '2026-09-04',
                 compatibility_flags: ['nodejs_compat'],
                 preview_urls: false,
-                assets: {
-                    directory: '.output/public',
-                    binding: 'ASSETS',
-                },
+                routes: [{ pattern: 'nuxt-files-sdk.liria.me', custom_domain: true }],
                 kv_namespaces: [
                     {
                         binding: 'DOCS_CACHE',
-                        id: 'replace-with-docs-cache-namespace-id',
+                        id: 'f3da43e9be0643b2b83bcf193a6d267d',
                     },
                 ],
                 observability: {
@@ -67,12 +66,12 @@ export default defineNuxtConfig({
     },
 
     site: {
-        url: deployedSiteUrl,
+        url: siteUrl,
         name: 'Nuxt Files SDK',
     },
 
     i18n: {
-        baseUrl: deployedSiteUrl,
+        baseUrl: siteUrl,
         defaultLocale: 'en',
         locales: [{ code: 'en', language: 'en-US', name: 'English' }],
         strategy: 'no_prefix',

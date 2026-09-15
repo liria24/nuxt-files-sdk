@@ -205,13 +205,8 @@ const createContent = (source: ContentSource, driver?: ReturnType<typeof cacheDr
 
 async function validateContent(content: AnyComarkContent): Promise<AnyComarkContent> {
     await content.init({ partial: false })
-    const [home, navigation, sections] = await Promise.all([
-        content.get('/'),
-        content.navigation(),
-        buildSearchSections(content),
-    ])
-    if (!home || navigation.length === 0 || sections.length === 0)
-        throw new Error('The content revision is incomplete.')
+    const [navigation, sections] = await Promise.all([content.navigation(), buildSearchSections(content)])
+    if (navigation.length === 0 || sections.length === 0) throw new Error('The content revision is incomplete.')
     return content
 }
 
