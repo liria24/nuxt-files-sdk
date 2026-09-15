@@ -34,6 +34,16 @@ jobs:
               with: { persist-credentials: false }
             - uses: ./.github/actions/setup
             - run: bun run typecheck
+    docs-build:
+        permissions:
+            contents: read
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run build
+            - run: bun run docs:build
     lint:
         permissions:
             contents: read
@@ -157,6 +167,7 @@ jobs:
         needs:
             - build
             - typecheck
+            - docs-build
             - lint
             - knip
             - unit

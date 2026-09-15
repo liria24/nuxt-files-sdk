@@ -1,0 +1,43 @@
+{
+    "name": "nuxt-files-sdk-docs",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "nuxt build",
+        "dev": "nuxt dev",
+        "deploy": "wrangler deploy",
+        "preview": "wrangler dev",
+        "typecheck": "nuxt prepare && bun typecheck.ts -b --noEmit"
+    },
+    "dependencies": {
+        "@comark/nuxt": "^0.6.2",
+        "@iconify-json/lucide": "^1.2.132",
+        "@iconify-json/simple-icons": "^1.2.96",
+        "@nuxt/fonts": "^0.14.0",
+        "@nuxt/image": "^2.1.0",
+        "@nuxt/ui": "^4.11.1",
+        "@nuxtjs/i18n": "^10.6.0",
+        "@nuxtjs/robots": "^6.2.2",
+        "@nuxtjs/sitemap": "^8.5.1",
+        "@takumi-rs/core": "^2.13.7",
+        "@takumi-rs/wasm": "^2.13.7",
+        "@vueuse/core": "^14.4.0",
+        "@vueuse/nuxt": "^14.4.0",
+        "comark": "^0.6.2",
+        "comark-content": "0.4.0",
+        "h3": "^1.15.11",
+        "nuxt": "^4.5.2",
+        "nuxt-files-sdk": "workspace:*",
+        "nuxt-og-image": "^6.7.8",
+        "rangi": "^2.2.0",
+        "tailwindcss": "^4.3.3",
+        "ufo": "^1.6.4",
+        "unstorage": "^1.17.5"
+    },
+    "devDependencies": {
+        "nuxtseo-layer-devtools": "^5.3.16",
+        "typescript6": "npm:typescript@6.0.3",
+        "vue-tsc": "^3.3.11",
+        "wrangler": "^4.131.1"
+    }
+}

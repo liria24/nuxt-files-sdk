@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+
+@source '../../app.vue';
+@source '../../components/**/*.{vue,ts}';
+@source '../../pages/**/*.vue';
+
+@theme {
+    --font-sans: 'Geist', sans-serif;
+    --font-mono: 'Geist Mono', monospace;
+}
+
+@layer base {
+    :root {
+        --ui-container: 90rem;
+    }
+
+    html {
+        @apply scroll-smooth;
+    }
+
+    body {
+        @apply min-w-80;
+    }
+}
+
+@layer components {
+    .docs-prose pre {
+        @apply overflow-x-auto;
+    }
+
+    .docs-prose [data-filename]::before {
+        content: attr(data-filename);
+    }
+}
+
+:root {
+    --ui-radius: 0.5rem;
+    --ui-primary: black;
+    --ui-bg: white;
+}
+
+.dark {
+    --ui-primary: white;
+    --ui-bg: black;
+    --ui-bg-muted: var(--color-neutral-900);
+    --ui-border-muted: var(--color-neutral-800);
+}

@@ -15,6 +15,7 @@ export default defineConfig({
     singleQuote: true,
     sortImports: true,
     sortPackageJson: true,
+    sortTailwindcss: {},
     tabWidth: 4,
     trailingComma: 'all',
 })

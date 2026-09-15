@@ -6,7 +6,8 @@
 - Run `bun run test`, not `bun test`: the former selects this repository's Vitest projects; the latter invokes Bun's separate test runner.
 - Tests stay under `test/`. `test/contracts.ts` owns the contract ID, guarantee, test source, and blocking-job mapping. Keep IDs on executable tests or negative compilation cases; the unit project checks registration and CI coverage.
 - For verification and release readiness, use `.agents/skills/verify-release/SKILL.md`. Keep durable repository constraints here and reproducible procedures in that skill, without duplicating reports under `docs/`.
-- Canonical public examples live in `test/fixtures/nuxt4/`; generated-type tests compile them both locally and in a packed consumer. README prose is not a test input. Do not expand the README or create a documentation website unless requested.
+- Canonical public examples live in `test/fixtures/nuxt4/`; generated-type tests compile them both locally and in a packed consumer. Keep `docs/content/` examples aligned with those fixtures and the current source types. README prose is not a test input; keep it as a short entry point to the web documentation.
+- The docs app reads `docs/content/` from the filesystem in development and from an immutable GitHub commit through `comark-content` in production. Keep content-only commits deploy-free, the active revision validated before switching, and Cloudflare KV keys scoped by parser version and commit SHA.
 
 ## Architecture and invariants
 
@@ -14,6 +15,7 @@
 - Preserve the public root/config/nitro/plugins/runtime entrypoints. Reuse native Files SDK methods, errors, provider names, plugin types, and factories instead of maintaining parallel implementations or a provider registry.
 - `useServerFiles` synchronously constructs and memoizes the selected native client. Failed construction is not cached; native file operations remain asynchronous.
 - Single-storage configuration is direct and supports unnamed access. Multiple storages are named and always require a name. Neither construction nor native operation failures switch provider or use devStorage. Development overrides retain the base plugins, hooks, and common options.
+- A configuration containing only `devStorage` installs a complete registry in development and no runtime plugin or provider import in production.
 - Native environment keys and aliases take priority over NUXT aliases. Inject only the selected provider's declared keys during synchronous construction and remove them on success and failure.
 - Keep native error identity and user-before-bridge hook order. A hook rejection must not replace a native operation result.
 - Generated declarations augment the public runtime entrypoint and the installed Nitro hook namespace. Standalone fixtures use their native prepare/typecheck/build commands without installing Nuxt; retain the fixture's explicit type dependencies.
@@ -29,7 +31,7 @@
 - Package checks cover exports, declarations, dependency boundaries, publint/ATTW, permitted contents, fresh consumer compilation/build/HTTP routes, and secret absence. Root typecheck also checks the unit type assertions; generated declarations have positive and negative compiler checks.
 - Bundle checks exclude unused Vue, production DevFrame, standalone Nuxt Kit, unrelated native plugins, unused provider entrypoints, and external cloud SDK packages in fs-only apps. Provider entrypoints can retain their own optional internal engines, such as R2's AWS SDK path.
 - Sizes are complete fixture deployment outputs, not this package's isolated contribution. Keep budgets in executable bundle tests; do not loosen them to conceal regressions. Optional SDK warnings are not by themselves runtime failures, but real route and output checks must pass.
-- CI does not guarantee real cloud credentials/network access, every deploy preset, application authorization, unknown upstream changes, or complete interactive GUI coverage. File Explorer, gateway helpers, UI components, MCP, advanced telemetry, and a documentation website are outside the implemented scope.
+- CI does not guarantee real cloud credentials/network access, every deploy preset, application authorization, unknown upstream changes, or complete interactive GUI coverage. File Explorer, gateway helpers, UI components, MCP, and advanced telemetry remain outside the package scope; the `docs/` workspace documents the implemented Nuxt/Nitro integration without redefining native Files SDK APIs.
 
 ## Historical summary
 

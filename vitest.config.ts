@@ -12,6 +12,7 @@ const project = (name: string, include: string[]) => ({
 })
 
 export default defineConfig({
+    tsconfig: 'test/tsconfig.json',
     test: {
         fileParallelism: false,
         maxWorkers: 1,

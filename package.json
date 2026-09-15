@@ -3,23 +3,28 @@
     "private": true,
     "workspaces": [
         "packages/*",
-        "playground"
+        "docs"
     ],
     "type": "module",
     "scripts": {
         "build": "bun --filter nuxt-files-sdk build",
-        "check": "bun run format:check && bun run lint && bun run workspace:check && bun run unused && bun run typecheck && bun run test && bun run build",
+        "check": "bun run format:check && bun run lint && bun run workspace:check && bun run unused && bun run typecheck && bun run test && bun run build && bun run docs:build",
         "deps:update": "taze",
-        "dev": "bun run build && bun --filter nuxt-files-sdk-playground dev",
+        "dev": "bun run build && bun --cwd=docs dev",
         "dev:devtools-v4": "bun run build && bun --cwd=test/fixtures/nuxt5-nightly install --ignore-scripts && bun --cwd=test/fixtures/nuxt5-nightly run dev",
+        "docs:build": "bun run --cwd=docs build && bun scripts/verify-docs-output.ts",
+        "docs:deploy": "bun run build && bun run docs:build && bun run --cwd=docs deploy",
+        "docs:preview": "bun run build && bun run docs:build && bun run --cwd=docs preview",
+        "docs:typecheck": "bun run build && bun run --cwd=docs typecheck",
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
         "lint": "oxlint .",
         "lint:fix": "oxlint . --fix",
+        "postinstall": "bun run build && bun --cwd=docs run nuxt prepare",
         "preview:package": "pkg-pr-new publish ./packages/nuxt-files-sdk --bun --compact --previewVersion",
         "test": "vitest run",
         "test:unit": "vitest run --project unit",
-        "typecheck": "bun --filter nuxt-files-sdk typecheck && bun --filter nuxt-files-sdk-playground typecheck && tsc --noEmit -p test/tsconfig.json",
+        "typecheck": "bun --filter nuxt-files-sdk typecheck && bun run docs:typecheck && tsc --noEmit -p test/tsconfig.json",
         "unused": "knip && knip --production",
         "workspace:check": "sherif",
         "test:nuxt4": "vitest run --project nuxt4",
@@ -43,6 +48,9 @@
         "taze": "^21.1.0",
         "typescript": "^7.0.2",
         "vitest": "^5.0.0"
+    },
+    "overrides": {
+        "comark-content": "0.4.0"
     },
     "engines": {
         "node": ">=24.0.0"

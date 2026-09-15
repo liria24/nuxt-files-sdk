@@ -9,15 +9,34 @@
         },
         "packages/nuxt-files-sdk": {
             "entry": ["tsdown.config.ts", "src/{module,config,nitro,plugins}.ts", "test/benchmark.ts"],
-            "ignoreDependencies": ["@arethetypeswrong/cli"],
+            "ignoreDependencies": ["@arethetypeswrong/cli", "@vitejs/devtools-kit"],
             "ignoreIssues": {
                 "package.json": ["optionalPeerDependencies"]
             },
             "project": ["src/**/*.ts!", "test/benchmark.ts", "*.config.ts"]
         },
-        "playground": {
-            "entry": ["nuxt.config.ts", "files.config.ts", "server/**/*.ts"],
-            "project": ["**/*.ts"]
+        "docs": {
+            "entry": [
+                "nuxt.config.ts",
+                "app.config.ts",
+                "files.config.ts",
+                "components/**/*.vue",
+                "composables/**/*.ts",
+                "utils/**/*.ts",
+                "server/**/*.ts"
+            ],
+            "ignoreDependencies": [
+                "@iconify-json/lucide",
+                "@iconify-json/simple-icons",
+                "@vueuse/core",
+                "comark",
+                "h3",
+                "nuxtseo-layer-devtools",
+                "rangi",
+                "ufo",
+                "unstorage"
+            ],
+            "project": ["**/*.{ts,vue}"]
         }
     }
 }

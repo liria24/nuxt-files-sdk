@@ -58,6 +58,17 @@ describe('configuration types', () => {
         expect(typeof resolved.storage.config).toBe('function')
     })
 
+    test('[CFG-011] strips a development-only storage safely in production', () => {
+        const nodeEnvironment = process.env.NODE_ENV
+        process.env.NODE_ENV = 'production'
+        try {
+            expect(defineFilesConfig({ devStorage: { adapter: 'memory' } })).toEqual({ storage: undefined })
+        } finally {
+            if (nodeEnvironment === undefined) delete process.env.NODE_ENV
+            else process.env.NODE_ENV = nodeEnvironment
+        }
+    })
+
     test('[TYPE-008] rejects unmatched development names', () => {
         expect.assertions(0)
         defineFilesConfig({

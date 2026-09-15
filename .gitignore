@@ -5,6 +5,8 @@ dist
 .contract-invalid
 .contract-examples
 .output
+.wrangler
+.dev.vars
 *.tgz
 .data
 packages/nuxt-files-sdk/README.md
