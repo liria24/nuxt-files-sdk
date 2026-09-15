@@ -1,11 +1,11 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import type { ProviderSlug } from 'files-sdk'
 import { getProvider } from 'files-sdk/providers'
 import { createJiti } from 'jiti'
 
-import type { FilesConfig, StorageConfig } from '../config'
+import type { StorageConfig } from '../config'
 
 export interface NitroIntegration {
     meta?: { majorVersion?: number }
@@ -18,6 +18,7 @@ export interface NitroIntegration {
         externals?: { inline?: unknown[] }
     }
     unimport?: {
+        injectImports(code: string, id?: string): Promise<{ code: string }>
         getInternalContext(): {
             addons: {
                 name?: string
@@ -44,11 +45,15 @@ const isStorageRecord = (value: unknown): value is Record<string, StorageConfig>
     Boolean(value && typeof value === 'object' && Object.values(value).every(isStorageConfig))
 
 export const selectedAdapters = (
-    config: FilesConfig,
+    config: unknown,
     development: boolean,
 ): { adapters: ProviderSlug[]; single: boolean } | undefined => {
-    const storage = config.storage
-    const devStorage = config.devStorage
+    if (!config || typeof config !== 'object') {
+        throw new Error('[nuxt-files-sdk:invalid-config] Files configuration must be an object.')
+    }
+    const typedConfig: { storage?: unknown; devStorage?: unknown } = config
+    const storage = typedConfig.storage
+    const devStorage = typedConfig.devStorage
     if (!storage && !development) return undefined
     if (!storage && !devStorage) {
         throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
@@ -71,13 +76,14 @@ export const selectedAdapters = (
         if (devStorage && !isStorageRecord(devStorage)) {
             throw new Error('[nuxt-files-sdk:invalid-config] Named storage requires named devStorage overrides.')
         }
-        for (const name of Object.keys(devStorage ?? {})) {
+        const overrides = isStorageRecord(devStorage) ? devStorage : undefined
+        for (const name of Object.keys(overrides ?? {})) {
             if (!Object.hasOwn(storage, name)) {
                 throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
             }
         }
         for (const [name, namedStorage] of Object.entries(storage)) {
-            selected.push(development ? (devStorage?.[name] ?? namedStorage) : namedStorage)
+            selected.push(development ? (overrides?.[name] ?? namedStorage) : namedStorage)
         }
     }
     const adapters = [...new Set(selected.map(({ adapter }) => adapter))].toSorted()
@@ -133,11 +139,15 @@ export const setupNitroFilesIntegration = async (
     options: NitroFilesIntegrationOptions,
 ): Promise<void> => {
     const configPath = options.configPath.replaceAll('\\', '/')
-    const config = await createJiti(import.meta.url, {
+    const jiti = createJiti(import.meta.url, {
         ...(nitro.options.alias ? { alias: nitro.options.alias } : {}),
         interopDefault: true,
         moduleCache: false,
-    }).import<FilesConfig>(configPath, { default: true })
+    })
+    const source = await readFile(configPath, 'utf8')
+    const code = nitro.unimport ? (await nitro.unimport.injectImports(source, configPath)).code : source
+    const loaded: unknown = await jiti.evalModule(code, { filename: configPath, async: true })
+    const config: unknown = loaded && typeof loaded === 'object' && 'default' in loaded ? loaded.default : loaded
     const selected = selectedAdapters(config, options.development)
     if (!selected) return
     const { adapters, single } = selected

@@ -17,6 +17,9 @@ afterAll(() => Promise.all(temporaryDirectories.map((directory) => rm(directory,
 
 describe('provider generation', () => {
     test('[CFG-009] selects only providers used in the active runtime mode without resolving credentials', () => {
+        expect(() => selectedAdapters(undefined, true)).toThrow(
+            '[nuxt-files-sdk:invalid-config] Files configuration must be an object.',
+        )
         const runtimeConfig = vi.fn<() => { binding: never }>(() => ({ binding: undefined as never }))
         const config = defineFilesConfig({
             storage: {

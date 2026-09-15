@@ -17,10 +17,13 @@ export const cleanTypeContracts = async (directory: string): Promise<void> => {
 export const checkGeneratedTypes = async (directory: string): Promise<void> => {
     const generated = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/storage-registry.d.ts'), 'utf8')
     const imports = await readFile(resolve(directory, '.nuxt/types/nitro-imports.d.ts'), 'utf8')
+    const appImports = await readFile(resolve(directory, '.nuxt/imports.d.ts'), 'utf8')
     const plugin = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/plugin.mjs'), 'utf8')
     expect(generated).toContain("declare module 'nuxt-files-sdk/runtime'")
     expect(generated).toContain('StorageRegistry<typeof config>')
     expect(imports).toContain("typeof import('nuxt-files-sdk/runtime').useServerFiles")
+    expect(imports).toMatch(/const defineFilesConfig: typeof import\(.+\)\.defineFilesConfig/u)
+    expect(appImports).toContain('defineFilesConfig')
     expect(imports).not.toMatch(/node_modules\/nuxt-files-sdk\/runtime/u)
     expect(plugin).toContain('from "files-sdk/fs"')
     expect(plugin).not.toContain('files-sdk/loader')
@@ -61,6 +64,7 @@ export const checkPublicExamples = async (directory: string): Promise<void> => {
         JSON.stringify({
             extends: '../.nuxt/tsconfig.server.json',
             include: [
+                '../.nuxt/types/imports.d.ts',
                 '../.nuxt/types/nitro.d.ts',
                 '../.nuxt/nuxt-files-sdk/storage-registry.d.ts',
                 '../files.config.ts',

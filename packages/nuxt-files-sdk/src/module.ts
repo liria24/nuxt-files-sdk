@@ -16,7 +16,7 @@ declare module '@nuxt/schema' {
 export interface ModuleOptions {
     /** Path to the Files configuration module, relative to the Nuxt root directory. */
     config: string
-    /** Enable Files SDK development tools, optionally allowing file writes. */
+    /** Enable Files SDK development tools. File writes are enabled unless explicitly disabled. */
     devtools: boolean | FilesDevtoolsOptions
 }
 
@@ -33,6 +33,7 @@ export default defineNuxtModule<ModuleOptions>({
     },
     async setup(options, nuxt: Nuxt) {
         const configPath = resolve(nuxt.options.rootDir, options.config)
+        ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
         nuxt.hook('nitro:init', (nitro) =>
             setupNitroFilesIntegration(nitro, {
                 configPath,
@@ -43,7 +44,11 @@ export default defineNuxtModule<ModuleOptions>({
             references.push({ path: resolve(nuxt.options.buildDir, 'nuxt-files-sdk/storage-registry.d.ts') })
         })
 
-        addServerImports({ name: 'useServerFiles', from: 'nuxt-files-sdk/runtime' })
+        addServerImports([
+            { name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' },
+            { name: 'useServerFiles', from: 'nuxt-files-sdk/runtime' },
+        ])
+        addImports({ name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' })
         for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {
             addImports({ name, from: 'files-sdk/vue' })
         }
