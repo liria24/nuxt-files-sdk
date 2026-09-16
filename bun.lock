@@ -40,6 +40,7 @@
         "h3": "^1.15.11",
         "nuxt": "^4.5.2",
         "nuxt-files-sdk": "workspace:*",
+        "nuxt-llms": "^0.2.0",
         "nuxt-og-image": "^6.8.0",
         "rangi": "^2.2.0",
         "tailwindcss": "^4.3.3",
@@ -1952,6 +1953,8 @@
     "nuxt-files-sdk": ["nuxt-files-sdk@workspace:packages/nuxt-files-sdk"],
 
     "nuxt-files-sdk-docs": ["nuxt-files-sdk-docs@workspace:docs"],
+
+    "nuxt-llms": ["nuxt-llms@0.2.0", "", { "dependencies": { "@nuxt/kit": "^4.2.2" } }, "sha512-GoEW00x8zaZ1wS0R0aOYptt3b54JEaRwlyVtuAiQoH51BwYdjN5/3+00/+4wi39M5cT4j5XcnGwOxJ7v4WVb9A=="],
 
     "nuxt-og-image": ["nuxt-og-image@6.8.0", "", { "dependencies": { "@clack/prompts": "^1.8.0", "@nuxt/kit": "^4.5.2", "@vue/compiler-sfc": "^3.5.42", "chrome-launcher": "^1.2.1", "consola": "^3.4.2", "defu": "^6.1.7", "devalue": "^5.9.2", "exsolve": "^1.1.1", "fnv1a-64": "^0.1.2", "lightningcss": "^1.33.0", "magic-string": "^1.3.1", "magicast": "^0.5.5", "mocked-exports": "^0.1.1", "nuxt-site-config": "^4.2.3", "nuxtseo-shared": "^5.3.16", "nypm": "^0.6.10", "object-identity": "^0.2.3", "ofetch": "^1.5.1", "ohash": "^2.0.12", "oxc-parser": "^0.149.0", "oxc-walker": "^1.1.1", "pathe": "^2.0.3", "pkg-types": "^2.3.3", "radix3": "^1.1.2", "std-env": "^4.2.0", "strip-literal": "^4.0.0", "tinyexec": "^1.3.1", "ufo": "^1.6.4", "ultrahtml": "^1.7.0", "unplugin": "^3.3.0" }, "peerDependencies": { "@resvg/resvg-js": "^2.6.0", "@resvg/resvg-wasm": "^2.6.0", "@takumi-rs/core": "^1.0.0-beta.3 || ^2.0.0", "@takumi-rs/wasm": "^1.0.0-beta.3 || ^2.0.0", "@unhead/vue": "^2.0.5 || ^3.0.0", "@unocss/config": "^66.10.2", "@unocss/core": "^66.10.2", "fontless": "^0.2.0 || ^0.4.3", "nitropack": "^2.13.4", "playwright-core": "^1.50.0", "satori": ">=0.19.2", "sharp": "^0.34.0 || ^0.35.4", "tailwindcss": "^4.0.0", "unifont": "^0.7.0 || ^0.8.3", "unstorage": "^1.15.0", "zod": ">=3" }, "optionalPeers": ["@resvg/resvg-js", "@resvg/resvg-wasm", "@takumi-rs/core", "@takumi-rs/wasm", "@unocss/config", "@unocss/core", "fontless", "nitropack", "playwright-core", "satori", "sharp", "tailwindcss", "unifont", "zod"], "bin": { "nuxt-og-image": "./bin/cli.mjs" } }, "sha512-OS3mr1BUKBz+xmKDmyaUVdJMcVIc3uQ2an80fDVxZQ/tBBaCMj8AMUupkP/QrrcJLZOODbywe8OLmlynOz7b2Q=="],
 

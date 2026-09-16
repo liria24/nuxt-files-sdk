@@ -16,6 +16,7 @@ export default defineNuxtConfig({
         '@nuxt/fonts',
         '@nuxtjs/sitemap',
         '@nuxtjs/robots',
+        'nuxt-llms',
         'nuxt-og-image',
         '@nuxt/ui',
         '@comark/nuxt',
@@ -90,6 +91,14 @@ export default defineNuxtConfig({
     sitemap: {
         sources: ['/api/__sitemap__/urls'],
         excludeAppSources: ['nuxt:pages', '@nuxtjs/i18n:pages'],
+    },
+
+    llms: {
+        domain: siteUrl,
+        title: 'Nuxt Files SDK',
+        description: 'Native-first Files SDK integration for Nuxt and Nitro.',
+        sections: [],
+        prerender: false,
     },
 
     ogImage: {
