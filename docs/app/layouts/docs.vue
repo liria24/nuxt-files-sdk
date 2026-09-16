@@ -92,7 +92,7 @@ provide('docs-navigation', navigation)
             </template>
             <template #right>
                 <UTheme :props="{ button: { color: 'neutral', variant: 'link' } }">
-                    <UButton to="/getting-started" label="Docs" />
+                    <UButton to="/getting-started/installation" label="Docs" />
                     <UButton to="/llms.txt" label="llms.txt" />
                     <UButton :to="docs.filesSdk" target="_blank" label="Files SDK" />
                 </UTheme>

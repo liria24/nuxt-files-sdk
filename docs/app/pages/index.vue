@@ -9,7 +9,7 @@ const packageManagers: Record<packageManager, { label: string; icon: string; ins
     bun: { label: 'Bun', icon: 'simple-icons:bun', install: 'bun add' },
     yarn: { label: 'yarn', icon: 'simple-icons:yarn', install: 'yarn add' },
 }
-const selectPM = ref<packageManager>('npm')
+const selectPM = useCookie<packageManager>('package-manager', { default: () => 'npm' })
 const displayCommand = computed(() => `${packageManagers[selectPM.value].install} nuxt-files-sdk`)
 
 const siteUrl = useRuntimeConfig().public.siteUrl.replace(/\/$/u, '')
@@ -59,12 +59,12 @@ useSeoMeta({
 </script>
 
 <template>
-    <UPage :ui="{ center: 'flex flex-col items-center' }">
+    <UPage :ui="{ center: 'flex flex-col items-center pb-24' }">
         <UPageHero
             headline="Unofficial Nuxt Integration"
             title="Set up Files SDK easily"
             description="Native-first Files SDK integration for Nuxt and Nitro."
-            :ui="{ container: 'pb-8 lg:pb-8' }"
+            :ui="{ container: 'pb-8 sm:pb-8 lg:pb-8' }"
         >
             <template #links>
                 <div class="group relative">

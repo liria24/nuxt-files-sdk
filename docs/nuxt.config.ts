@@ -66,6 +66,12 @@ export default defineNuxtConfig({
         },
     },
 
+    app: {
+        head: {
+            link: [{ rel: 'icon', href: `/favicon.ico`, sizes: '75x75' }],
+        },
+    },
+
     site: {
         url: siteUrl,
         name: 'Nuxt Files SDK',
@@ -98,7 +104,6 @@ export default defineNuxtConfig({
         title: 'Nuxt Files SDK',
         description: 'Native-first Files SDK integration for Nuxt and Nitro.',
         sections: [],
-        prerender: false,
     },
 
     ogImage: {
