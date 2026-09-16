@@ -1,20 +1,45 @@
-# nuxt-files-sdk
+<p align="center">
+  <img alt="nuxt-files-sdk" src="https://shieldcn.dev/header/transparent.svg?title=Nuxt+Files+SDK&amp;subtitle=Native-first+Files+SDK+integration+for+Nuxt+and+Nitro.&amp;logo=nuxt&amp;mode=dark&amp;font=geist&amp;border=false" />
+</p>
 
-Native-first [Files SDK](https://files-sdk.dev/docs) integration for Nuxt and Nitro.
+<p align="center">
+  <a href="https://npmx.dev/package/nuxt-files-sdk"><img alt="badge" src="https://shieldcn.dev/npm/nuxt-files-sdk.svg?size=xs&amp;font=geist&amp;split=true" /></a>
+  <a href="https://github.com/liria24/nuxt-files-sdk"><img alt="license" src="https://shieldcn.dev/github/liria24/nuxt-files-sdk/license.svg?size=xs&amp;font=geist&amp;split=true" /></a>
+  <a href="https://github.com/liria24/nuxt-files-sdk/actions"><img alt="CI" src="https://shieldcn.dev/github/liria24/nuxt-files-sdk/ci.svg?size=xs&amp;font=geist&amp;split=true" /></a>
+  <a href="https://github.com/liria24/nuxt-files-sdk/commits"><img alt="last commit" src="https://shieldcn.dev/github/liria24/nuxt-files-sdk/last-commit.svg?size=xs&amp;font=geist&amp;split=true" /></a>
+</p>
 
-- [Documentation source](./docs/content/index.md)
-- [Installation](./docs/content/1.getting-started/2.installation.md)
-- [Canonical compiled examples](./test/fixtures/nuxt4)
+<p align="center">
+Unofficial <a href="https://files-sdk.dev">Files SDK</a> integration for Nuxt and Nitro.
+</p>
+
+<p align="center">
+Docs: <a href="https://nuxt-files-sdk.liria.me">https://nuxt-files-sdk.liria.me</a>
+</p>
 
 ```bash
-bun add nuxt-files-sdk
+npm i nuxt-files-sdk
 ```
 
 ```ts
 // nuxt.config.ts
-export default defineNuxtConfig({ modules: ['nuxt-files-sdk'] })
+export default defineNuxtConfig({
+    modules: ['nuxt-files-sdk'],
+})
+
+// files.config.ts
+export default defineFilesConfig({
+    storage: {
+        adapter: 'fs',
+        config: { root: '.data/files-devtools' },
+    },
+})
 ```
 
-Run `bun run dev` to build the package once, then start the documentation site with both Nuxt DevTools integrations. Restart it after package source changes. Production serves the Markdown directly from GitHub through the Cloudflare Worker, so content-only updates do not require a new app deployment.
+<p align="center">
+  <a href="https://github.com/liria24/nuxt-files-sdk/graphs/contributors"><img alt="contributors" src="https://shieldcn.dev/contributors/liria24/nuxt-files-sdk.svg?title=false&amp;mode=dark&amp;font=geist" /></a>
+</p>
 
-Cloudflare deployment settings are documented in [`docs/README.md`](./docs/README.md).
+<p align="center">
+  <img alt="npm downloads chart" src="https://shieldcn.dev/chart/npm/nuxt-files-sdk.svg?font=geist&amp;logo=false&amp;height=300" />
+</p>
