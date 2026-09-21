@@ -8,7 +8,6 @@ import {
     type FilesRetryEvent,
     type ProviderSlug,
 } from 'files-sdk'
-import { getProvider, listEnvVars } from 'files-sdk/providers'
 
 import type {
     DevelopmentOnlyNamedFilesConfig,
@@ -18,11 +17,13 @@ import type {
     SingleFilesConfig,
     StorageConfig,
 } from '../config'
-import { createFilesDevtoolsDiagnostic, type FilesDevtoolsDiagnostic } from '../devtools/diagnostics'
-import type { FilesDevtoolsSnapshot } from '../devtools/snapshot'
+import type { FilesDevtoolsDiagnosticCode } from '../devtools/diagnostics'
+import { normalizeFilesConfig, type StorageEntry } from './normalize'
+import type { ProviderFactories } from './provider-types'
 
 /** Native Files client plus the methods contributed by a storage's plugins. */
-export type FilesForStorage<T extends StorageConfig> = Files & ExtensionsOf<NonNullable<T['plugins']>>
+export type FilesForStorage<T extends StorageConfig> = Files<ReturnType<ProviderFactories[T['adapter']]>> &
+    ExtensionsOf<NonNullable<T['plugins']>>
 
 /** Map each configured storage name to its native Files client and plugin extensions. */
 export type StorageRegistry<C extends FilesConfig> =
@@ -65,67 +66,44 @@ const runHooks = async (...hooks: (() => void | Promise<void> | undefined)[]): P
     }
 }
 
-const isStorageConfig = (value: unknown): value is StorageConfig =>
-    Boolean(value && typeof value === 'object' && 'adapter' in value && typeof value.adapter === 'string')
-const isStorageRecord = (value: unknown): value is Record<string, StorageConfig> =>
-    Boolean(value && typeof value === 'object' && Object.values(value).every(isStorageConfig))
+const nativeFilesOptions = ({
+    adapter: _adapter,
+    config: _config,
+    hooks: _hooks,
+    plugins: _plugins,
+    ...options
+}: StorageConfig) => options
 
-type StorageEntry = {
-    name: string | undefined
-    storage: StorageConfig
-    override: StorageConfig | undefined
-    source: 'storage' | 'devStorage'
+export type ProviderEnvironment = Partial<Record<ProviderSlug, readonly (readonly string[])[]>>
+export interface RegistryDiagnostic {
+    code: FilesDevtoolsDiagnosticCode
+    name?: string
+    adapter?: string
 }
 
 /** Lazily construct and memoize native Files clients for a validated project configuration. */
 export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
-    readonly #config: C
-    readonly #development: boolean
+    readonly #entries: Map<string | undefined, StorageEntry>
+    readonly #environment: ProviderEnvironment
     readonly #factories: FilesProviderFactories
     readonly #hooks: FilesRuntimeHooks
-    readonly #instances = new Map<string, Files>()
-    readonly #initializing = new Set<string>()
-    readonly #diagnostics = new Map<string, FilesDevtoolsDiagnostic>()
+    readonly #instances = new Map<string | undefined, Files>()
+    readonly #initializing = new Set<string | undefined>()
+    readonly #diagnostics = new Map<string | undefined, RegistryDiagnostic>()
 
     /** Create a registry without constructing a provider. */
     constructor(
         config: C,
         options: {
             development?: boolean
+            environment?: ProviderEnvironment
             factories: FilesProviderFactories
             hooks?: FilesRuntimeHooks
         },
     ) {
-        if ('default' in config) {
-            throw new Error('[nuxt-files-sdk:invalid-config] The default option has been removed.')
-        }
-        const development = options.development ?? false
-        if (!config.storage && (!development || !config.devStorage)) {
-            throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
-        }
-        if (
-            config.storage &&
-            !isStorageConfig(config.storage) &&
-            (!isStorageRecord(config.storage) || Object.keys(config.storage).length === 0)
-        ) {
-            throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
-        }
-        if (!config.storage && !isStorageConfig(config.devStorage)) {
-            if (!isStorageRecord(config.devStorage) || Object.keys(config.devStorage).length === 0) {
-                throw new Error('[nuxt-files-sdk:invalid-config] At least one development storage is required.')
-            }
-        } else if (config.storage && !isStorageConfig(config.storage)) {
-            if (config.devStorage && !isStorageRecord(config.devStorage)) {
-                throw new Error('[nuxt-files-sdk:invalid-config] Named storage requires named devStorage overrides.')
-            }
-            for (const name of Object.keys(config.devStorage ?? {})) {
-                if (!Object.hasOwn(config.storage, name)) {
-                    throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
-                }
-            }
-        }
-        this.#config = config
-        this.#development = development
+        this.#entries = normalizeFilesConfig(config, options.development ?? false)
+        if (!this.#entries.size) throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
+        this.#environment = options.environment ?? {}
         this.#factories = options.factories
         this.#hooks = options.hooks ?? {}
     }
@@ -136,7 +114,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     get<Name extends Extract<keyof StorageRegistry<C>, string>>(name: Name): StorageRegistry<C>[Name]
     get(name?: string): Files {
         const entry = this.#entry(name)
-        const key = entry.name ?? ''
+        const key = entry.name
         const cached = this.#instances.get(key)
         if (cached) return cached
         if (this.#initializing.has(key)) {
@@ -149,14 +127,11 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             this.#diagnostics.delete(key)
             return files
         } catch (error) {
-            const label = entry.name === undefined ? 'The single storage' : `Storage "${entry.name}"`
-            this.#diagnostics.set(
-                key,
-                createFilesDevtoolsDiagnostic(
-                    'NUXT_FILES_ADAPTER_INIT_FAILED',
-                    `${label} (${entry.override?.adapter ?? entry.storage.adapter}) could not be initialized.`,
-                ),
-            )
+            this.#diagnostics.set(key, {
+                code: 'NUXT_FILES_ADAPTER_INIT_FAILED',
+                ...(entry.name === undefined ? {} : { name: entry.name }),
+                adapter: entry.selected.adapter,
+            })
             throw error
         } finally {
             this.#initializing.delete(key)
@@ -164,71 +139,36 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     }
 
     /** Return secret-free storage metadata and initialization state for development diagnostics. */
-    inspect(): FilesDevtoolsSnapshot {
+    inspect() {
         return {
-            storages: this.#entries().map(({ name, storage, override, source }) => ({
+            storages: [...this.#entries.values()].map(({ name, storage, selected, source }) => ({
                 ...(name === undefined ? {} : { name }),
-                adapter: override?.adapter ?? storage.adapter,
+                adapter: selected.adapter,
                 plugins: storage.plugins?.map((plugin) => plugin.name) ?? [],
                 source,
-                initialized: this.#instances.has(name ?? ''),
+                initialized: this.#instances.has(name),
             })),
             diagnostics: [...this.#diagnostics.values()],
         }
     }
 
-    #entries(): StorageEntry[] {
-        const storage = this.#config.storage
-        const devStorage = this.#config.devStorage
-        if (!storage) {
-            if (isStorageConfig(devStorage)) {
-                return [{ name: undefined, storage: devStorage, override: undefined, source: 'devStorage' }]
-            }
-            return Object.entries(devStorage ?? {}).map(([name, developmentStorage]) => ({
-                name,
-                storage: developmentStorage,
-                override: undefined,
-                source: 'devStorage',
-            }))
-        }
-        if (isStorageConfig(storage)) {
-            const override = this.#development && isStorageConfig(devStorage) ? devStorage : undefined
-            return [{ name: undefined, storage, override, source: override ? 'devStorage' : 'storage' }]
-        }
-        const overrides = this.#development && isStorageRecord(devStorage) ? devStorage : undefined
-        return Object.entries(storage).map(([name, namedStorage]) => ({
-            name,
-            storage: namedStorage,
-            override: overrides?.[name],
-            source: overrides?.[name] ? 'devStorage' : 'storage',
-        }))
-    }
-
     #entry(name?: string): StorageEntry {
-        const entries = this.#entries()
-        if (entries.length === 1 && entries[0]?.name === undefined) {
-            if (name !== undefined) {
-                throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
-            }
-            return entries[0]!
-        }
-        if (name === undefined) {
+        if (name === undefined && !this.#entries.has(undefined)) {
             throw new Error('[nuxt-files-sdk:storage-name-required] A storage name is required.')
         }
-        const entry = entries.find((candidate) => candidate.name === name)
+        const entry = this.#entries.get(name)
         if (!entry) throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
         return entry
     }
 
-    #create({ name, storage, override }: StorageEntry): Files {
-        const selected = override ?? storage
+    #create({ name, storage, selected }: StorageEntry): Files {
         const factory = this.#factories[selected.adapter]
         if (!factory) {
             throw new Error(
                 `[nuxt-files-sdk:adapter-not-generated] Adapter "${selected.adapter}" is not available in this build.`,
             )
         }
-        const adapter = withNuxtEnvironment(selected.adapter, () => {
+        const adapter = withNuxtEnvironment(this.#environment[selected.adapter] ?? [], () => {
             const input = typeof selected.config === 'function' ? selected.config() : selected.config
             if (input && typeof input === 'object' && 'then' in input) {
                 throw new Error('[nuxt-files-sdk:async-config] Storage config functions must be synchronous.')
@@ -239,6 +179,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         })
         return createFiles({
             adapter,
+            ...nativeFilesOptions(storage),
             hooks: {
                 onAction: (event) =>
                     runHooks(
@@ -257,22 +198,14 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
                     ),
             },
             ...(storage.plugins ? { plugins: storage.plugins } : {}),
-            ...(storage.prefix === undefined ? {} : { prefix: storage.prefix }),
-            ...(storage.retries === undefined ? {} : { retries: storage.retries }),
-            ...(storage.timeout === undefined ? {} : { timeout: storage.timeout }),
         })
     }
 }
 
 /** Bridge only NUXT_ aliases declared by the configured native provider during synchronous construction. */
-export const withNuxtEnvironment = <T>(provider: ProviderSlug, load: () => T): T => {
-    const metadata = getProvider(provider)
-    if (!metadata) return load()
-    const variables = listEnvVars(provider)
-    if (variables.length === 0) return load()
+export const withNuxtEnvironment = <T>(variables: readonly (readonly string[])[], load: () => T): T => {
     const injected: string[] = []
-    for (const variable of variables) {
-        const keys = [variable.key, ...(variable.aliases ?? [])]
+    for (const keys of variables) {
         if (keys.some((key) => process.env[key] !== undefined)) continue
         for (const key of keys) {
             const value = process.env[`NUXT_${key}`]

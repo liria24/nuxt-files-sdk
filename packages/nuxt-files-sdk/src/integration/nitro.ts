@@ -1,11 +1,13 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import type { ProviderSlug } from 'files-sdk'
-import { getProvider } from 'files-sdk/providers'
+import { getProvider, listEnvVars } from 'files-sdk/providers'
 import { createJiti } from 'jiti'
 
-import type { StorageConfig } from '../config'
+import { normalizeFilesConfig } from '../runtime/normalize'
 
 export interface NitroIntegration {
     meta?: { majorVersion?: number }
@@ -13,6 +15,7 @@ export interface NitroIntegration {
         rootDir: string
         buildDir: string
         dev?: boolean
+        preset?: string
         plugins: string[]
         alias?: Record<string, string>
         externals?: { inline?: unknown[] }
@@ -44,54 +47,38 @@ export interface NitroFilesIntegrationOptions {
     development: boolean
 }
 
-const isStorageConfig = (value: unknown): value is StorageConfig =>
-    Boolean(value && typeof value === 'object' && 'adapter' in value && typeof value.adapter === 'string')
-const isStorageRecord = (value: unknown): value is Record<string, StorageConfig> =>
-    Boolean(value && typeof value === 'object' && Object.values(value).every(isStorageConfig))
+const AWS_CORE_DEPENDENCIES = [
+    '@aws-sdk/client-s3',
+    '@aws-sdk/s3-presigned-post',
+    '@aws-sdk/s3-request-presigner',
+] as const
+const AWS_MULTIPART_DEPENDENCY = '@aws-sdk/lib-storage'
+const FETCH_CAPABLE_S3_ADAPTERS = new Set<ProviderSlug>(['minio', 'r2', 'rustfs'])
+const WORKERD_PRESETS = new Set(['cloudflare-module', 'cloudflare-durable', 'cloudflare-pages'])
+
+export const optionalAwsSdkDependencies = (
+    adapters: ProviderSlug[],
+    options: { nitroMajor: number; preset?: string | undefined; resolvable: (dependency: string) => boolean },
+): string[] => {
+    if (options.nitroMajor >= 3 || !options.preset || !WORKERD_PRESETS.has(options.preset)) return []
+    const s3Adapters = adapters.filter((adapter) => getProvider(adapter)?.peerDeps.includes('@aws-sdk/client-s3'))
+    if (s3Adapters.length === 0) return []
+    const optional = s3Adapters.every((adapter) => FETCH_CAPABLE_S3_ADAPTERS.has(adapter))
+        ? [...AWS_CORE_DEPENDENCIES, AWS_MULTIPART_DEPENDENCY]
+        : [AWS_MULTIPART_DEPENDENCY]
+    return optional.filter((dependency) => !options.resolvable(dependency))
+}
+
+const nitroMajorVersion = (nitro: NitroIntegration): number => nitro.meta?.majorVersion ?? ('routing' in nitro ? 3 : 2)
 
 export const selectedAdapters = (
     config: unknown,
     development: boolean,
 ): { adapters: ProviderSlug[]; single: boolean } | undefined => {
-    if (!config || typeof config !== 'object') {
-        throw new Error('[nuxt-files-sdk:invalid-config] Files configuration must be an object.')
-    }
-    const typedConfig: { storage?: unknown; devStorage?: unknown } = config
-    const storage = typedConfig.storage
-    const devStorage = typedConfig.devStorage
-    if (!storage && !development) return undefined
-    if (!storage && !devStorage) {
-        throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
-    }
-    const selected: StorageConfig[] = []
-    const single = isStorageConfig(storage ?? devStorage)
-    if (!storage) {
-        if (isStorageConfig(devStorage)) selected.push(devStorage)
-        else if (isStorageRecord(devStorage) && Object.keys(devStorage).length > 0)
-            selected.push(...Object.values(devStorage))
-        else throw new Error('[nuxt-files-sdk:invalid-config] At least one development storage is required.')
-    } else if (!isStorageConfig(storage) && (!isStorageRecord(storage) || Object.keys(storage).length === 0)) {
-        throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
-    } else if (isStorageConfig(storage)) {
-        if (devStorage && !isStorageConfig(devStorage)) {
-            throw new Error('[nuxt-files-sdk:invalid-config] A single storage requires a single devStorage override.')
-        }
-        selected.push(development && isStorageConfig(devStorage) ? devStorage : storage)
-    } else {
-        if (devStorage && !isStorageRecord(devStorage)) {
-            throw new Error('[nuxt-files-sdk:invalid-config] Named storage requires named devStorage overrides.')
-        }
-        const overrides = isStorageRecord(devStorage) ? devStorage : undefined
-        for (const name of Object.keys(overrides ?? {})) {
-            if (!Object.hasOwn(storage, name)) {
-                throw new Error(`[nuxt-files-sdk:unknown-storage] Unknown storage "${name}".`)
-            }
-        }
-        for (const [name, namedStorage] of Object.entries(storage)) {
-            selected.push(development ? (overrides?.[name] ?? namedStorage) : namedStorage)
-        }
-    }
-    const adapters = [...new Set(selected.map(({ adapter }) => adapter))].toSorted()
+    const entries = normalizeFilesConfig(config, development)
+    if (!entries.size) return undefined
+    const single = entries.has(undefined)
+    const adapters = [...new Set([...entries.values()].map(({ selected }) => selected.adapter))].toSorted()
     for (const adapter of adapters) {
         if (!getProvider(adapter)) {
             throw new Error(`[nuxt-files-sdk:unknown-adapter] Unknown adapter "${adapter}".`)
@@ -157,7 +144,44 @@ export const setupNitroFilesIntegration = async (
     if (!selected) return
     const { adapters, single } = selected
     const providers = providerCode(adapters)
+    const internalPath = fileURLToPath(new URL('../runtime/internal.js', import.meta.url)).replaceAll('\\', '/')
+    const environment = Object.fromEntries(
+        adapters.map((adapter) => [
+            adapter,
+            listEnvVars(adapter).map((variable) => [variable.key, ...(variable.aliases ?? [])]),
+        ]),
+    )
     const runtimeConfig = options.development ? 'config' : '{ storage: config.storage }'
+    const directory = resolve(nitro.options.rootDir, nitro.options.buildDir, 'nuxt-files-sdk')
+    const require = createRequire(resolve(nitro.options.rootDir, 'package.json'))
+    const aliases = nitro.options.alias ?? {}
+    const awsShims = optionalAwsSdkDependencies(adapters, {
+        nitroMajor: nitroMajorVersion(nitro),
+        preset: nitro.options.preset,
+        resolvable: (dependency) => {
+            if (Object.hasOwn(aliases, dependency)) return true
+            try {
+                require.resolve(dependency)
+                return true
+            } catch {
+                return false
+            }
+        },
+    })
+    if (awsShims.length > 0) {
+        nitro.options.alias = aliases
+        await mkdir(directory, { recursive: true })
+        await Promise.all(
+            awsShims.map(async (dependency) => {
+                const shimPath = resolve(directory, `${dependency.replaceAll(/[^a-z0-9]+/giu, '-')}.mjs`)
+                aliases[dependency] = shimPath.replaceAll('\\', '/')
+                await writeFile(
+                    shimPath,
+                    `throw new Error(${JSON.stringify(`[nuxt-files-sdk:missing-optional-dependency] ${dependency} is required for this Files SDK operation. Install it or select the provider's fetch client.`)})\n`,
+                )
+            }),
+        )
+    }
     nitro.unimport?.getInternalContext().addons.push({
         name: 'nuxt-files-sdk-jsdoc',
         declaration: (declarations) =>
@@ -171,25 +195,24 @@ export const setupNitroFilesIntegration = async (
     ;(externals.inline ??= []).push('nuxt-files-sdk')
     // Nitro's single-file dev build would eagerly import every native provider SDK.
     if (!nitro.options.dev) externals.inline.push('files-sdk')
-    const directory = resolve(nitro.options.buildDir, 'nuxt-files-sdk')
     const pluginPath = resolve(directory, options.development ? 'plugin.dev.mjs' : 'plugin.mjs')
     const typesPath = resolve(directory, 'storage-registry.d.ts')
-    const filesSdkTypes = resolve(nitro.options.rootDir, 'node_modules/files-sdk/dist').replaceAll('\\', '/')
     // Development also externalizes local .mjs files unless explicitly inlined.
     externals.inline.push(pluginPath.replaceAll('\\', '/'), configPath)
     nitro.options.plugins.push(pluginPath.replaceAll('\\', '/'))
-    nitro.hooks.hook('types:extend', async (types) => {
+    const writeGeneratedFiles = async (): Promise<void> => {
         await mkdir(directory, { recursive: true })
         await Promise.all([
             writeFile(
                 pluginPath,
                 `import config from ${JSON.stringify(configPath)}
 ${providers.imports}
-import { configureFiles } from 'nuxt-files-sdk/runtime'
+import { configureFiles } from ${JSON.stringify(internalPath)}
 
 export default (nitroApp) => configureFiles(${runtimeConfig}, {
   development: ${JSON.stringify(options.development)},
   factories: { ${providers.factories} },
+  environment: ${JSON.stringify(environment)},
   hooks: {
     onAction: (event, storage) => nitroApp.hooks.callHook('files:action', { event, storage }),
     onError: (event, storage) => nitroApp.hooks.callHook('files:error', { event, storage }),
@@ -199,15 +222,15 @@ export default (nitroApp) => configureFiles(${runtimeConfig}, {
 `,
             ),
             // Older v2 and current v3 omit meta; only v3 exposes the routing API.
-            writeFile(
-                typesPath,
-                storageTypes(configPath, nitro.meta?.majorVersion ?? ('routing' in nitro ? 3 : 2), single),
-            ),
+            writeFile(typesPath, storageTypes(configPath, nitroMajorVersion(nitro), single)),
         ])
+    }
+    await writeGeneratedFiles()
+    nitro.hooks.hook('types:extend', async (types) => {
+        await writeGeneratedFiles()
         const tsConfig = (types.tsConfig ??= {})
         ;(tsConfig.include ??= []).push(typesPath)
         const paths = ((tsConfig.compilerOptions ??= {}).paths ??= {})
-        paths['files-sdk'] ??= [`${filesSdkTypes}/index.d.ts`]
-        paths['files-sdk/*'] ??= [`${filesSdkTypes}/*/index.d.ts`]
+        paths['files-sdk'] ??= [resolve(nitro.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
     })
 }

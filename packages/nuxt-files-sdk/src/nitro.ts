@@ -14,5 +14,3 @@ export default {
             development: Boolean(nitro.options.dev),
         }),
 }
-
-export * from './runtime'
