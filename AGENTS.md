@@ -31,7 +31,7 @@
 - Package checks cover exports, declarations, dependency boundaries, publint/ATTW, permitted contents, fresh consumer compilation/build/HTTP routes, and secret absence. Root typecheck also checks the unit type assertions; generated declarations have positive and negative compiler checks.
 - Bundle checks exclude unused Vue, production DevFrame, standalone Nuxt Kit, unrelated native plugins, unused provider entrypoints, and external cloud SDK packages in fs-only apps. Provider entrypoints can retain their own optional internal engines, such as R2's AWS SDK path.
 - Sizes are complete fixture deployment outputs, not this package's isolated contribution. Keep budgets in executable bundle tests; do not loosen them to conceal regressions. Optional SDK warnings are not by themselves runtime failures, but real route and output checks must pass.
-- CI does not guarantee real cloud credentials/network access, every deploy preset, application authorization, unknown upstream changes, or complete interactive GUI coverage. File Explorer, gateway helpers, UI components, MCP, and advanced telemetry remain outside the package scope; the `docs/` workspace documents the implemented Nuxt/Nitro integration without redefining native Files SDK APIs.
+- CI does not guarantee real cloud credentials/network access, every deploy preset, application authorization, unknown upstream changes, or complete interactive GUI coverage. The development-only file browser uses native Files SDK client/gateway APIs; application-facing File Explorer, gateway helpers, UI components, MCP, and advanced telemetry remain outside the package scope. The `docs/` workspace documents the implemented Nuxt/Nitro integration without redefining native Files SDK APIs.
 
 ## Historical summary
 
