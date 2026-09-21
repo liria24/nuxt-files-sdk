@@ -2,7 +2,9 @@ import type { Files } from 'files-sdk'
 import { createFilesRouter, type FilesOperation } from 'files-sdk/api'
 import { createRouteHandler } from 'files-sdk/nitro'
 
-import { inspectFiles, useServerFiles } from '../runtime'
+import { useServerFiles } from '../runtime'
+import { inspectFiles } from '../runtime/internal'
+import { authorizeFilesDevtoolsRequest } from './auth'
 import { FILES_DEVTOOLS_MAX_UPLOAD_SIZE } from './snapshot'
 
 const readOperations = ['capabilities', 'list', 'exists', 'download'] as const satisfies readonly FilesOperation[]
@@ -33,10 +35,13 @@ export const createFilesDevtoolsHandler = (write: boolean) => {
             secret: crypto.randomUUID(),
         }),
     )
-    return (event: Parameters<typeof handleFiles>[0]): Promise<Response> => {
+    return async (event: Parameters<typeof handleFiles>[0], secret: string): Promise<Response> => {
+        if (!(await authorizeFilesDevtoolsRequest(event.node.req, secret))) {
+            return new Response(null, { status: 401 })
+        }
         const url = new URL(event.node.req.url ?? '/', 'http://nuxt-files-sdk.local')
         if (event.node.req.method === 'GET' && url.searchParams.get('op') === 'devtools') {
-            return Promise.resolve(Response.json({ write, maxUploadSize: FILES_DEVTOOLS_MAX_UPLOAD_SIZE }))
+            return Response.json({ write, maxUploadSize: FILES_DEVTOOLS_MAX_UPLOAD_SIZE })
         }
         return handleFiles(event)
     }
