@@ -125,11 +125,11 @@ jobs:
             matrix:
                 include:
                     - compatibility: minimum
-                      sdk: '2.4.1'
+                      sdk: '2.6.0'
                       nuxt: '4.0.0'
                       nitro2: '2.13.0'
                     - compatibility: latest-supported
-                      sdk: '^2.4.0'
+                      sdk: '^2.6.0'
                       nuxt: '^4.0.0'
                       nitro2: '^2.13.0'
         env:
@@ -142,10 +142,29 @@ jobs:
               with: { persist-credentials: false }
             - uses: ./.github/actions/setup
             - run: bun run test:consumer
+    test-package-managers:
+        permissions:
+            contents: read
+        needs: build
+        strategy:
+            fail-fast: false
+            matrix:
+                package-manager: [npm, pnpm]
+        env:
+            NUXT_FILES_PACKAGE_MANAGER: ${{ matrix.package-manager }}
+            NUXT_FILES_SDK_VERSION: '^2.6.0'
+            NUXT_FILES_NUXT_VERSION: '^4.0.0'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - if: matrix.package-manager == 'pnpm'
+              run: npm install --global pnpm@10.25.0
+            - run: bun run test:consumer
     test-size:
         permissions:
             contents: read
-        needs: test-nuxt4
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -175,6 +194,7 @@ jobs:
             - test-nitro2
             - test-nitro3
             - test-consumer
+            - test-package-managers
             - test-size
             - benchmark
         runs-on: ubuntu-latest

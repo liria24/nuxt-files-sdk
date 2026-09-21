@@ -8,6 +8,7 @@
         "build": "nuxt build"
     },
     "dependencies": {
+        "files-sdk": "^2.6.0",
         "nuxt": "npm:nuxt-nightly@latest",
         "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
     },

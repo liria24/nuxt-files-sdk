@@ -6,6 +6,7 @@
         "build": "nuxt build"
     },
     "dependencies": {
+        "files-sdk": "^2.6.0",
         "nuxt": "^4.0.0",
         "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
     },
