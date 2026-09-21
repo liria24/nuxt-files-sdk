@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
@@ -12,6 +13,7 @@ const forbidden = [
     '@nuxtjs/mcp-toolkit',
     'Files SDK, wired for Nuxt',
 ]
+let hasLlmsRoute = false
 
 await Promise.all(
     (await readdir(output, { recursive: true, withFileTypes: true }))
@@ -19,6 +21,7 @@ await Promise.all(
         .map(async (path) => {
             const file = resolve(path.parentPath, path.name)
             const content = await readFile(file, 'utf8')
+            hasLlmsRoute ||= /route\s*:\s*['"]\/llms\.txt['"]/.test(content)
             for (const marker of forbidden) {
                 if (content.includes(marker)) throw new Error(`${marker} found in ${file}`)
             }
@@ -29,6 +32,8 @@ const wrangler = await readFile(resolve(output, 'server/wrangler.json'), 'utf8')
 for (const required of ['nuxt-files-sdk-docs', 'nuxt-files-sdk.liria.me', 'DOCS_CACHE']) {
     if (!wrangler.includes(required)) throw new Error(`${required} missing from generated Wrangler config`)
 }
+if (existsSync(resolve(output, 'public/llms.txt'))) throw new Error('llms.txt must be generated at runtime')
+if (!hasLlmsRoute) throw new Error('llms.txt runtime route is missing')
 const deployConfig = await readFile(resolve(output, '../.wrangler/deploy/config.json'), 'utf8')
 if (!deployConfig.includes('wrangler.json')) throw new Error('Nitro Wrangler deploy redirect is missing')
 

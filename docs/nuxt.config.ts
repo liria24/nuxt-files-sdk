@@ -104,6 +104,7 @@ export default defineNuxtConfig({
         title: 'Nuxt Files SDK',
         description: 'Native-first Files SDK integration for Nuxt and Nitro.',
         sections: [],
+        prerender: false,
     },
 
     ogImage: {
