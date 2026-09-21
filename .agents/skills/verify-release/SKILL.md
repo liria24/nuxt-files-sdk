@@ -24,6 +24,7 @@ Work from the repository root. Read [AGENTS.md](../../../AGENTS.md), root/packag
 
 ## CI and release conclusion
 
+- `packages/nuxt-files-sdk/package.json` version is owned by `uppt`. Do not edit it manually during feature work, dependency updates, or release preparation; let `uppt` set it during release versioning.
 - Inspect the failing commit and first failed job before changing workflow logic. Required checks must run even for docs/workflow-only changes. Every blocking job must be a direct `ci-ok` dependency, and failure/cancellation/skipping must fail that gate; nightly is the explicit exception.
 - Use `.github/workflows/release.yml` as the release procedure: successful push CI for the tagged SHA, exact `uppt/pack` archive verification, then publication of that same uploaded artifact. Verify this ordering without triggering a tag, push, or publish unless the user requested it.
 - Finish with actual commands/results, compatibility selections, material warnings or failures, and what was not run. Distinguish local results, remote CI, and publication/OIDC readiness. Run `git diff --check` and inspect tracked changes; never present a historical report or a green local run as current remote CI evidence.
