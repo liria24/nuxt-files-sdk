@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import type { Nuxt } from '@nuxt/schema'
 import { describe, expect, test, vi } from 'vitest'
 
+import { verifyFilesDevtoolsToken } from '../../packages/nuxt-files-sdk/src/devtools/auth'
 import { createFilesDevframe } from '../../packages/nuxt-files-sdk/src/devtools/devframe'
 import {
     filesDevtoolsWriteEnabled,
@@ -94,20 +95,20 @@ describe('Nuxt DevTools integration', () => {
 
     test('[DEV-002] v3 registers one legacy iframe tab for the shared UI', () => {
         const { hooks, nuxt } = fakeNuxt()
-        setupNuxtV3Devtools(nuxt)
+        setupNuxtV3Devtools(nuxt, 'legacy-secret')
         const tabs: unknown[] = []
         hooks.get('devtools:customTabs')?.(tabs as never)
         expect(tabs).toEqual([
             expect.objectContaining({
                 name: 'nuxt-files-sdk',
-                view: { type: 'iframe', src: '/__nuxt-files-sdk/' },
+                view: { type: 'iframe', src: '/__nuxt-files-sdk/?bootstrap=legacy-secret' },
             }),
         ])
     })
 
     test('[DEV-003] v4 registers only the native DevFrame-ready host', async () => {
         const { hooks, nuxt } = fakeNuxt()
-        setupNuxtV4Devtools(nuxt, { write: true, maxUploadSize: 10 })
+        setupNuxtV4Devtools(nuxt, { write: true, maxUploadSize: 10, tokenSecret: 'test-secret' })
         expect([...hooks.keys()]).toEqual(['devtools:ready'])
         const { context, diagnosticHandles, rpcDefinitions } = fakeDevtoolsContext()
         await hooks.get('devtools:ready')?.(context as never)
@@ -130,7 +131,15 @@ describe('Nuxt DevTools integration', () => {
             'Files: Copy Diagnostics',
         ])
         expect(context.diagnostics.register).toHaveBeenCalledOnce()
-        expect(rpcDefinitions.map(({ name }) => name)).toEqual(['report-diagnostics', 'report-failure'])
+        expect(rpcDefinitions.map(({ name }) => name)).toEqual([
+            'issue-http-token',
+            'report-diagnostics',
+            'report-failure',
+        ])
+        const token = (await rpcDefinitions.find(({ name }) => name === 'issue-http-token')?.handler?.(undefined)) as {
+            token: string
+        }
+        await expect(verifyFilesDevtoolsToken(token.token, 'test-secret')).resolves.toBe(true)
 
         rpcDefinitions
             .find(({ name }) => name === 'report-diagnostics')
@@ -154,6 +163,7 @@ describe('Nuxt DevTools integration', () => {
         await createFilesDevframe({
             write: false,
             maxUploadSize: 10,
+            tokenSecret: 'test-secret',
             notifyFailure: (message) => context.messages.add(message),
         }).setup(context as never)
         rpcDefinitions

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { defineDevframe, defineRpcFunction } from 'devframe'
 
 import { version } from '../../package.json'
+import { createFilesDevtoolsToken } from './auth'
 import {
     createFilesDevtoolsDiagnostic,
     FILES_DEVTOOLS_DIAGNOSTICS,
@@ -25,6 +26,7 @@ interface FilesDevframeMessage {
 export interface FilesDevframeOptions {
     write: boolean
     maxUploadSize: number
+    tokenSecret: string
     notifyFailure: (message: FilesDevframeMessage) => unknown
 }
 
@@ -36,7 +38,7 @@ const messageTitles = {
     gateway: 'Files DevTools gateway failed',
 } as const
 
-export const createFilesDevframe = ({ write, maxUploadSize, notifyFailure }: FilesDevframeOptions) =>
+export const createFilesDevframe = ({ write, maxUploadSize, tokenSecret, notifyFailure }: FilesDevframeOptions) =>
     defineDevframe({
         id: 'nuxt-files-sdk',
         name: 'Files',
@@ -75,6 +77,13 @@ export const createFilesDevframe = ({ write, maxUploadSize, notifyFailure }: Fil
             }
 
             const scoped = context.scope('nuxt-files-sdk')
+            scoped.rpc.register(
+                defineRpcFunction({
+                    name: 'issue-http-token',
+                    type: 'query',
+                    handler: () => createFilesDevtoolsToken(tokenSecret),
+                }),
+            )
             scoped.rpc.register(
                 defineRpcFunction({
                     name: 'report-diagnostics',

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 
 import { addImports, addServerImports, defineNuxtModule, getNuxtModuleVersion } from '@nuxt/kit'
@@ -58,7 +59,8 @@ export default defineNuxtModule<ModuleOptions>({
         if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
             const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
             const { setupFilesDevtools } = await import('./devtools')
-            setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools))
+            const secrets = { bootstrap: randomUUID(), token: randomUUID() }
+            setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools), secrets)
         }
     },
 })
