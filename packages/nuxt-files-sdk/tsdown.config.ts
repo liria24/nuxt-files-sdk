@@ -32,6 +32,7 @@ export default defineConfig([
             nitro: 'src/nitro.ts',
             runtime: 'src/runtime.ts',
             'runtime/internal': 'src/runtime/internal.ts',
+            'integration/config': 'src/integration/config.ts',
             'devtools/files-read': 'src/devtools/files-read.ts',
             'devtools/files-write': 'src/devtools/files-write.ts',
             'devtools/nuxt-v3-handler': 'src/devtools/nuxt-v3-handler.ts',

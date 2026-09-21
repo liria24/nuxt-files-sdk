@@ -17,7 +17,7 @@ const assets = new Map([
 ])
 
 export default async (event: { path: string; node: { res: { setHeader(name: string, value: string): void } } }) => {
-    const asset = assets.get(event.path)
+    const asset = assets.get(new URL(event.path, 'http://localhost').pathname)
     if (!asset) return undefined
     event.node.res.setHeader('content-type', asset.contentType)
     return asset.content

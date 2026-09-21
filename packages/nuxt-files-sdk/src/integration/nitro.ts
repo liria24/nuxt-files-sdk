@@ -115,12 +115,12 @@ declare module ${JSON.stringify(moduleName)} {
 export const storageTypes = (
     configPath: string,
     nitroMajor: number,
-    single: boolean,
 ): string => `import type config from ${JSON.stringify(configPath)}
 import type { SingleStorage, StorageRegistry } from 'nuxt-files-sdk/runtime'
 
 declare module 'nuxt-files-sdk/runtime' {
-  ${single ? 'interface NuxtFilesSingleStorage { value: SingleStorage<typeof config> }' : 'interface NuxtFilesStorageRegistry extends StorageRegistry<typeof config> {}'}
+  interface NuxtFilesSingleStorage { value: SingleStorage<typeof config> }
+  interface NuxtFilesStorageRegistry extends StorageRegistry<typeof config> {}
 }
 ${hookTypes(nitroMajor >= 3 ? 'nitro/types' : 'nitropack/types')}
 export {}
@@ -132,7 +132,10 @@ export const setupNitroFilesIntegration = async (
 ): Promise<void> => {
     const configPath = options.configPath.replaceAll('\\', '/')
     const jiti = createJiti(import.meta.url, {
-        ...(nitro.options.alias ? { alias: nitro.options.alias } : {}),
+        alias: {
+            ...nitro.options.alias,
+            'nuxt-files-sdk/config': fileURLToPath(new URL('./config.js', import.meta.url)),
+        },
         interopDefault: true,
         moduleCache: false,
     })
@@ -141,8 +144,24 @@ export const setupNitroFilesIntegration = async (
     const loaded: unknown = await jiti.evalModule(code, { filename: configPath, async: true })
     const config: unknown = loaded && typeof loaded === 'object' && 'default' in loaded ? loaded.default : loaded
     const selected = selectedAdapters(config, options.development)
+    const directory = resolve(nitro.options.rootDir, nitro.options.buildDir, 'nuxt-files-sdk')
+    const typesPath = resolve(directory, 'storage-registry.d.ts')
+    let writeRuntime: (() => Promise<void>) | undefined
+    const writeTypes = async (): Promise<void> => {
+        await mkdir(directory, { recursive: true })
+        await writeFile(typesPath, storageTypes(configPath, nitroMajorVersion(nitro)))
+    }
+    await writeTypes()
+    nitro.hooks.hook('types:extend', async (types) => {
+        await writeTypes()
+        await writeRuntime?.()
+        const tsConfig = (types.tsConfig ??= {})
+        ;(tsConfig.include ??= []).push(typesPath)
+        const paths = ((tsConfig.compilerOptions ??= {}).paths ??= {})
+        paths['files-sdk'] ??= [resolve(nitro.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
+    })
     if (!selected) return
-    const { adapters, single } = selected
+    const { adapters } = selected
     const providers = providerCode(adapters)
     const internalPath = fileURLToPath(new URL('../runtime/internal.js', import.meta.url)).replaceAll('\\', '/')
     const environment = Object.fromEntries(
@@ -152,7 +171,6 @@ export const setupNitroFilesIntegration = async (
         ]),
     )
     const runtimeConfig = options.development ? 'config' : '{ storage: config.storage }'
-    const directory = resolve(nitro.options.rootDir, nitro.options.buildDir, 'nuxt-files-sdk')
     const require = createRequire(resolve(nitro.options.rootDir, 'package.json'))
     const aliases = nitro.options.alias ?? {}
     const awsShims = optionalAwsSdkDependencies(adapters, {
@@ -196,16 +214,14 @@ export const setupNitroFilesIntegration = async (
     // Nitro's single-file dev build would eagerly import every native provider SDK.
     if (!nitro.options.dev) externals.inline.push('files-sdk')
     const pluginPath = resolve(directory, options.development ? 'plugin.dev.mjs' : 'plugin.mjs')
-    const typesPath = resolve(directory, 'storage-registry.d.ts')
     // Development also externalizes local .mjs files unless explicitly inlined.
     externals.inline.push(pluginPath.replaceAll('\\', '/'), configPath)
     nitro.options.plugins.push(pluginPath.replaceAll('\\', '/'))
-    const writeGeneratedFiles = async (): Promise<void> => {
+    writeRuntime = async (): Promise<void> => {
         await mkdir(directory, { recursive: true })
-        await Promise.all([
-            writeFile(
-                pluginPath,
-                `import config from ${JSON.stringify(configPath)}
+        await writeFile(
+            pluginPath,
+            `import config from ${JSON.stringify(configPath)}
 ${providers.imports}
 import { configureFiles } from ${JSON.stringify(internalPath)}
 
@@ -220,17 +236,7 @@ export default (nitroApp) => configureFiles(${runtimeConfig}, {
   },
 })
 `,
-            ),
-            // Older v2 and current v3 omit meta; only v3 exposes the routing API.
-            writeFile(typesPath, storageTypes(configPath, nitroMajorVersion(nitro), single)),
-        ])
+        )
     }
-    await writeGeneratedFiles()
-    nitro.hooks.hook('types:extend', async (types) => {
-        await writeGeneratedFiles()
-        const tsConfig = (types.tsConfig ??= {})
-        ;(tsConfig.include ??= []).push(typesPath)
-        const paths = ((tsConfig.compilerOptions ??= {}).paths ??= {})
-        paths['files-sdk'] ??= [resolve(nitro.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
-    })
+    await writeRuntime()
 }

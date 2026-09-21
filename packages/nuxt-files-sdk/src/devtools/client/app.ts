@@ -63,9 +63,11 @@ const isAccess = (value: unknown): value is Access =>
 const isAccessToken = (value: unknown): value is AccessToken =>
     isRecord(value) && typeof value.token === 'string' && typeof value.expiresAt === 'number'
 const requestAccessToken = async (): Promise<AccessToken> => {
-    const bootstrap = new URL(window.location.href).searchParams.get('bootstrap')
-    if (bootstrap) {
-        const response = await fetch('./token', { headers: { 'x-nuxt-files-sdk-bootstrap': bootstrap } })
+    if (new URL(window.location.href).searchParams.get('host') === 'nuxt-v3') {
+        // Nuxt DevTools v3 stores the token after its native authorization flow.
+        const token = localStorage.getItem('__nuxt_dev_token__')
+        if (!token) throw new Error('Authorize this browser in Nuxt DevTools, then refresh Files.')
+        const response = await fetch('./token', { headers: { 'x-nuxt-devtools-token': token } })
         if (!response.ok) throw new Error(`DevTools authentication failed (${response.status}).`)
         const value: unknown = await response.json()
         if (isAccessToken(value)) return value
@@ -426,6 +428,7 @@ const copyDiagnostics = async (): Promise<void> => {
 }
 
 const initializeBridge = async (): Promise<void> => {
+    if (new URL(window.location.href).searchParams.get('host') === 'nuxt-v3') return
     try {
         devframe = await connectDevframe({ simpleAuth: false })
         const rpc = devframe.scope('nuxt-files-sdk').rpc

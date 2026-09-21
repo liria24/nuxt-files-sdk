@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 
 import {
     authorizeFilesDevtoolsRequest,
@@ -7,9 +7,25 @@ import {
     verifyFilesDevtoolsToken,
 } from '../../packages/nuxt-files-sdk/src/devtools/auth'
 import snapshot from '../../packages/nuxt-files-sdk/src/devtools/snapshot'
+import tokenHandler from '../../packages/nuxt-files-sdk/src/devtools/token'
 import { configureFiles, inspectFiles } from '../../packages/nuxt-files-sdk/src/runtime/internal'
 
 describe('Files DevTools HTTP authentication', () => {
+    test('[SEC-005] issues tokens only after native v3 authorization succeeds', async () => {
+        const authorize = vi.fn<(token: string) => Promise<void>>(async (token) => {
+            if (token !== 'native-token') throw new Error('Unauthorized')
+        })
+        const request = (headers: Record<string, string>) =>
+            tokenHandler({ node: { req: { headers } } }, 'test-secret', authorize)
+        expect((await request({})).status).toBe(401)
+        expect((await request({ 'x-nuxt-files-sdk-bootstrap': 'public-tab-value' })).status).toBe(401)
+        expect(authorize).not.toHaveBeenCalled()
+        expect((await request({ 'x-nuxt-devtools-token': 'invalid' })).status).toBe(401)
+        const response = await request({ 'x-nuxt-devtools-token': 'native-token' })
+        expect(response.status).toBe(200)
+        const { token } = (await response.json()) as { token: string }
+        await expect(verifyFilesDevtoolsToken(token, 'test-secret')).resolves.toBe(true)
+    })
     test('enriches runtime diagnostic codes only in the authenticated development snapshot', async () => {
         const registry = configureFiles(
             { storage: { adapter: 'memory' } },

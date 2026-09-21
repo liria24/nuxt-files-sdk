@@ -1,4 +1,6 @@
 import { fs } from 'files-sdk/fs'
+import type { FsAdapter } from 'files-sdk/fs'
+import type { MemoryAdapter } from 'files-sdk/memory'
 import type { RustfsAdapter } from 'files-sdk/rustfs'
 import { versioning } from 'files-sdk/versioning'
 import { describe, expect, expectTypeOf, test } from 'vitest'
@@ -11,6 +13,33 @@ import {
 } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 describe('configuration types', () => {
+    test('[TYPE-001] preserves both providers and base plugins across environments', () => {
+        const single = defineFilesConfig({
+            storage: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },
+            devStorage: { adapter: 'memory' },
+        })
+        const named = defineFilesConfig({
+            storage: {
+                archive: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },
+                same: { adapter: 'fs', config: { root: '.' } },
+                untouched: { adapter: 'fs', config: { root: '.' } },
+            },
+            devStorage: { archive: { adapter: 'memory' }, same: { adapter: 'fs', config: { root: './dev' } } },
+        })
+        expectTypeOf(single.devStorage!.adapter).toEqualTypeOf<'memory'>()
+        expectTypeOf<SingleStorage<typeof single>['adapter']>().toEqualTypeOf<FsAdapter | MemoryAdapter>()
+        expectTypeOf<SingleStorage<typeof single>>().toHaveProperty('versions')
+        expectTypeOf<StorageRegistry<typeof named>['archive']['adapter']>().toEqualTypeOf<FsAdapter | MemoryAdapter>()
+        expectTypeOf<StorageRegistry<typeof named>['archive']>().toHaveProperty('versions')
+        expectTypeOf<StorageRegistry<typeof named>['same']['adapter']>().toEqualTypeOf<FsAdapter>()
+        expectTypeOf<StorageRegistry<typeof named>['untouched']['adapter']>().toEqualTypeOf<FsAdapter>()
+        expectTypeOf<
+            SingleStorage<{ storage: { adapter: 'fs'; config: { root: string } } }>['adapter']
+        >().toEqualTypeOf<FsAdapter>()
+        expectTypeOf<
+            StorageRegistry<{ storage: { archive: { adapter: 'fs'; config: { root: string } } } }>['archive']['adapter']
+        >().toEqualTypeOf<FsAdapter>()
+    })
     test('[TYPE-001][TYPE-013][API-002][API-003] preserves single, named, provider, and plugin types', () => {
         const single = defineFilesConfig({
             storage: { adapter: 'fs', config: { root: '.data/files' }, plugins: [versioning()] },

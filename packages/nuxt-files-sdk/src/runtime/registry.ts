@@ -12,6 +12,7 @@ import {
 import type {
     DevelopmentOnlyNamedFilesConfig,
     DevelopmentOnlySingleFilesConfig,
+    DevStorageConfig,
     FilesConfig,
     NamedFilesConfig,
     SingleFilesConfig,
@@ -22,21 +23,28 @@ import { normalizeFilesConfig, type StorageEntry } from './normalize'
 import type { ProviderFactories } from './provider-types'
 
 /** Native Files client plus the methods contributed by a storage's plugins. */
-export type FilesForStorage<T extends StorageConfig> = Files<ReturnType<ProviderFactories[T['adapter']]>> &
+export type FilesForStorage<T extends StorageConfig, Dev = never> = Files<
+    ReturnType<ProviderFactories[T['adapter'] | (Dev extends DevStorageConfig ? Dev['adapter'] : never)]>
+> &
     ExtensionsOf<NonNullable<T['plugins']>>
 
 /** Map each configured storage name to its native Files client and plugin extensions. */
 export type StorageRegistry<C extends FilesConfig> =
-    C extends NamedFilesConfig<infer Storages>
-        ? { [Name in keyof Storages]: FilesForStorage<Storages[Name]> }
+    C extends NamedFilesConfig<infer Storages, infer Dev>
+        ? {
+              [Name in keyof Storages]: FilesForStorage<
+                  Storages[Name],
+                  'devStorage' extends keyof C ? (Name extends keyof Dev ? Dev[Name] : never) : never
+              >
+          }
         : C extends DevelopmentOnlyNamedFilesConfig<infer Storages>
           ? { [Name in keyof Storages]: FilesForStorage<Storages[Name]> }
           : Record<never, never>
 
 /** Files client returned by an unnamed single-storage configuration. */
 export type SingleStorage<C extends FilesConfig> =
-    C extends SingleFilesConfig<infer Storage>
-        ? FilesForStorage<Storage>
+    C extends SingleFilesConfig<infer Storage, infer Dev>
+        ? FilesForStorage<Storage, 'devStorage' extends keyof C ? Dev : never>
         : C extends DevelopmentOnlySingleFilesConfig<infer Storage>
           ? FilesForStorage<Storage>
           : never

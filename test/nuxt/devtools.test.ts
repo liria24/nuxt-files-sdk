@@ -95,13 +95,13 @@ describe('Nuxt DevTools integration', () => {
 
     test('[DEV-002] v3 registers one legacy iframe tab for the shared UI', () => {
         const { hooks, nuxt } = fakeNuxt()
-        setupNuxtV3Devtools(nuxt, 'legacy-secret')
+        setupNuxtV3Devtools(nuxt)
         const tabs: unknown[] = []
         hooks.get('devtools:customTabs')?.(tabs as never)
         expect(tabs).toEqual([
             expect.objectContaining({
                 name: 'nuxt-files-sdk',
-                view: { type: 'iframe', src: '/__nuxt-files-sdk/?bootstrap=legacy-secret' },
+                view: { type: 'iframe', src: '/__nuxt-files-sdk/?host=nuxt-v3' },
             }),
         ])
     })

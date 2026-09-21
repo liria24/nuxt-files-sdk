@@ -1,5 +1,22 @@
 import { FilesError, sync, transfer } from 'files-sdk'
 import type { FileHandle, Files, FilesPlugin, StoredFile, SyncResult, TransferResult } from 'files-sdk'
+import type { FsAdapter } from 'files-sdk/fs'
+import type { MemoryAdapter } from 'files-sdk/memory'
+import { versioning } from 'files-sdk/versioning'
+import { defineFilesConfig } from 'nuxt-files-sdk/config'
+import type { SingleStorage } from 'nuxt-files-sdk/runtime'
+
+const switchedConfig = defineFilesConfig({
+    storage: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },
+    devStorage: { adapter: 'memory' },
+})
+const assertSwitchedTypes = (files: SingleStorage<typeof switchedConfig>): void => {
+    files.adapter satisfies FsAdapter | MemoryAdapter
+    // @ts-expect-error development can select memory, so fs-only access needs narrowing
+    files.adapter satisfies FsAdapter
+    void files.versions('example.txt')
+}
+void assertSwitchedTypes
 
 const publicRuntime = { FilesError, sync, transfer }
 void publicRuntime

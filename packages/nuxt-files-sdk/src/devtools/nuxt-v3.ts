@@ -15,13 +15,13 @@ declare module '@nuxt/schema' {
     }
 }
 
-export const setupNuxtV3Devtools = (nuxt: Nuxt, bootstrap: string): void => {
+export const setupNuxtV3Devtools = (nuxt: Nuxt): void => {
     nuxt.hook('devtools:customTabs', (tabs) => {
         tabs.push({
             name: 'nuxt-files-sdk',
             title: 'Files',
             icon: 'ph:files-duotone',
-            view: { type: 'iframe', src: `${FILES_DEVTOOLS_PATH}?bootstrap=${encodeURIComponent(bootstrap)}` },
+            view: { type: 'iframe', src: `${FILES_DEVTOOLS_PATH}?host=nuxt-v3` },
         })
     })
 }

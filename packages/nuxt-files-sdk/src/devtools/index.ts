@@ -13,6 +13,7 @@ import {
     FILES_SNAPSHOT_PATH,
     FILES_TOKEN_PATH,
 } from './snapshot'
+import tokenHandler from './token'
 
 const authenticatedHandler = (name: string, path: string, arguments_: string[]): string => {
     const filename = `#nuxt-files-sdk/${name}`
@@ -24,12 +25,7 @@ const authenticatedHandler = (name: string, path: string, arguments_: string[]):
     return filename
 }
 
-export const setupFilesDevtools = (
-    nuxt: Nuxt,
-    version: string,
-    write: boolean,
-    secrets: { bootstrap: string; token: string },
-): void => {
+export const setupFilesDevtools = (nuxt: Nuxt, version: string, write: boolean, secrets: { token: string }): void => {
     // Snapshot must run inside Nitro's worker, where the runtime registry lives.
     addServerHandler({
         route: FILES_SNAPSHOT_PATH,
@@ -52,17 +48,26 @@ export const setupFilesDevtools = (
             tokenSecret: secrets.token,
         })
     } else {
-        addServerHandler({
+        addDevServerHandler({
             route: FILES_TOKEN_PATH,
-            handler: authenticatedHandler('token', fileURLToPath(new URL('./token.js', import.meta.url)), [
-                secrets.token,
-                secrets.bootstrap,
-            ]),
+            handler: (event) =>
+                tokenHandler(event, secrets.token, async (token) => {
+                    const host = 'devtools' in nuxt ? nuxt.devtools : undefined
+                    if (
+                        !host ||
+                        typeof host !== 'object' ||
+                        !('ensureDevAuthToken' in host) ||
+                        typeof host.ensureDevAuthToken !== 'function'
+                    ) {
+                        throw new Error('Nuxt DevTools authentication is unavailable.')
+                    }
+                    await host.ensureDevAuthToken(token)
+                }),
         })
         addDevServerHandler({
             route: FILES_DEVTOOLS_PATH,
             handler: uiHandler,
         })
-        setupNuxtV3Devtools(nuxt, secrets.bootstrap)
+        setupNuxtV3Devtools(nuxt)
     }
 }

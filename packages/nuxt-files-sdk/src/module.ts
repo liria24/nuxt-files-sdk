@@ -59,7 +59,7 @@ export default defineNuxtModule<ModuleOptions>({
         if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
             const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
             const { setupFilesDevtools } = await import('./devtools')
-            const secrets = { bootstrap: randomUUID(), token: randomUUID() }
+            const secrets = { token: randomUUID() }
             setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools), secrets)
         }
     },

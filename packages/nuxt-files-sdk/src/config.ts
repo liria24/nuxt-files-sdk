@@ -36,19 +36,25 @@ export type DevStorageConfig<Provider extends ProviderSlug = ProviderSlug> = Pro
     : never
 
 /** One unnamed storage, available through `useServerFiles()`. */
-export interface SingleFilesConfig<Storage extends StorageConfig = StorageConfig> {
+export interface SingleFilesConfig<
+    Storage extends StorageConfig = StorageConfig,
+    Dev extends DevStorageConfig | undefined = DevStorageConfig | undefined,
+> {
     /** Files SDK storage configuration. */
     storage: Storage
     /** Development-only provider settings. */
-    devStorage?: DevStorageConfig
+    devStorage?: Dev
 }
 
 /** Named storages, each requiring its name when accessed. */
-export interface NamedFilesConfig<Storages extends Record<string, StorageConfig> = Record<string, StorageConfig>> {
+export interface NamedFilesConfig<
+    Storages extends Record<string, StorageConfig> = Record<string, StorageConfig>,
+    Dev extends Partial<Record<keyof Storages, DevStorageConfig>> = Partial<Record<keyof Storages, DevStorageConfig>>,
+> {
     /** Files SDK storage configuration. */
     storage: Storages
     /** Development-only provider settings keyed by storage name. */
-    devStorage?: Partial<{ [Name in keyof Storages]: DevStorageConfig }>
+    devStorage?: Dev
 }
 
 /** One unnamed storage that exists only while the development server is running. */
@@ -73,13 +79,27 @@ export type FilesConfig =
     | DevelopmentOnlyNamedFilesConfig
 
 /** Define one unnamed Files SDK storage while preserving its provider and plugin types. */
-export function defineFilesConfig<const Storage extends StorageConfig>(
-    config: SingleFilesConfig<Storage>,
-): SingleFilesConfig<Storage>
+export function defineFilesConfig<
+    const Storage extends StorageConfig,
+    const Dev extends DevStorageConfig | undefined = undefined,
+>(
+    config: SingleFilesConfig<Storage, Dev> & {
+        devStorage?: Dev & Record<Exclude<keyof Dev, 'adapter' | 'config'>, never>
+    },
+): SingleFilesConfig<Storage, Dev>
 /** Define named Files SDK storages while preserving their names, providers, and plugin types. */
-export function defineFilesConfig<const Storages extends Record<string, StorageConfig>>(
-    config: NamedFilesConfig<Storages>,
-): NamedFilesConfig<Storages>
+export function defineFilesConfig<
+    const Storages extends Record<string, StorageConfig>,
+    const Dev extends Partial<Record<keyof Storages, DevStorageConfig>> = Record<never, never>,
+>(
+    config: NamedFilesConfig<Storages, Dev> & {
+        devStorage?: {
+            [Name in keyof Dev]: Name extends keyof Storages
+                ? Dev[Name] & Record<Exclude<keyof Dev[Name], 'adapter' | 'config'>, never>
+                : never
+        }
+    },
+): NamedFilesConfig<Storages, Dev>
 /** Define one unnamed development-only storage. */
 export function defineFilesConfig<const Storage extends StorageConfig>(
     config: DevelopmentOnlySingleFilesConfig<Storage>,

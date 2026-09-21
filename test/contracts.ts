@@ -67,7 +67,7 @@ export const contracts = [
     },
     {
         id: 'CFG-011',
-        guarantee: 'Development-only storage is available in development and omitted from production integration',
+        guarantee: 'Development-only storage has declarations in every mode but no production runtime plugin',
         source: 'test/unit/generation.test.ts',
         job: 'unit',
     },
@@ -97,7 +97,7 @@ export const contracts = [
     },
     {
         id: 'TYPE-001',
-        guarantee: 'Actual generated consumer types preserve native and plugin surfaces',
+        guarantee: 'Actual generated consumer types preserve native and plugin surfaces across provider overrides',
         source: 'test/nuxt/nuxt4-generated-types.test.ts',
         job: 'test-nuxt4',
     },
@@ -284,7 +284,7 @@ export const contracts = [
     },
     {
         id: 'DEV-004',
-        guarantee: 'A real development host registers the Files tab and serves its UI and registry snapshot',
+        guarantee: 'A real development host serves the registered Files URL and requires native authentication',
         source: 'test/nuxt/nuxt4-devframe.test.ts',
         job: 'test-nuxt4',
     },
@@ -368,7 +368,8 @@ export const contracts = [
     },
     {
         id: 'SEC-005',
-        guarantee: 'Development HTTP endpoints reject missing, invalid, and expired bearer tokens',
+        guarantee:
+            'Native authorization gates token issuance; HTTP endpoints reject missing, invalid, or expired tokens',
         source: 'test/unit/devtools-auth.test.ts',
         job: 'unit',
     },

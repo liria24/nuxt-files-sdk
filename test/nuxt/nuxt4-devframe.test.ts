@@ -1,20 +1,38 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
+
 import { $fetch, setup, url, useTestContext } from '@nuxt/test-utils/e2e'
 import { createFilesClient } from 'files-sdk/client'
-import { describe, expect, test } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import type { FilesDevtoolsSnapshot } from '../../packages/nuxt-files-sdk/src/devtools/snapshot'
 import { cleanFixture, fixtureDirectory, installFixture } from '../utils/fixture'
 
 await cleanFixture('nuxt4')
 await installFixture('nuxt4')
+const authHome = await mkdtemp(resolve(tmpdir(), 'nuxt-files-auth-'))
+await mkdir(resolve(authHome, '.nuxt/devtools'), { recursive: true })
+await writeFile(resolve(authHome, '.nuxt/devtools/dev-auth-token.txt'), 'fixture-native-token')
+vi.stubEnv('XDG_CONFIG_HOME', authHome)
+// Exercise native DevTools, which otherwise skips setup under test runners.
+vi.stubEnv('VITEST', undefined)
+vi.stubEnv('TEST', undefined)
+vi.stubEnv('NODE_ENV', 'development')
+afterAll(async () => {
+    vi.unstubAllEnvs()
+    await rm(authHome, { recursive: true, force: true })
+})
 
 describe('Nuxt DevFrame development endpoint', async () => {
     await setup({
+        runner: 'vitest',
         rootDir: fixtureDirectory('nuxt4'),
         browser: false,
         dev: true,
         server: false,
         build: true,
+        nuxtConfig: { modules: ['@nuxt/devtools'], devtools: { enabled: true } },
     })
 
     let authorization = ''
@@ -31,7 +49,7 @@ describe('Nuxt DevFrame development endpoint', async () => {
         expect(filesTabs).toEqual([
             expect.objectContaining({
                 name: 'nuxt-files-sdk',
-                view: { type: 'iframe', src: expect.stringMatching(/^\/__nuxt-files-sdk\/\?bootstrap=/u) },
+                view: { type: 'iframe', src: '/__nuxt-files-sdk/?host=nuxt-v3' },
             }),
         ])
         const listener = await context.nuxt!.server!.listen(0, { hostname: '127.0.0.1' })
@@ -39,7 +57,7 @@ describe('Nuxt DevFrame development endpoint', async () => {
         ;(context.teardown ??= []).push(() => listener.close())
         const api = await fetch(url('/api/files'))
         expect(api.status, await api.text()).toBe(200)
-        const response = await fetch(url('/__nuxt-files-sdk/'))
+        const response = await fetch(url(filesTabs[0]!.view.src))
         const html = await response.text()
         expect(response.status, html).toBe(200)
         expect(html).toContain('<title>Files</title>')
@@ -55,9 +73,14 @@ describe('Nuxt DevFrame development endpoint', async () => {
         expect(javascript).not.toMatch(/from\s*["'](?:devframe|files-sdk)/u)
         const unauthorized = await fetch(url('/__nuxt-files-sdk/snapshot'))
         expect(unauthorized.status).toBe(401)
-        const bootstrap = new URL(filesTabs[0]!.view.src, url('/')).searchParams.get('bootstrap')!
+        for (const headers of [{}, { 'x-nuxt-files-sdk-bootstrap': 'nuxt-v3' }, { 'x-nuxt-devtools-token': 'wrong' }]) {
+            expect((await fetch(url('/__nuxt-files-sdk/token'), { headers })).status).toBe(401)
+        }
+        const host = (context.nuxt as unknown as { devtools: { ensureDevAuthToken(token: string): Promise<void> } })
+            .devtools
+        await expect(host.ensureDevAuthToken('fixture-native-token')).resolves.toBeUndefined()
         const tokenResponse = await fetch(url('/__nuxt-files-sdk/token'), {
-            headers: { 'x-nuxt-files-sdk-bootstrap': bootstrap },
+            headers: { 'x-nuxt-devtools-token': 'fixture-native-token' },
         })
         expect(tokenResponse.status, await tokenResponse.clone().text()).toBe(200)
         const token = (await tokenResponse.json()) as { token: string }

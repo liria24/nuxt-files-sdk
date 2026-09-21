@@ -115,18 +115,42 @@ describe('provider generation', () => {
         const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-development-only-'))
         temporaryDirectories.push(directory)
         const configPath = resolve(directory, 'files.config.mjs')
-        await writeFile(configPath, `export default { devStorage: { adapter: 'memory' } }`)
+        await writeFile(
+            configPath,
+            `import { defineFilesConfig } from 'nuxt-files-sdk/config'
+export default defineFilesConfig({ devStorage: { adapter: 'memory' } })`,
+        )
         const hook = vi.fn<NitroIntegration['hooks']['hook']>()
         const nitro: NitroIntegration = {
             options: { rootDir: directory, buildDir: directory, dev: false, plugins: [] },
             hooks: { hook },
         }
 
-        await setupNitroFilesIntegration(nitro, { configPath, development: false })
+        vi.stubEnv('NODE_ENV', 'production')
+        try {
+            await setupNitroFilesIntegration(nitro, { configPath, development: false })
+            const devNitro: NitroIntegration = {
+                options: { rootDir: directory, buildDir: directory, dev: true, plugins: [] },
+                hooks: { hook: vi.fn<NitroIntegration['hooks']['hook']>() },
+            }
+            await setupNitroFilesIntegration(devNitro, { configPath, development: true })
+            expect(await readFile(devNitro.options.plugins[0]!, 'utf8')).toContain('files-sdk/memory')
+        } finally {
+            vi.unstubAllEnvs()
+        }
 
         expect(nitro.options.plugins).toEqual([])
         expect(nitro.options.externals).toBeUndefined()
-        expect(hook).not.toHaveBeenCalled()
+        expect(hook).toHaveBeenCalledOnce()
+        const typesPath = resolve(directory, 'nuxt-files-sdk/storage-registry.d.ts')
+        const declarations = await readFile(typesPath, 'utf8')
+        expect(declarations).toContain('SingleStorage<typeof config>')
+        expect(declarations).toContain('StorageRegistry<typeof config>')
+        await writeFile(typesPath, 'stale declarations')
+        const types = { tsConfig: { include: [] as string[] } }
+        await hook.mock.calls[0]![1](types)
+        expect(types.tsConfig.include).toContain(typesPath)
+        expect(await readFile(typesPath, 'utf8')).toBe(declarations)
     })
 
     test('[CFG-010] prepare cannot overwrite a running development plugin', async () => {
