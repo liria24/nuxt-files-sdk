@@ -72,6 +72,12 @@ export const contracts = [
         job: 'unit',
     },
     {
+        id: 'CFG-012',
+        guarantee: 'Native Files constructor options pass through without narrowing',
+        source: 'test/unit/registry.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'API-001',
         guarantee: 'useServerFiles synchronously returns the cached Files client',
         source: 'test/unit/registry.test.ts',
@@ -168,6 +174,12 @@ export const contracts = [
         job: 'typecheck',
     },
     {
+        id: 'TYPE-014',
+        guarantee: 'RustFS and native common options preserve provider-specific client types',
+        source: 'test/unit/config.test.ts',
+        job: 'typecheck',
+    },
+    {
         id: 'ENV-001',
         guarantee: 'Native environment keys and aliases take precedence over NUXT aliases',
         source: 'test/unit/environment.test.ts',
@@ -247,7 +259,7 @@ export const contracts = [
     },
     {
         id: 'NITRO-001',
-        guarantee: 'Nitro v2/v3 prepare, typecheck, build, and serve the Files route',
+        guarantee: 'Nitro v2/v3 generate, typecheck, build, and serve the Files route',
         source: 'test/nitro/suite.ts',
         job: 'test-nitro2',
     },
@@ -319,6 +331,18 @@ export const contracts = [
         job: 'test-size',
     },
     {
+        id: 'BUNDLE-007',
+        guarantee: 'Nitro v2 workerd builds shim only missing optional AWS SDK engines',
+        source: 'test/unit/generation.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'BUNDLE-008',
+        guarantee: 'Nitro v2 and v3 workerd builds support R2, MinIO, and RustFS without bundled AWS SDK engines',
+        source: 'test/nitro/suite.ts',
+        job: 'test-nitro2',
+    },
+    {
         id: 'SEC-001',
         guarantee: 'Dummy secrets and development storage settings are absent from production outputs',
         source: 'test/bundle/bundle.test.ts',
@@ -341,6 +365,12 @@ export const contracts = [
         guarantee: 'Development file writes are enabled by default and can be explicitly disabled',
         source: 'test/nuxt/devtools.test.ts',
         job: 'test-nuxt4',
+    },
+    {
+        id: 'SEC-005',
+        guarantee: 'Development HTTP endpoints reject missing, invalid, and expired bearer tokens',
+        source: 'test/unit/devtools-auth.test.ts',
+        job: 'unit',
     },
     {
         id: 'PKG-001',
@@ -395,6 +425,42 @@ export const contracts = [
         id: 'REL-002',
         guarantee: 'ci-ok directly gates every blocking job, and release verifies the tarball before publishing',
         source: 'test/unit/contracts.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'CFG-013',
+        guarantee: 'Preparation and runtime share structural configuration validation',
+        source: 'test/unit/normalization.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'RUNTIME-005',
+        guarantee: 'Memoized access does not enumerate storage configuration',
+        source: 'test/unit/normalization.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'API-004',
+        guarantee: 'Runtime only exports the public accessor',
+        source: 'test/unit/normalization.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'DEV-006',
+        guarantee: 'Stale browser requests cannot update a different location',
+        source: 'test/unit/devtools-browser.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'DEV-007',
+        guarantee: 'Browser pagination resets on navigation and refresh',
+        source: 'test/unit/devtools-browser.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'DEV-008',
+        guarantee: 'In-flight operations retain their original storage',
+        source: 'test/unit/devtools-browser.test.ts',
         job: 'unit',
     },
 ]

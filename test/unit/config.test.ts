@@ -1,4 +1,5 @@
 import { fs } from 'files-sdk/fs'
+import type { RustfsAdapter } from 'files-sdk/rustfs'
 import { versioning } from 'files-sdk/versioning'
 import { describe, expect, expectTypeOf, test } from 'vitest'
 
@@ -56,6 +57,25 @@ describe('configuration types', () => {
 
         expect(direct.storage.adapter).toBe('fs')
         expect(typeof resolved.storage.config).toBe('function')
+    })
+
+    test('[TYPE-014] preserves RustFS, native common options, and provider raw types', () => {
+        const controller = new AbortController()
+        const rustfs = defineFilesConfig({
+            storage: {
+                adapter: 'rustfs',
+                config: { bucket: 'files', endpoint: 'http://localhost:9000', client: 'fetch' },
+                prefix: 'uploads',
+                readonly: true,
+                receipts: { sha256: true },
+                retries: { max: 2, backoff: () => 0 },
+                signal: controller.signal,
+                timeout: 1000,
+            },
+        })
+
+        expect(rustfs.storage.adapter).toBe('rustfs')
+        expectTypeOf<SingleStorage<typeof rustfs>['adapter']>().toEqualTypeOf<RustfsAdapter>()
     })
 
     test('[CFG-011] strips a development-only storage safely in production', () => {

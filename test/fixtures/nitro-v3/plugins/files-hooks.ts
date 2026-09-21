@@ -1,4 +1,4 @@
-import { defineNitroPlugin } from 'nitro/runtime'
+import { definePlugin as defineNitroPlugin } from 'nitro'
 
 export default defineNitroPlugin((nitroApp) => {
     nitroApp.hooks.hook('files:error', ({ event, storage }) => {

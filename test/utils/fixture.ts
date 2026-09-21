@@ -23,12 +23,13 @@ export const unusedPlugins = [
 export const runCommand = (
     command: string,
     args: string[],
-    options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+    options: { cwd?: string; env?: NodeJS.ProcessEnv; shell?: boolean } = {},
 ): Promise<string> =>
     new Promise((resolveOutput, reject) => {
         const child = spawn(command, args, {
             cwd: options.cwd ?? repositoryRoot,
             env: { ...process.env, ...options.env },
+            shell: options.shell,
             stdio: ['ignore', 'pipe', 'pipe'],
             timeout: 290_000,
         })
@@ -59,17 +60,20 @@ export const installFixture = async (name: string): Promise<string> => {
 export const cleanFixture = async (name: string): Promise<void> => {
     const directory = fixtureDirectory(name)
     await Promise.all(
-        ['.nuxt', '.nitro', '.output', '.data'].map((entry) =>
+        ['.nuxt', '.nitro', 'node_modules/.nitro', '.output', '.data'].map((entry) =>
             rm(resolve(directory, entry), { recursive: true, force: true }),
         ),
     )
 }
 
-export const runFixture = async (name: string): Promise<void> => {
+export const runFixture = async (
+    name: string,
+    scripts: string[] = ['prepare', 'typecheck', 'build'],
+): Promise<void> => {
     const directory = fixtureDirectory(name)
     await cleanFixture(name)
     await installFixture(name)
-    for (const script of ['prepare', 'typecheck', 'build']) {
+    for (const script of scripts) {
         await runCommand('bun', ['run', script], { cwd: directory })
     }
 }
@@ -182,11 +186,11 @@ export const copyPackedConsumer = async (fixture: string, directory: string, tar
     const packagePath = resolve(destination, 'package.json')
     const packageJson = JSON.parse(await readFile(packagePath, 'utf8')) as {
         dependencies: Record<string, string>
-        overrides?: Record<string, string>
     }
     packageJson.dependencies['nuxt-files-sdk'] = `file:${tarball.replaceAll('\\', '/')}`
+    delete packageJson.dependencies['files-sdk']
     if (process.env.NUXT_FILES_SDK_VERSION) {
-        packageJson.overrides = { 'files-sdk': process.env.NUXT_FILES_SDK_VERSION }
+        packageJson.dependencies['files-sdk'] = process.env.NUXT_FILES_SDK_VERSION
     }
     if (fixture === 'nuxt4' && process.env.NUXT_FILES_NUXT_VERSION) {
         packageJson.dependencies.nuxt = process.env.NUXT_FILES_NUXT_VERSION
