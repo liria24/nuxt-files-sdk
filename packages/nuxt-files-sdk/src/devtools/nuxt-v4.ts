@@ -5,7 +5,10 @@ import { createEmbedded } from 'devframe/adapters/embedded'
 import { createFilesDevframe } from './devframe'
 import { FILES_DEVTOOLS_PATH } from './snapshot'
 
-export const setupNuxtV4Devtools = (nuxt: Nuxt, options: { write: boolean; maxUploadSize: number }): void => {
+export const setupNuxtV4Devtools = (
+    nuxt: Nuxt,
+    options: { write: boolean; maxUploadSize: number; tokenSecret: string },
+): void => {
     onDevtoolsReady(async (context) => {
         await createEmbedded(
             createFilesDevframe({

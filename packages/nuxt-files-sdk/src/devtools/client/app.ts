@@ -1,13 +1,19 @@
 import { connectDevframe } from 'devframe/client'
-import type { AdapterCapabilities, StoredFile } from 'files-sdk'
-import { createFilesClient, type FilesClient } from 'files-sdk/client'
+import type { StoredFile } from 'files-sdk'
+import { createFilesClient } from 'files-sdk/client'
 
 import { isFilesDevtoolsDiagnostic, type FilesDevtoolsFailure } from '../diagnostics'
 import type { FilesDevtoolsSnapshot as Snapshot } from '../snapshot'
+import { FilesBrowser } from './browser'
 
 interface Access {
     write: boolean
     maxUploadSize: number
+}
+
+interface AccessToken {
+    token: string
+    expiresAt: number
 }
 
 const element = <T extends Element>(selector: string, kind: new () => T): T => {
@@ -28,12 +34,13 @@ const uploadButton = element('.upload-button', HTMLElement)
 
 let snapshot: Snapshot
 let access: Access
-let storage: string | undefined
-let prefix = ''
-let loadId = 0
+let initializationId = 0
 let devframe: Awaited<ReturnType<typeof connectDevframe>> | undefined
 let bridgeReady: Promise<void>
-const capabilities = new Map<string, AdapterCapabilities>()
+let accessToken: AccessToken | undefined
+let accessTokenRequest: Promise<AccessToken> | undefined
+const previousButton = element('#previous-page', HTMLButtonElement)
+const nextButton = element('#next-page', HTMLButtonElement)
 
 const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object'
 const isSnapshot = (value: unknown): value is Snapshot =>
@@ -53,29 +60,57 @@ const isSnapshot = (value: unknown): value is Snapshot =>
     value.diagnostics.every(isFilesDevtoolsDiagnostic)
 const isAccess = (value: unknown): value is Access =>
     isRecord(value) && typeof value.write === 'boolean' && typeof value.maxUploadSize === 'number'
+const isAccessToken = (value: unknown): value is AccessToken =>
+    isRecord(value) && typeof value.token === 'string' && typeof value.expiresAt === 'number'
+const requestAccessToken = async (): Promise<AccessToken> => {
+    const bootstrap = new URL(window.location.href).searchParams.get('bootstrap')
+    if (bootstrap) {
+        const response = await fetch('./token', { headers: { 'x-nuxt-files-sdk-bootstrap': bootstrap } })
+        if (!response.ok) throw new Error(`DevTools authentication failed (${response.status}).`)
+        const value: unknown = await response.json()
+        if (isAccessToken(value)) return value
+        throw new Error('Files development tools returned an invalid access token.')
+    }
+    await bridgeReady
+    const value: unknown = await devframe?.scope('nuxt-files-sdk').rpc.call('issue-http-token')
+    if (isAccessToken(value)) return value
+    throw new Error('Files development tools require a trusted DevFrame connection.')
+}
+const getAccessToken = async (): Promise<string> => {
+    if (accessToken && accessToken.expiresAt - Date.now() > 10_000) return accessToken.token
+    accessTokenRequest ??= requestAccessToken().finally(() => (accessTokenRequest = undefined))
+    accessToken = await accessTokenRequest
+    return accessToken.token
+}
+const authorizationHeaders = async (): Promise<HeadersInit> => ({ authorization: `Bearer ${await getAccessToken()}` })
 const fetchJson = async (url: string): Promise<unknown> => {
-    const response = await fetch(url)
+    const response = await fetch(url, { headers: await authorizationHeaders() })
     if (!response.ok) throw new Error(`DevTools request failed (${response.status}).`)
     return response.json()
 }
 
-const endpoint = (): string => (storage === undefined ? './files' : `./files?storage=${encodeURIComponent(storage)}`)
-const client = (): FilesClient => createFilesClient({ endpoint: endpoint() })
-const storageKey = (): string => storage ?? ''
+const browser = new FilesBrowser((storage) =>
+    createFilesClient({
+        endpoint: storage === undefined ? './files' : './files?storage=' + encodeURIComponent(storage),
+        headers: authorizationHeaders,
+    }),
+)
 
 const showStatus = (message: string, error = false): void => {
     browserStatus.textContent = message
     browserStatus.classList.toggle('error-text', error)
 }
 
-const reportFailure = async (failure: FilesDevtoolsFailure): Promise<void> => {
+const reportFailure = async (failure: FilesDevtoolsFailure, current: () => boolean): Promise<void> => {
     await bridgeReady
-    devframe?.scope('nuxt-files-sdk').rpc.callEvent('report-failure', failure)
+    if (current()) devframe?.scope('nuxt-files-sdk').rpc.callEvent('report-failure', failure)
 }
 
 const publishDiagnostics = async (): Promise<void> => {
+    const reportedSnapshot = snapshot
     await bridgeReady
-    devframe?.scope('nuxt-files-sdk').rpc.callEvent('report-diagnostics', snapshot.diagnostics)
+    if (snapshot === reportedSnapshot)
+        devframe?.scope('nuxt-files-sdk').rpc.callEvent('report-diagnostics', reportedSnapshot.diagnostics)
 }
 
 const formatBytes = (bytes: number): string => {
@@ -90,7 +125,7 @@ const formatBytes = (bytes: number): string => {
     return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`
 }
 
-const displayName = (key: string): string => key.slice(prefix.length).replace(/\/$/u, '') || key
+const displayName = (key: string): string => key.slice(browser.prefix.length).replace(/\/$/u, '') || key
 
 const actionButton = (label: string, action: () => void): HTMLButtonElement => {
     const button = document.createElement('button')
@@ -102,10 +137,10 @@ const actionButton = (label: string, action: () => void): HTMLButtonElement => {
 }
 
 const renderBreadcrumbs = (): void => {
-    const parts = prefix.split('/').filter(Boolean)
+    const parts = browser.prefix.split('/').filter(Boolean)
     const nodes: Node[] = []
     const root = actionButton('Root', () => {
-        prefix = ''
+        browser.navigate(browser.storage)
         void loadFiles()
     })
     root.className = 'breadcrumb'
@@ -116,7 +151,7 @@ const renderBreadcrumbs = (): void => {
         path += `${part}/`
         const target = path
         const button = actionButton(part, () => {
-            prefix = target
+            browser.navigate(browser.storage, target)
             void loadFiles()
         })
         button.className = 'breadcrumb'
@@ -151,7 +186,7 @@ const folderRow = (folder: string): HTMLTableRowElement => {
     const name = document.createElement('td')
     name.className = 'file-name'
     const button = actionButton(`📁 ${displayName(folder)}`, () => {
-        prefix = folder
+        browser.navigate(browser.storage, folder)
         void loadFiles()
     })
     button.className = 'folder'
@@ -165,44 +200,43 @@ const folderRow = (folder: string): HTMLTableRowElement => {
 }
 
 const loadFiles = async (): Promise<void> => {
-    const requestId = ++loadId
-    const initializing = !capabilities.has(storageKey())
+    const initializing = browser.initializing
     renderBreadcrumbs()
     filesBody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading files…</td></tr>'
     showStatus('Loading…')
+    previousButton.disabled = true
+    nextButton.disabled = true
+    const pending = browser.list()
+    const request = browser.capture()
     try {
-        const files = client()
-        let adapterCapabilities = capabilities.get(storageKey())
-        if (!adapterCapabilities) {
-            adapterCapabilities = await files.capabilities()
-            capabilities.set(storageKey(), adapterCapabilities)
-        }
-        const result = await files.list({
-            prefix,
-            limit: 1000,
-            ...(adapterCapabilities.delimiter ? { delimiter: '/' } : {}),
-        })
-        if (requestId !== loadId) return
+        const result = await pending
+        if (!request.current() || !result) return
         const rows = [
             ...(result.prefixes ?? []).toSorted().map(folderRow),
             ...result.items.toSorted((left, right) => left.key.localeCompare(right.key)).map(fileRow),
         ]
         if (rows.length) filesBody.replaceChildren(...rows)
         else filesBody.innerHTML = '<tr><td colspan="5" class="empty-state">No files in this location.</td></tr>'
-        showStatus(`${rows.length} item${rows.length === 1 ? '' : 's'}${result.cursor ? ' · first page' : ''}`)
+        showStatus(`${rows.length} item${rows.length === 1 ? '' : 's'}`)
+        previousButton.disabled = !browser.hasPrevious
+        nextButton.disabled = !browser.hasNext
     } catch (error) {
-        if (requestId !== loadId) return
+        if (!request.current()) return
         filesBody.innerHTML = '<tr><td colspan="5" class="empty-state">Unable to load files.</td></tr>'
         const message = error instanceof Error ? error.message : String(error)
         showStatus(message, true)
-        void reportFailure({
-            kind: initializing ? 'initialization' : 'gateway',
-            message,
-            ...(storage === undefined ? {} : { target: storage }),
-        })
+        void reportFailure(
+            {
+                kind: initializing ? 'initialization' : 'gateway',
+                message,
+                ...(browser.storage === undefined ? {} : { target: browser.storage }),
+            },
+            request.current,
+        )
+        previousButton.disabled = !browser.hasPrevious
         try {
             const nextSnapshot = await fetchJson('./snapshot')
-            if (isSnapshot(nextSnapshot)) {
+            if (request.current() && isSnapshot(nextSnapshot)) {
                 snapshot = nextSnapshot
                 renderSnapshot()
                 void publishDiagnostics()
@@ -212,52 +246,64 @@ const loadFiles = async (): Promise<void> => {
 }
 
 const downloadFile = async (key: string): Promise<void> => {
+    const request = browser.capture()
     showStatus(`Downloading ${key}…`)
     try {
-        const file = await client().download(key, { as: 'blob' })
+        const file = await request.client.download(key, { as: 'blob' })
         const url = URL.createObjectURL(await file.blob())
         const link = document.createElement('a')
         link.href = url
         link.download = key.split('/').at(-1) || key
         link.click()
         setTimeout(() => URL.revokeObjectURL(url))
-        showStatus(`Downloaded ${key}`)
+        if (request.current()) showStatus(`Downloaded ${key}`)
     } catch (error) {
+        if (!request.current()) return
         showStatus(error instanceof Error ? error.message : String(error), true)
     }
 }
 
 const deleteFile = async (key: string): Promise<void> => {
+    const request = browser.capture()
     if (!window.confirm(`Delete ${key}? This cannot be undone.`)) return
     showStatus(`Deleting ${key}…`)
     try {
-        await client().delete(key)
+        await request.client.delete(key)
+        if (!request.current()) return
+        browser.reset()
         await loadFiles()
     } catch (error) {
+        if (!request.current()) return
         const message = error instanceof Error ? error.message : String(error)
         showStatus(message, true)
-        void reportFailure({ kind: 'delete', message, target: key })
+        void reportFailure({ kind: 'delete', message, target: key }, request.current)
     }
 }
 
 const uploadFile = async (file: File): Promise<void> => {
-    const key = `${prefix}${file.name}`
+    const request = browser.capture()
+    const key = `${request.prefix}${file.name}`
     if (file.size > access.maxUploadSize) {
         const message = `${file.name} exceeds the ${formatBytes(access.maxUploadSize)} development upload limit.`
         showStatus(message, true)
-        void reportFailure({ kind: 'upload', message, target: key })
+        void reportFailure({ kind: 'upload', message, target: key }, request.current)
         return
     }
-    const files = client()
+    const files = request.client
     try {
-        if ((await files.exists(key)) && !window.confirm(`Replace the existing file ${key}?`)) return
+        const exists = await files.exists(key)
+        if (!request.current()) return
+        if (exists && !window.confirm(`Replace the existing file ${key}?`)) return
         showStatus(`Uploading ${key}…`)
         await files.upload(key, file, { contentType: file.type || 'application/octet-stream' })
+        if (!request.current()) return
+        browser.reset()
         await loadFiles()
     } catch (error) {
+        if (!request.current()) return
         const message = error instanceof Error ? error.message : String(error)
         showStatus(message, true)
-        void reportFailure({ kind: 'upload', message, target: key })
+        void reportFailure({ kind: 'upload', message, target: key }, request.current)
     }
 }
 
@@ -310,11 +356,15 @@ const renderSnapshot = (): void => {
 }
 
 const initialize = async (): Promise<void> => {
+    const id = ++initializationId
+    browser.reset(true)
+    const request = browser.capture()
     try {
         const [snapshotResponse, accessResponse] = await Promise.all([
             fetchJson('./snapshot'),
             fetchJson('./files?op=devtools'),
         ])
+        if (id !== initializationId || !request.current()) return
         if (!isSnapshot(snapshotResponse) || !isAccess(accessResponse)) {
             throw new Error('Files development tools returned an invalid response.')
         }
@@ -322,7 +372,7 @@ const initialize = async (): Promise<void> => {
         access = accessResponse
         renderSnapshot()
         void publishDiagnostics()
-        const previousStorage = storage
+        const previousStorage = browser.storage
         storageSelect.replaceChildren(
             ...snapshot.storages.map((item) => {
                 const option = document.createElement('option')
@@ -332,10 +382,11 @@ const initialize = async (): Promise<void> => {
             }),
         )
         storageSelect.hidden = snapshot.storages.length < 2
-        storage = snapshot.storages.some(({ name }) => name === previousStorage)
+        const selected = snapshot.storages.some(({ name }) => name === previousStorage)
             ? previousStorage
             : snapshot.storages[0]?.name
-        storageSelect.value = storage ?? ''
+        browser.navigate(selected, selected === previousStorage ? browser.prefix : '')
+        storageSelect.value = browser.storage ?? ''
         accessBadge.textContent = access.write ? 'Read & write' : 'Read only'
         accessBadge.className = `access-badge ${access.write ? 'write' : ''}`
         accessBadge.hidden = false
@@ -344,10 +395,11 @@ const initialize = async (): Promise<void> => {
         if (snapshot.storages.length) await loadFiles()
         else showStatus('No configured storage.', true)
     } catch (error) {
+        if (id !== initializationId || !request.current()) return
         summary.textContent = 'Unable to load Files development tools'
         const message = error instanceof Error ? error.message : String(error)
         showStatus(message, true)
-        void reportFailure({ kind: 'gateway', message })
+        void reportFailure({ kind: 'gateway', message }, request.current)
     }
 }
 
@@ -383,8 +435,15 @@ const initializeBridge = async (): Promise<void> => {
 }
 
 storageSelect.addEventListener('change', () => {
-    storage = storageSelect.value || undefined
-    prefix = ''
+    browser.navigate(snapshot.storages[storageSelect.selectedIndex]?.name)
+    void loadFiles()
+})
+previousButton.addEventListener('click', () => {
+    browser.previous()
+    void loadFiles()
+})
+nextButton.addEventListener('click', () => {
+    browser.next()
     void loadFiles()
 })
 refreshButton.addEventListener('click', () => void initialize())
