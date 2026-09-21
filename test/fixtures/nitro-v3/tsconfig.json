@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "module": "Preserve",
+        "moduleResolution": "Bundler",
+        "paths": {
+            "files-sdk": ["./node_modules/files-sdk"]
+        },
+        "skipLibCheck": true,
+        "strict": true,
+        "target": "ESNext"
+    },
+    "files": [
+        "files.config.ts",
+        "nitro.config.ts",
+        "routes/files.ts",
+        "plugins/files-hooks.ts",
+        "node_modules/.nitro/nuxt-files-sdk/storage-registry.d.ts"
+    ]
+}

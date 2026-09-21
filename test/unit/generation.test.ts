@@ -6,6 +6,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
 import {
+    optionalAwsSdkDependencies,
     providerCode,
     selectedAdapters,
     setupNitroFilesIntegration,
@@ -13,6 +14,7 @@ import {
 } from '../../packages/nuxt-files-sdk/src/integration/nitro'
 
 const temporaryDirectories: string[] = []
+const missingDependency = () => false
 afterAll(() => Promise.all(temporaryDirectories.map((directory) => rm(directory, { recursive: true, force: true }))))
 
 describe('provider generation', () => {
@@ -38,6 +40,60 @@ describe('provider generation', () => {
         const generated = providerCode(['r2'])
         expect(generated.imports).toBe('import { r2 as provider0 } from "files-sdk/r2"')
         expect(generated.factories).toBe('"r2": provider0')
+        expect(providerCode(['rustfs']).imports).toBe('import { rustfs as provider0 } from "files-sdk/rustfs"')
+    })
+
+    test('[BUNDLE-007] shims only missing optional AWS engines on Nitro v2 workerd presets', () => {
+        const expected = [
+            '@aws-sdk/client-s3',
+            '@aws-sdk/s3-presigned-post',
+            '@aws-sdk/s3-request-presigner',
+            '@aws-sdk/lib-storage',
+        ]
+        for (const adapter of ['r2', 'minio', 'rustfs'] as const) {
+            expect(
+                optionalAwsSdkDependencies([adapter], {
+                    nitroMajor: 2,
+                    preset: 'cloudflare-module',
+                    resolvable: missingDependency,
+                }),
+            ).toEqual(expected)
+        }
+        expect(
+            optionalAwsSdkDependencies(['s3'], {
+                nitroMajor: 2,
+                preset: 'cloudflare-pages',
+                resolvable: missingDependency,
+            }),
+        ).toEqual(['@aws-sdk/lib-storage'])
+        expect(
+            optionalAwsSdkDependencies(['r2', 's3'], {
+                nitroMajor: 2,
+                preset: 'cloudflare-durable',
+                resolvable: missingDependency,
+            }),
+        ).toEqual(['@aws-sdk/lib-storage'])
+        expect(
+            optionalAwsSdkDependencies(['r2'], {
+                nitroMajor: 3,
+                preset: 'cloudflare-module',
+                resolvable: missingDependency,
+            }),
+        ).toEqual([])
+        expect(
+            optionalAwsSdkDependencies(['r2'], {
+                nitroMajor: 2,
+                preset: 'node-server',
+                resolvable: missingDependency,
+            }),
+        ).toEqual([])
+        expect(
+            optionalAwsSdkDependencies(['r2'], {
+                nitroMajor: 2,
+                preset: 'cloudflare-module',
+                resolvable: (dependency) => dependency === '@aws-sdk/client-s3',
+            }),
+        ).toEqual(expected.slice(1))
     })
 
     test('[CFG-011] omits development-only storage from production integration', async () => {
@@ -99,10 +155,9 @@ describe('provider generation', () => {
                 },
             }
             await extendTypes(types)
-            expect(types.tsConfig.compilerOptions.paths['files-sdk']?.[0]).toMatch(/files-sdk\/dist\/index\.d\.ts$/u)
-            expect(types.tsConfig.compilerOptions.paths['files-sdk/*']?.[0]).toMatch(
-                /files-sdk\/dist\/\*\/index\.d\.ts$/u,
-            )
+            expect(types.tsConfig.compilerOptions.paths['files-sdk']?.[0]).toMatch(/node_modules\/files-sdk$/u)
+            expect(types.tsConfig.compilerOptions.paths['files-sdk']?.[0]).not.toContain('/dist')
+            expect(types.tsConfig.compilerOptions.paths['files-sdk/*']).toBeUndefined()
             return nitro.options.plugins[0]!
         }
 
@@ -115,7 +170,14 @@ describe('provider generation', () => {
         expect(await readFile(developmentPlugin, 'utf8')).toBe(developmentSource)
         expect(developmentSource).toContain('from "files-sdk/fs"')
         expect(developmentSource).toContain('configureFiles(config,')
+        expect(developmentSource).toMatch(/import \{ configureFiles \} from "[^"\n]+\/runtime\/internal\.js"/u)
+        expect(developmentSource).not.toContain("from 'nuxt-files-sdk/runtime'")
         expect(productionSource).toContain('from "files-sdk/r2"')
         expect(productionSource).toContain('configureFiles({ storage: config.storage },')
+        const environment = JSON.parse(/environment: (.+),/u.exec(productionSource)![1]!) as Record<string, string[][]>
+        expect(Object.keys(environment)).toEqual(['r2'])
+        expect(environment.r2?.flat()).toContain('R2_ACCESS_KEY_ID')
+        expect(environment.r2?.flat()).not.toContain('NUXT_R2_ACCESS_KEY_ID')
+        expect(productionSource).not.toContain('files-sdk/providers')
     })
 })

@@ -36,7 +36,14 @@ describe('Bundle contract', () => {
     })
 
     test('[BUNDLE-001][BUNDLE-002] server-only Nuxt excludes Vue and development tooling', () => {
-        for (const forbidden of ['files-sdk/vue', 'devframe', '@nuxt/devtools-kit', '@vitejs/devtools']) {
+        for (const forbidden of [
+            'files-sdk/vue',
+            'devframe',
+            '@nuxt/devtools-kit',
+            '@vitejs/devtools',
+            'Check the storage and devStorage shapes',
+            '/4.reference/4.troubleshooting.md',
+        ]) {
             expect(nuxtOutput.includes(forbidden), forbidden).toBe(false)
         }
     })
@@ -49,6 +56,11 @@ describe('Bundle contract', () => {
         }
         expect(nuxtOutput).not.toContain('files-sdk/loader')
         expect(nitroOutput).not.toContain('files-sdk/loader')
+        for (const output of [nuxtOutput, nitroOutput]) {
+            expect(output).not.toContain('files-sdk/providers')
+            expect(output).not.toContain('AKAMAI_ACCESS_KEY_ID')
+            expect(output).not.toContain('YANDEX_ACCESS_KEY_ID')
+        }
     })
 
     test('[BUNDLE-004] versioning-only import excludes unrelated built-in plugins', () => {
@@ -73,6 +85,7 @@ describe('Bundle contract', () => {
         // oxlint-disable-next-line no-console -- These measurements are the CI size report.
         console.info({ nuxtServerBytes, nuxtClientBytes, nitroServerBytes })
         expect(nitroServerBytes).toBeGreaterThan(0)
+        expect(nitroServerBytes).toBeLessThanOrEqual(350_000)
     })
 
     test('[SEC-001] production and generated outputs contain no fixture secret', () => {

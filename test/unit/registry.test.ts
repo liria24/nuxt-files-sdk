@@ -7,7 +7,8 @@ import { versioning } from 'files-sdk/versioning'
 import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
-import { configureFiles, useServerFiles } from '../../packages/nuxt-files-sdk/src/runtime'
+import { useServerFiles } from '../../packages/nuxt-files-sdk/src/runtime'
+import { configureFiles } from '../../packages/nuxt-files-sdk/src/runtime/internal'
 import { FilesRegistry, type FilesProviderFactories } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 const factories: FilesProviderFactories = { fs }
@@ -75,6 +76,36 @@ describe('FilesRegistry', () => {
         expect(files.versions).toBeTypeOf('function')
         await files.upload('plugin-contract.txt', 'hello')
         expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'upload' }))
+    })
+
+    test('[CFG-012] passes native constructor options through unchanged', async () => {
+        const signal = new AbortController().signal
+        const files = new FilesRegistry(
+            defineFilesConfig({
+                storage: {
+                    adapter: 'fs',
+                    config: { root: '.data/test-files' },
+                    prefix: 'native-options',
+                    receipts: true,
+                    retries: { max: 2, backoff: () => 0 },
+                    signal,
+                    timeout: 250,
+                },
+            }),
+            { factories },
+        ).get()
+
+        expect(files.prefix).toBe('native-options')
+        expect(files.defaults).toEqual({ retries: { max: 2, backoff: expect.any(Function) }, signal, timeout: 250 })
+        await expect(files.upload('passthrough.txt', 'hello')).resolves.toMatchObject({ key: 'passthrough.txt' })
+
+        const readonly = new FilesRegistry(
+            defineFilesConfig({
+                storage: { adapter: 'fs', config: { root: '.data/test-files' }, readonly: true },
+            }),
+            { factories },
+        ).get()
+        await expect(readonly.upload('readonly.txt', 'blocked')).rejects.toMatchObject({ code: 'ReadOnly' })
     })
 
     test('[CFG-011] supports a complete development-only storage', () => {
@@ -180,7 +211,7 @@ describe('FilesRegistry', () => {
         )
         expect(() => registry.get()).toThrow('first attempt failed')
         expect(registry.inspect().diagnostics).toEqual([
-            expect.objectContaining({ code: 'NUXT_FILES_ADAPTER_INIT_FAILED', level: 'error' }),
+            expect.objectContaining({ code: 'NUXT_FILES_ADAPTER_INIT_FAILED', adapter: 'fs' }),
         ])
         expect(registry.get()).toMatchObject({ adapter: { name: 'fs' } })
         expect(registry.inspect().diagnostics).toEqual([])

@@ -77,7 +77,7 @@ export const checkPublicExamples = async (directory: string): Promise<void> => {
 
 const hoverSource = `import module, { type ModuleOptions } from 'nuxt-files-sdk'
 import { defineFilesConfig, type SingleFilesConfig, type StorageConfig } from 'nuxt-files-sdk/config'
-import { FilesRegistry, useServerFiles as importedUseServerFiles } from 'nuxt-files-sdk/runtime'
+import { useServerFiles as importedUseServerFiles } from 'nuxt-files-sdk/runtime'
 import { useServerFiles as aliasedUseServerFiles } from '#imports'
 
 void /*module*/module
@@ -91,7 +91,6 @@ void documentedConfig./*devStorage*/devStorage
 declare const documentedStorage: StorageConfig
 void documentedStorage./*adapter*/adapter
 void documentedStorage./*providerConfig*/config
-void new /*registry*/FilesRegistry(config, { factories: {} })./*get*/get()
 void /*imported*/importedUseServerFiles()
 void /*aliased*/aliasedUseServerFiles()
 void /*global*/useServerFiles()
@@ -204,8 +203,6 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             adapter: 'Files SDK provider slug',
             providerConfig: 'Native provider factory options',
             devStorage: 'Development-only provider settings',
-            registry: 'Create a registry without constructing a provider',
-            get: 'Return the client from an unnamed single-storage configuration',
             imported: "Return the project's unnamed Files client",
             aliased: "Return the project's unnamed Files client",
             global: "Return the project's Files client",

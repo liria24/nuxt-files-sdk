@@ -27,6 +27,31 @@ let contents: string[]
 let extractedOutput: string
 let digest: string
 const secret = 'NUXT_FILES_TEST_SECRET_123456'
+const requestedPackageManager = process.env.NUXT_FILES_PACKAGE_MANAGER ?? 'bun'
+if (!['bun', 'npm', 'pnpm'].includes(requestedPackageManager)) {
+    throw new Error(`Unsupported package manager: ${requestedPackageManager}`)
+}
+const packageManager = requestedPackageManager as 'bun' | 'npm' | 'pnpm'
+const packageManagerShell = process.platform === 'win32' && packageManager !== 'bun'
+const consumerFixtures = packageManager === 'bun' ? ['nuxt4', 'nitro-v2', 'nitro-v3'] : ['nuxt4']
+const installConsumer = (directory: string): Promise<string> =>
+    packageManager === 'bun'
+        ? runCommand('bun', ['install', '--ignore-scripts'], { cwd: directory })
+        : packageManager === 'npm'
+          ? runCommand(packageManager, ['install', '--ignore-scripts', '--package-lock=false'], {
+                cwd: directory,
+                shell: packageManagerShell,
+            })
+          : runCommand(packageManager, ['install', '--ignore-scripts', '--no-frozen-lockfile'], {
+                cwd: directory,
+                shell: packageManagerShell,
+            })
+const runConsumerScript = (directory: string, script: string): Promise<string> =>
+    runCommand(packageManager, ['run', script], {
+        cwd: directory,
+        env: { NUXT_AWS_SECRET_ACCESS_KEY: secret },
+        shell: packageManagerShell,
+    })
 
 describe('Packed consumer', () => {
     beforeAll(async () => {
@@ -85,8 +110,8 @@ describe('Packed consumer', () => {
         }
         expect(Object.keys(packageJson.exports)).toEqual(['.', './config', './nitro', './runtime', './package.json'])
         expect(packageJson.dependencies['files-sdk']).toBeUndefined()
-        expect(packageJson.devDependencies['files-sdk']).toBe('^2.4.1')
-        expect(packageJson.peerDependencies['files-sdk']).toBe('^2.4.1')
+        expect(packageJson.devDependencies['files-sdk']).toBe('^2.6.0')
+        expect(packageJson.peerDependencies['files-sdk']).toBe('^2.6.0')
         expect(packageJson.peerDependenciesMeta['files-sdk']).toBeUndefined()
         expect(JSON.stringify(packageJson.dependencies)).not.toMatch(/@aws-sdk|@azure|@google-cloud/u)
     })
@@ -102,66 +127,76 @@ describe('Packed consumer', () => {
         )
     })
 
-    test.each(['nuxt4', 'nitro-v2', 'nitro-v3'])(
-        '[PKG-004] %s installs the exact tarball and passes public contracts',
-        async (name) => {
-            const consumer = await copyPackedConsumer(name, packed.directory, packed.tarball)
-            const consumerPackage = JSON.parse(await readFile(resolve(consumer, 'package.json'), 'utf8')) as {
-                dependencies: Record<string, string>
-            }
-            expect(consumerPackage.dependencies['files-sdk']).toBeUndefined()
-            await runCommand('bun', ['install', '--ignore-scripts'], { cwd: consumer })
-            for (const script of ['prepare', 'typecheck', 'build']) {
-                const log = await runCommand('bun', ['run', script], {
-                    cwd: consumer,
-                    env: { NUXT_AWS_SECRET_ACCESS_KEY: secret },
-                })
-                expect(log.includes(secret), `${name} ${script} log`).toBe(false)
-            }
-            if (name === 'nuxt4') {
-                await checkGeneratedTypes(consumer)
-                for (const entry of invalidTypeCases) await checkInvalidType(consumer, entry)
-                await checkPublicExamples(consumer)
-                await checkHoverDocumentation(consumer)
-                await cleanTypeContracts(consumer)
-            }
-            const paths = await outputPaths(resolve(consumer, '.output'))
-            const output = await readOutput(resolve(consumer, '.output'))
-            const runtime = await readOutput(resolve(consumer, '.output'), true)
-            const generated = await readOutput(
-                resolve(consumer, name === 'nuxt4' ? '.nuxt/nuxt-files-sdk' : '.nitro/nuxt-files-sdk'),
-            )
-            expect((output + generated).includes(secret), `${name} secret leakage`).toBe(false)
-            expect(paths.filter((path) => /node_modules\/(?:@aws-sdk|@azure|@google-cloud)\//u.test(path))).toEqual([])
-            expect(runtime).toMatch(/name:\s*["']versioning["']/u)
-            for (const plugin of unusedPlugins) {
-                expect(runtime, `${name}: ${plugin}`).not.toMatch(new RegExp(`name:\\s*["']${plugin}["']`, 'u'))
-                expect(paths.filter((path) => path.includes(`files-sdk/dist/${plugin}/`))).toEqual([])
-            }
-            for (const forbidden of [
-                'files-sdk/vue',
-                'devframe',
-                '@nuxt/devtools',
-                ...(name === 'nuxt4' ? [] : ['@nuxt/kit']),
-            ]) {
-                expect(runtime.includes(forbidden), `${name}: ${forbidden}`).toBe(false)
-            }
-            expect(paths.filter((path) => /node_modules\/(?:@nuxt\/(?:kit|devtools)|devframe)\//u.test(path))).toEqual(
-                [],
-            )
-            const dependencies = await outputPaths(resolve(consumer, 'node_modules'))
-            expect(dependencies).toContain('files-sdk/package.json')
-            expect(dependencies.some((path) => /(?:^|\/)nuxt\/package.json$/u.test(path))).toBe(name === 'nuxt4')
-            const server = await startFixtureServer(consumer)
-            try {
-                const response = await fetch(`${server.url}/${name === 'nuxt4' ? 'api/' : ''}files`)
-                expect(response.status).toBe(200)
-                expect(await response.json()).toMatchObject({ adapter: 'fs' })
-            } finally {
-                await server.close()
-            }
-        },
-    )
+    test.each(consumerFixtures)('[PKG-004] %s installs the exact tarball and passes public contracts', async (name) => {
+        const consumer = await copyPackedConsumer(name, packed.directory, packed.tarball)
+        const consumerPackage = JSON.parse(await readFile(resolve(consumer, 'package.json'), 'utf8')) as {
+            dependencies: Record<string, string>
+        }
+        expect(consumerPackage.dependencies['files-sdk']).toBe(process.env.NUXT_FILES_SDK_VERSION)
+        await installConsumer(consumer)
+        const runtimeExports = await runCommand(
+            'node',
+            [
+                '--input-type=module',
+                '-e',
+                "import * as runtime from 'nuxt-files-sdk/runtime'; console.log(JSON.stringify(Object.keys(runtime)))",
+            ],
+            { cwd: consumer },
+        )
+        expect(JSON.parse(runtimeExports.trim())).toEqual(['useServerFiles'])
+        const scripts = name === 'nitro-v3' ? ['build', 'typecheck'] : ['prepare', 'typecheck', 'build']
+        for (const script of scripts) {
+            const log = await runConsumerScript(consumer, script)
+            expect(log.includes(secret), `${name} ${script} log`).toBe(false)
+        }
+        if (name === 'nuxt4') {
+            await checkGeneratedTypes(consumer)
+            for (const entry of invalidTypeCases) await checkInvalidType(consumer, entry)
+            await checkPublicExamples(consumer)
+            await checkHoverDocumentation(consumer)
+            await cleanTypeContracts(consumer)
+        }
+        const paths = await outputPaths(resolve(consumer, '.output'))
+        const output = await readOutput(resolve(consumer, '.output'))
+        const runtime = await readOutput(resolve(consumer, '.output'), true)
+        const generated = await readOutput(
+            resolve(
+                consumer,
+                name === 'nuxt4'
+                    ? '.nuxt/nuxt-files-sdk'
+                    : name === 'nitro-v3'
+                      ? 'node_modules/.nitro/nuxt-files-sdk'
+                      : '.nitro/nuxt-files-sdk',
+            ),
+        )
+        expect((output + generated).includes(secret), `${name} secret leakage`).toBe(false)
+        expect(paths.filter((path) => /node_modules\/(?:@aws-sdk|@azure|@google-cloud)\//u.test(path))).toEqual([])
+        expect(runtime).toMatch(/name:\s*["'\x60]versioning["'\x60]/u)
+        for (const plugin of unusedPlugins) {
+            expect(runtime, `${name}: ${plugin}`).not.toMatch(new RegExp(`name:\\s*["'\\x60]${plugin}["'\\x60]`, 'u'))
+            expect(paths.filter((path) => path.includes(`files-sdk/dist/${plugin}/`))).toEqual([])
+        }
+        for (const forbidden of [
+            'files-sdk/vue',
+            'devframe',
+            '@nuxt/devtools',
+            ...(name === 'nuxt4' ? [] : ['@nuxt/kit']),
+        ]) {
+            expect(runtime.includes(forbidden), `${name}: ${forbidden}`).toBe(false)
+        }
+        expect(paths.filter((path) => /node_modules\/(?:@nuxt\/(?:kit|devtools)|devframe)\//u.test(path))).toEqual([])
+        const dependencies = await outputPaths(resolve(consumer, 'node_modules'))
+        expect(dependencies).toContain('files-sdk/package.json')
+        expect(dependencies.some((path) => /(?:^|\/)nuxt\/package.json$/u.test(path))).toBe(name === 'nuxt4')
+        const server = await startFixtureServer(consumer)
+        try {
+            const response = await fetch(`${server.url}/${name === 'nuxt4' ? 'api/' : ''}files`)
+            expect(response.status).toBe(200)
+            expect(await response.json()).toMatchObject({ adapter: 'fs' })
+        } finally {
+            await server.close()
+        }
+    })
 
     test('[REL-001] consumer verification never rebuilds or mutates the release tarball', async () => {
         const after = createHash('sha256')
