@@ -4,6 +4,13 @@ const deployedSiteUrl = process.env.NUXT_PUBLIC_SITE_URL
 const siteUrl =
     deployedSiteUrl ||
     (process.env.NODE_ENV === 'production' ? 'https://nuxt-files-sdk.liria.me' : 'http://localhost:3000')
+const llmsConfig = {
+    domain: siteUrl,
+    title: 'Nuxt Files SDK',
+    description: 'Native-first Files SDK integration for Nuxt and Nitro.',
+    sections: [],
+    prerender: false,
+}
 
 export default defineNuxtConfig({
     compatibilityDate: '2026-09-04',
@@ -99,12 +106,7 @@ export default defineNuxtConfig({
         excludeAppSources: ['nuxt:pages', '@nuxtjs/i18n:pages'],
     },
 
-    llms: {
-        domain: siteUrl,
-        title: 'Nuxt Files SDK',
-        description: 'Native-first Files SDK integration for Nuxt and Nitro.',
-        sections: [],
-    },
+    llms: llmsConfig,
 
     ogImage: {
         security: { restrictRuntimeImagesToOrigin: true },
