@@ -1,51 +1,13 @@
 import type { Files } from 'files-sdk'
 
-import type { FilesConfig } from './config'
-import { createFilesDevtoolsDiagnostic, type FilesDevtoolsDiagnostic } from './devtools/diagnostics'
-import type { FilesDevtoolsSnapshot } from './devtools/snapshot'
-import { FilesRegistry } from './runtime/registry'
+import { getFiles } from './runtime/internal'
 
-export { FilesRegistry } from './runtime/registry'
-export type {
-    FilesForStorage,
-    FilesProviderFactories,
-    FilesProviderFactory,
-    FilesRuntimeHooks,
-    SingleStorage,
-    StorageRegistry,
-} from './runtime/registry'
+export type { FilesForStorage, SingleStorage, StorageRegistry } from './runtime/registry'
 
 /** Project storage names and plugin-extended Files clients supplied by generated declarations. */
 export interface NuxtFilesStorageRegistry {}
 /** Project single Files client supplied by generated declarations. */
 export interface NuxtFilesSingleStorage {}
-
-let registry: FilesRegistry | undefined
-let registryDiagnostic: FilesDevtoolsDiagnostic | undefined
-
-/** Configure the process-local Files registry used by {@link useServerFiles}. */
-export const configureFiles = <const C extends FilesConfig>(
-    config: C,
-    options: ConstructorParameters<typeof FilesRegistry<C>>[1],
-): FilesRegistry<C> => {
-    try {
-        const value = new FilesRegistry(config, options)
-        registry = value
-        registryDiagnostic = undefined
-        return value
-    } catch (error) {
-        registry = undefined
-        registryDiagnostic = createFilesDevtoolsDiagnostic('NUXT_FILES_INVALID_CONFIG')
-        throw error
-    }
-}
-
-/** Return secret-free diagnostics for the configured process-local Files registry. */
-export const inspectFiles = (): FilesDevtoolsSnapshot =>
-    registry?.inspect() ?? {
-        storages: [],
-        diagnostics: [registryDiagnostic ?? createFilesDevtoolsDiagnostic('NUXT_FILES_NOT_CONFIGURED')],
-    }
 
 /** Return the project's unnamed Files client, including its configured plugin extensions. */
 export function useServerFiles(
@@ -56,8 +18,5 @@ export function useServerFiles<Name extends Extract<keyof NuxtFilesStorageRegist
     name: Name,
 ): NuxtFilesStorageRegistry[Name]
 export function useServerFiles(name?: string): Files {
-    if (!registry) {
-        throw new Error('[nuxt-files-sdk:not-configured] The Files registry has not been configured.')
-    }
-    return name === undefined ? registry.get() : (registry.get as (storage: string) => Files)(name)
+    return getFiles(name)
 }
