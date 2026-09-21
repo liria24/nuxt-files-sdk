@@ -5,38 +5,25 @@
     "workspaces": {
         ".": {
             "entry": ["*.config.ts", "test/**/*.test.ts"],
-            "project": ["*.config.ts", "test/**/*.ts"]
+            "project": ["*.{ts,vue}", "test/**/*.ts"]
         },
         "packages/nuxt-files-sdk": {
-            "entry": ["tsdown.config.ts", "src/{module,config,nitro,plugins}.ts", "test/benchmark.ts"],
+            "entry": ["src/{module,config,nitro,runtime}.ts"],
             "ignoreDependencies": ["@arethetypeswrong/cli", "@vitejs/devtools-kit"],
             "ignoreIssues": {
                 "package.json": ["optionalPeerDependencies"]
             },
-            "project": ["src/**/*.ts!", "test/benchmark.ts", "*.config.ts"]
+            "project": ["src/**/*.{ts,vue}!", "*.config.ts"]
         },
         "docs": {
-            "entry": [
-                "nuxt.config.ts",
-                "app.config.ts",
-                "files.config.ts",
-                "components/**/*.vue",
-                "composables/**/*.ts",
-                "utils/**/*.ts",
-                "server/**/*.ts"
-            ],
+            "entry": ["files.config.ts!", "app/**/*.{ts,vue}!", "server/**/*.ts!"],
             "ignoreDependencies": [
                 "@iconify-json/lucide",
                 "@iconify-json/simple-icons",
                 "@vueuse/core",
-                "comark",
-                "h3",
-                "nuxtseo-layer-devtools",
-                "rangi",
-                "ufo",
-                "unstorage"
+                "nuxtseo-layer-devtools"
             ],
-            "project": ["**/*.{ts,vue}"]
+            "project": ["**/*.{ts,vue,css}"]
         }
     }
 }

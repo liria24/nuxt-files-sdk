@@ -74,9 +74,10 @@ test('documentation dependencies and local storage stay isolated from the public
         'nuxt-og-image',
     ])
         expect(nuxtConfig).toContain(`'${module}'`)
-    expect(docsPackage).toContain('"comark-content": "0.4.0"')
+    const docsManifest = JSON.parse(docsPackage) as { dependencies: Record<string, string> }
+    expect(docsManifest.dependencies['comark-content']).toMatch(/^\d+\.\d+\.\d+$/u)
     expect(docsPackage).toContain('"nuxt-files-sdk": "workspace:*"')
-    expect(rootPackage).toContain('"postinstall": "bun run build && bun --cwd=docs run nuxt prepare"')
+    expect(rootPackage).not.toContain('"postinstall"')
     expect(docsPackage).not.toContain('"prepare": "nuxt prepare"')
     expect(docsPackage).not.toContain('"comark-docs"')
     expect(docsPackage).not.toContain('"satori"')

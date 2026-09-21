@@ -20,7 +20,6 @@
         "format:check": "oxfmt . --check",
         "lint": "oxlint .",
         "lint:fix": "oxlint . --fix",
-        "postinstall": "bun run build && bun --cwd=docs run nuxt prepare",
         "preview:package": "pkg-pr-new publish ./packages/nuxt-files-sdk --bun --compact --previewVersion",
         "test": "vitest run",
         "test:unit": "vitest run --project unit",
@@ -33,7 +32,7 @@
         "test:nitro3": "vitest run --project nitro-v3",
         "test:consumer": "vitest run --project consumer",
         "test:size": "vitest run --project bundle",
-        "benchmark": "bun packages/nuxt-files-sdk/test/benchmark.ts"
+        "benchmark": "bun test/benchmark.ts"
     },
     "devDependencies": {
         "@nuxt/schema": "^4.5.2",
