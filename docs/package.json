@@ -11,8 +11,8 @@
     },
     "dependencies": {
         "@comark/nuxt": "^0.7.0",
-        "@iconify-json/lucide": "^1.2.132",
-        "@iconify-json/simple-icons": "^1.2.96",
+        "@iconify-json/lucide": "^1.2.135",
+        "@iconify-json/simple-icons": "^1.2.97",
         "@nuxt/fonts": "^0.14.0",
         "@nuxt/image": "^2.1.0",
         "@nuxt/ui": "^4.11.1",
@@ -21,8 +21,8 @@
         "@nuxtjs/sitemap": "^8.5.1",
         "@takumi-rs/core": "^2.14.0",
         "@takumi-rs/wasm": "^2.14.0",
-        "@vueuse/core": "^14.4.0",
-        "@vueuse/nuxt": "^14.4.0",
+        "@vueuse/core": "^15.0.0",
+        "@vueuse/nuxt": "^15.0.0",
         "comark": "^0.7.0",
         "comark-content": "0.4.1",
         "h3": "^1.15.11",
@@ -39,6 +39,6 @@
         "nuxtseo-layer-devtools": "^5.3.16",
         "typescript6": "npm:typescript@6.0.3",
         "vue-tsc": "^3.3.11",
-        "wrangler": "^4.132.0"
+        "wrangler": "^4.136.0"
     }
 }

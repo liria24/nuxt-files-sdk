@@ -18,19 +18,23 @@
     "exports": {
         ".": {
             "types": "./dist/module.d.ts",
-            "import": "./dist/module.js"
+            "import": "./dist/module.js",
+            "default": "./dist/module.js"
         },
         "./config": {
             "types": "./dist/config.d.ts",
-            "import": "./dist/config.js"
+            "import": "./dist/config.js",
+            "default": "./dist/config.js"
         },
         "./nitro": {
             "types": "./dist/nitro.d.ts",
-            "import": "./dist/nitro.js"
+            "import": "./dist/nitro.js",
+            "default": "./dist/nitro.js"
         },
         "./runtime": {
             "types": "./dist/runtime.d.ts",
-            "import": "./dist/runtime.js"
+            "import": "./dist/runtime.js",
+            "default": "./dist/runtime.js"
         },
         "./package.json": "./package.json"
     },
@@ -45,24 +49,24 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@nuxt/devtools-kit": "4.0.0-alpha.20",
+        "@nuxt/devtools-kit": "4.0.0-beta.1",
         "@nuxt/kit": "^4.5.2",
-        "devframe": "^0.10.0",
+        "devframe": "^1.0.0",
         "jiti": "^2.7.0"
     },
     "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.5",
         "@nuxt/schema": "^4.5.2",
-        "@types/node": "^26.6.1",
-        "@vitejs/devtools-kit": "^0.7.4",
-        "files-sdk": "^2.4.1",
+        "@types/node": "^26.6.2",
+        "@vitejs/devtools-kit": "^0.7.5",
+        "files-sdk": "^2.6.0",
         "publint": "^0.3.24",
         "tsdown": "^0.23.0",
         "typescript": "^7.0.2",
-        "vue": "^3.5.42"
+        "vue": "^3.5.43"
     },
     "peerDependencies": {
-        "files-sdk": "^2.4.1",
+        "files-sdk": "^2.6.0",
         "nuxt": "^4.0.0 || ^5.0.0"
     },
     "peerDependenciesMeta": {
