@@ -1,0 +1,250 @@
+@reference 'tailwindcss';
+@source './components';
+@source './runtime/themes.ts';
+@source './runtime/themes.js';
+
+@keyframes nfs-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@layer components {
+    .nfs-root {
+        --nfs-color: var(--ui-primary, #2563eb);
+        --nfs-error: var(--ui-error, #dc2626);
+        --nfs-radius: calc(var(--ui-radius, 0.25rem) * 1.5);
+        --nfs-inverted: var(--ui-text-inverted, #fff);
+        --nfs-bg-elevated: var(--ui-bg-elevated, #e4e4e7);
+        --nfs-highlighted: var(--ui-text-highlighted, #18181b);
+        --nfs-border: var(--ui-border, #d4d4d8);
+        --nfs-bg: var(--ui-bg, #fff);
+        --nfs-bg-muted: var(--ui-bg-muted, #f4f4f5);
+        --nfs-text: var(--ui-text, #18181b);
+        --nfs-text-muted: var(--ui-text-muted, #71717a);
+        @apply box-border;
+        color: var(--nfs-text);
+        font-family: inherit;
+    }
+    .nfs-root *,
+    .nfs-root *::before,
+    .nfs-root *::after {
+        @apply box-border;
+    }
+
+    .nfs-stack {
+        @apply flex flex-col gap-3;
+    }
+    .nfs-row {
+        @apply flex min-w-0 flex-wrap items-center gap-2;
+    }
+    .nfs-between {
+        @apply justify-between;
+    }
+    .nfs-grow {
+        @apply min-w-0 flex-1;
+    }
+    .nfs-file-info {
+        @apply flex min-w-0 flex-1 flex-col gap-0.5;
+        flex-basis: 8rem;
+        overflow-wrap: anywhere;
+    }
+    .nfs-muted {
+        color: var(--nfs-text-muted);
+    }
+    .nfs-truncate {
+        @apply truncate;
+    }
+    .nfs-icon {
+        @apply inline-block shrink-0;
+        width: var(--nfs-icon-size, 1.25rem);
+        height: var(--nfs-icon-size, 1.25rem);
+    }
+    .nfs-icon-lg {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+    .nfs-spin {
+        animation: nfs-spin 0.8s linear infinite;
+    }
+
+    .nfs-button,
+    .nfs-icon-button,
+    .nfs-segment {
+        @apply shrink-0 cursor-pointer appearance-none border-0 transition-colors;
+        box-shadow: inset 0 0 0 1px var(--nfs-border);
+        border-color: var(--nfs-border);
+        border-radius: var(--nfs-radius);
+        background: var(--nfs-bg);
+        color: var(--nfs-text);
+        font: inherit;
+    }
+    .nfs-button {
+        @apply inline-flex items-center justify-center font-medium whitespace-nowrap;
+        gap: var(--nfs-gap, 0.375rem);
+        padding: var(--nfs-py, 0.375rem) var(--nfs-px, 0.625rem);
+    }
+    .nfs-button-primary {
+        color: var(--nfs-inverted);
+        box-shadow: none;
+        background: var(--nfs-color);
+    }
+    .nfs-button-danger {
+        color: var(--nfs-inverted);
+        box-shadow: none;
+        background: var(--nfs-error);
+    }
+    .nfs-icon-button {
+        @apply inline-flex items-center justify-center;
+        padding: var(--nfs-py, 0.375rem);
+    }
+    .nfs-button:hover:not(:disabled),
+    .nfs-icon-button:hover:not(:disabled),
+    .nfs-segment:hover:not(:disabled),
+    .nfs-clickable:hover:not(:disabled) {
+        background: var(--nfs-bg-elevated);
+    }
+    .nfs-button-primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--nfs-color) 75%, var(--nfs-bg));
+    }
+    .nfs-button-danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--nfs-error) 75%, var(--nfs-bg));
+    }
+    .nfs-button:focus-visible,
+    .nfs-icon-button:focus-visible,
+    .nfs-segment:focus-visible,
+    .nfs-clickable:focus-visible,
+    .nfs-input:focus-visible,
+    .nfs-select:focus-visible {
+        outline: 2px solid var(--nfs-color);
+        outline-offset: 2px;
+    }
+    .nfs-button:disabled,
+    .nfs-icon-button:disabled,
+    .nfs-clickable:disabled,
+    .nfs-input:disabled,
+    .nfs-select:disabled {
+        @apply cursor-not-allowed opacity-75;
+    }
+
+    .nfs-input,
+    .nfs-select {
+        @apply w-full min-w-0 border-0 transition-colors;
+        padding: var(--nfs-py, 0.375rem) var(--nfs-px, 0.625rem);
+        box-shadow: inset 0 0 0 1px var(--nfs-border);
+        border-color: var(--nfs-border);
+        border-radius: var(--nfs-radius);
+        background: var(--nfs-bg);
+        color: var(--nfs-text);
+        font: inherit;
+    }
+    .nfs-selected {
+        border-color: var(--nfs-color);
+        box-shadow: 0 0 0 1px var(--nfs-color);
+    }
+    .nfs-clickable {
+        @apply flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent text-start;
+        border-radius: calc(var(--nfs-radius) - 2px);
+        color: inherit;
+        font: inherit;
+    }
+    .nfs-tile,
+    .nfs-thumbnail {
+        @apply size-10 shrink-0 object-cover;
+        border-radius: calc(var(--nfs-radius) - 2px);
+    }
+    .nfs-tile {
+        @apply inline-flex items-center justify-center;
+        background: var(--nfs-bg-muted);
+        color: var(--nfs-text-muted);
+    }
+    .nfs-loading {
+        @apply flex min-h-32 items-center justify-center gap-2 text-center;
+        color: var(--nfs-text-muted);
+    }
+    .nfs-empty {
+        @apply flex min-h-32 flex-col items-center justify-center gap-2 text-center;
+        color: var(--nfs-text-muted);
+    }
+    .nfs-progress {
+        appearance: none;
+        color: var(--nfs-color);
+        background: var(--nfs-bg-muted);
+    }
+    .nfs-progress::-webkit-progress-bar {
+        background: var(--nfs-bg-muted);
+    }
+    .nfs-progress::-webkit-progress-value {
+        border-radius: inherit;
+        background: var(--nfs-color);
+    }
+    .nfs-progress::-moz-progress-bar {
+        border-radius: inherit;
+        background: var(--nfs-color);
+    }
+    .nfs-segments,
+    .nfs-badges {
+        @apply flex flex-wrap gap-1.5;
+    }
+    .nfs-segment {
+        @apply min-h-7 px-2 py-1 text-xs;
+    }
+    .nfs-segment[aria-pressed='true'] {
+        border-color: var(--nfs-color);
+        background: color-mix(in srgb, var(--nfs-color) 12%, var(--nfs-bg));
+    }
+    .nfs-badge {
+        @apply inline-flex items-center gap-1 border px-2 py-1 text-xs;
+        border-color: var(--nfs-border);
+        border-radius: 999px;
+    }
+    .nfs-preview-media {
+        @apply h-auto max-h-72 max-w-full object-contain;
+        border-radius: calc(var(--nfs-radius) - 2px);
+    }
+    .nfs-preview-object {
+        @apply h-72 w-full;
+    }
+    .nfs-preview-text {
+        @apply m-0 max-h-72 w-full min-w-0 overflow-auto whitespace-pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .nfs-details {
+        @apply relative;
+    }
+    .nfs-details > summary {
+        @apply list-none;
+    }
+    .nfs-details > summary::-webkit-details-marker {
+        @apply hidden;
+    }
+    .nfs-menu button {
+        @apply flex w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-2 py-1.5 text-start;
+        border-radius: calc(var(--nfs-radius) - 2px);
+        color: inherit;
+        font: inherit;
+    }
+    .nfs-menu button:hover {
+        background: var(--nfs-bg-muted);
+    }
+    .nfs-dialog-title {
+        @apply m-0 text-base font-semibold;
+        color: var(--nfs-highlighted);
+    }
+    .nfs-dialog-actions {
+        @apply flex flex-wrap justify-end gap-2;
+    }
+    .nfs-sr-only {
+        @apply sr-only;
+    }
+    .nfs-input::placeholder {
+        color: var(--ui-text-dimmed, #a1a1aa);
+    }
+    .nfs-row > .nfs-input {
+        flex: 1;
+    }
+    .nfs-menu button:focus-visible {
+        outline: 2px solid var(--nfs-color);
+        outline-offset: -2px;
+    }
+}

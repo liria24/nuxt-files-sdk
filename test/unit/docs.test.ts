@@ -1,8 +1,10 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
+import { parseMarkdown } from 'comark'
 import { expect, test } from 'vitest'
 
+import { useDemoFiles } from '../../docs/app/composables/useDemoFiles'
 import { fetchContentSha, isFreshRevision, isRevisionState } from '../../docs/server/utils/content-revision'
 import { repositoryRoot } from '../utils/fixture'
 
@@ -14,9 +16,17 @@ const routeFor = (path: string) => {
     return `/${route.join('/')}`
 }
 
-test('documentation pages and internal links stay complete', async () => {
+test('component demos keep uploads in their own in-memory client', async () => {
+    const files = useDemoFiles()
+    await files.upload('uploads/demo.txt', new Blob(['demo'], { type: 'text/plain' }))
+    expect(await (await files.download('uploads/demo.txt')).text()).toBe('demo')
+    expect(await useDemoFiles().exists('uploads/demo.txt')).toBe(false)
+    await expect(files.upload('uploads/invalid.txt', 'unsupported')).rejects.toThrow('File or Blob')
+})
+
+test('[UI-005] documentation pages, UI references, and internal links stay complete', async () => {
     const files = (await readdir(contentDirectory, { recursive: true })).filter((path) => path.endsWith('.md'))
-    expect(files).toHaveLength(13)
+    expect(files).toHaveLength(29)
 
     const routes = new Set(files.map(routeFor))
     const pages = await Promise.all(files.map((path) => readFile(resolve(contentDirectory, path), 'utf8')))
@@ -36,10 +46,90 @@ test('documentation pages and internal links stay complete', async () => {
         'useList',
         'nuxt-files-sdk/nitro',
         'write: false',
+        '<FilesDropzone',
+        '<FilesBrowser',
+        '<UApp :locale="locale">',
+        'nuxt-files-sdk/ui/locale',
     ]) {
         expect(content, example).toContain(example)
     }
     expect(content).not.toContain('nuxt-files-sdk/plugins')
+
+    const fixture = await readFile(resolve(repositoryRoot, 'test/fixtures/nuxt4-vue/app/app.vue'), 'utf8')
+    for (const name of [
+        'FilesActions',
+        'FilesBrowser',
+        'FilesCapabilities',
+        'FilesDropzone',
+        'FilesList',
+        'FilesMultipartUploader',
+        'FilesPreview',
+        'FilesSearch',
+        'FilesShareDialog',
+        'FilesTrashBin',
+        'FilesUploadProgress',
+        'FilesVersionHistory',
+    ]) {
+        expect(fixture).toContain(`<${name}`)
+        expect(content).toContain(`<${name}`)
+    }
+
+    const components = [
+        ['1.dropzone.md', 'FilesDropzone'],
+        ['2.list.md', 'FilesList'],
+        ['3.upload-progress.md', 'FilesUploadProgress'],
+        ['4.multipart-uploader.md', 'FilesMultipartUploader'],
+        ['5.preview.md', 'FilesPreview'],
+        ['6.browser.md', 'FilesBrowser'],
+        ['7.search.md', 'FilesSearch'],
+        ['8.share-dialog.md', 'FilesShareDialog'],
+        ['9.actions.md', 'FilesActions'],
+        ['10.capabilities.md', 'FilesCapabilities'],
+        ['11.version-history.md', 'FilesVersionHistory'],
+        ['12.trash-bin.md', 'FilesTrashBin'],
+    ] as const
+    for (const [pageName, componentName] of components) {
+        const page = await readFile(resolve(contentDirectory, '3.ui/5.components', pageName), 'utf8')
+        const source = await readFile(
+            resolve(repositoryRoot, 'packages/nuxt-files-sdk/src/ui/components', `${componentName}.vue`),
+            'utf8',
+        )
+        const headings = ['## Usage', '## Examples', '## API', '### Props', '### Slots', '### Emits', '## Theme']
+        let previous = -1
+        for (const heading of headings) {
+            const position = page.indexOf(heading)
+            expect(position, `${pageName}: ${heading}`).toBeGreaterThan(previous)
+            previous = position
+        }
+        const exampleName = `${componentName.slice('Files'.length)}Example`
+        const exampleTag = `${pageName.replace(/^\d+\./u, '').replace(/\.md$/u, '')}-example`
+        const document = await parseMarkdown(page)
+        expect(document.nodes.some((node) => Array.isArray(node) && node[0] === exampleTag)).toBe(true)
+        const example = await readFile(
+            resolve(repositoryRoot, 'docs/app/components/prose', `${exampleName}.vue`),
+            'utf8',
+        )
+        expect(example).toContain(`<${componentName}`)
+        expect(example).toContain('useDemoFiles()')
+        expect(page).toMatch(/\|\s*Prop\s*\|\s*Default\s*\|\s*Type\s*\|/u)
+        expect(page).not.toContain('## Events')
+        expect(page).toContain('### Class prop')
+        expect(page).toContain('### UI prop')
+        expect(page).toContain(`${componentName[0]!.toLowerCase()}${componentName.slice(1)}: {`)
+        expect(page).toContain("'error' \\| 'info' \\| 'neutral' \\| 'primary'")
+        expect(page).toContain("'ghost' \\| 'outline' \\| 'soft' \\| 'solid' \\| 'subtle'")
+        expect(page).toContain("'xs' \\| 'sm' \\| 'md' \\| 'lg' \\| 'xl'")
+        expect(page).toContain("HTMLAttributes['class']")
+        expect(page).not.toMatch(/`Files(?:Color|Size|Ui|Variant)`/u)
+        expect(page).toContain('```ts [app.config.ts]')
+        expect(page).toContain('slots: {')
+        expect(page).toContain('variants: {')
+        expect(page).toContain('compoundVariants: []')
+        expect(page).toContain('defaultVariants: {')
+
+        const propsBlock = source.match(/interface Props \{([\s\S]*?)\n\}/u)?.[1] ?? ''
+        for (const match of propsBlock.matchAll(/^\s+(\w+)\??:/gmu)) expect(page).toContain(`| \`${match[1]}\``)
+    }
 })
 
 test('documentation dependencies and local storage stay isolated from the public package', async () => {
