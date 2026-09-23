@@ -37,6 +37,7 @@
     "devDependencies": {
         "@nuxt/schema": "^4.5.2",
         "@nuxt/test-utils": "^4.3.2",
+        "comark": "^0.7.0",
         "files-sdk": "^2.6.0",
         "knip": "^6.37.0",
         "oxfmt": "^0.69.0",
