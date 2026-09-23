@@ -1,0 +1,372 @@
+@reference 'tailwindcss';
+@import 'tailwindcss/utilities';
+@source './components';
+@source './controls';
+@source './runtime/themes.ts';
+@source './runtime/themes.js';
+
+@keyframes nfs-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@layer components {
+    .nfs-root {
+        --nfs-primary-fallback: oklch(72.3% 0.219 149.579);
+        --nfs-secondary-fallback: oklch(62.3% 0.214 259.815);
+        --nfs-warning-fallback: oklch(79.5% 0.184 86.047);
+        --nfs-error-fallback: oklch(63.7% 0.237 25.331);
+        --nfs-color: var(--ui-primary, var(--nfs-primary-fallback));
+        --nfs-error: var(--ui-error, var(--nfs-error-fallback));
+        --nfs-radius: calc(var(--ui-radius, 0.25rem) * 1.5);
+        --nfs-inverted: var(--ui-text-inverted, #fff);
+        --nfs-bg-elevated: var(--ui-bg-elevated, oklch(96.8% 0.007 247.896));
+        --nfs-highlighted: var(--ui-text-highlighted, oklch(20.8% 0.042 265.755));
+        --nfs-border: var(--ui-border, oklch(92.9% 0.013 255.508));
+        --nfs-bg: var(--ui-bg, #fff);
+        --nfs-bg-muted: var(--ui-bg-muted, oklch(98.4% 0.003 247.858));
+        --nfs-text: var(--ui-text, oklch(37.2% 0.044 257.287));
+        --nfs-text-muted: var(--ui-text-muted, oklch(55.4% 0.046 257.417));
+        @apply box-border;
+        color: var(--nfs-text);
+        font-family: inherit;
+    }
+    .nfs-root *,
+    .nfs-root *::before,
+    .nfs-root *::after {
+        @apply box-border;
+    }
+    .dark .nfs-root {
+        --nfs-primary-fallback: oklch(79.2% 0.209 151.711);
+        --nfs-secondary-fallback: oklch(70.7% 0.165 254.624);
+        --nfs-warning-fallback: oklch(85.2% 0.199 91.936);
+        --nfs-error-fallback: oklch(70.4% 0.191 22.216);
+        --nfs-inverted: var(--ui-text-inverted, oklch(20.8% 0.042 265.755));
+        --nfs-bg: var(--ui-bg, oklch(20.8% 0.042 265.755));
+        --nfs-bg-muted: var(--ui-bg-muted, oklch(27.9% 0.041 260.031));
+        --nfs-bg-elevated: var(--ui-bg-elevated, oklch(27.9% 0.041 260.031));
+        --nfs-border: var(--ui-border, oklch(27.9% 0.041 260.031));
+        --nfs-text: var(--ui-text, oklch(92.9% 0.013 255.508));
+        --nfs-text-muted: var(--ui-text-muted, oklch(70.4% 0.04 256.788));
+        --nfs-highlighted: var(--ui-text-highlighted, #fff);
+    }
+    .nfs-dialog-overlay {
+        @apply fixed inset-0 z-40 bg-black/50;
+    }
+    .nfs-control-button,
+    .nfs-control-input,
+    .nfs-control-checkbox,
+    .nfs-control-progress,
+    .nfs-control-select-content {
+        --nfs-control-color: var(--nfs-color);
+        font: inherit;
+    }
+    :is(.nfs-control-button, .nfs-control-input, .nfs-control-checkbox, .nfs-control-progress)[data-color='secondary'] {
+        --nfs-control-color: var(--ui-secondary, var(--nfs-secondary-fallback));
+    }
+    :is(.nfs-control-button, .nfs-control-input, .nfs-control-checkbox, .nfs-control-progress)[data-color='success'] {
+        --nfs-control-color: var(--ui-success, var(--nfs-primary-fallback));
+    }
+    :is(.nfs-control-button, .nfs-control-input, .nfs-control-checkbox, .nfs-control-progress)[data-color='info'] {
+        --nfs-control-color: var(--ui-info, var(--nfs-secondary-fallback));
+    }
+    :is(.nfs-control-button, .nfs-control-input, .nfs-control-checkbox, .nfs-control-progress)[data-color='warning'] {
+        --nfs-control-color: var(--ui-warning, var(--nfs-warning-fallback));
+    }
+    :is(.nfs-control-button, .nfs-control-input, .nfs-control-checkbox, .nfs-control-progress)[data-color='error'] {
+        --nfs-control-color: var(--ui-error, var(--nfs-error-fallback));
+    }
+    :is(.nfs-control-button, .nfs-control-input, .nfs-control-checkbox, .nfs-control-progress)[data-color='neutral'] {
+        --nfs-control-color: var(--ui-bg-inverted, oklch(20.8% 0.042 265.755));
+    }
+    .dark
+        :is(
+            .nfs-control-button,
+            .nfs-control-input,
+            .nfs-control-checkbox,
+            .nfs-control-progress
+        )[data-color='neutral'] {
+        --nfs-control-color: var(--ui-bg-inverted, #fff);
+    }
+    .nfs-control-button {
+        @apply inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 font-medium whitespace-nowrap transition-colors;
+        border: 0;
+        border-radius: var(--nfs-radius);
+        background: var(--nfs-control-color);
+        color: var(--nfs-inverted);
+    }
+    .nfs-control-button[data-size='xs'] {
+        @apply gap-1 px-2 py-1 text-xs;
+    }
+    .nfs-control-button[data-size='sm'] {
+        @apply px-2.5 py-1.5 text-xs;
+    }
+    .nfs-control-button[data-size='md'] {
+        @apply px-2.5 py-1.5 text-sm;
+    }
+    .nfs-control-button[data-size='lg'] {
+        @apply gap-2 px-3 py-2 text-sm;
+    }
+    .nfs-control-button[data-size='xl'] {
+        @apply gap-2 px-3 py-2 text-base;
+    }
+    .nfs-control-button[data-size='xs'] .nfs-icon,
+    .nfs-control-button[data-size='sm'] .nfs-icon {
+        @apply size-4;
+    }
+    .nfs-control-button[data-size='xl'] .nfs-icon {
+        @apply size-6;
+    }
+    .nfs-control-button[data-variant='outline'] {
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nfs-control-color) 50%, transparent);
+        background: var(--nfs-bg);
+        color: var(--nfs-control-color);
+    }
+    .nfs-control-button[data-variant='soft'] {
+        background: color-mix(in srgb, var(--nfs-control-color) 13%, var(--nfs-bg));
+        color: var(--nfs-control-color);
+    }
+    .nfs-control-button[data-variant='subtle'] {
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nfs-control-color) 25%, transparent);
+        background: color-mix(in srgb, var(--nfs-control-color) 10%, var(--nfs-bg));
+        color: var(--nfs-control-color);
+    }
+    .nfs-control-button[data-variant='ghost'] {
+        background: transparent;
+        color: var(--nfs-control-color);
+    }
+    .nfs-control-button:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--nfs-control-color) 75%, var(--nfs-bg));
+    }
+    .nfs-control-button[data-color='neutral']:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--nfs-control-color) 90%, var(--nfs-bg));
+    }
+    .nfs-control-button[data-variant='outline']:hover:not(:disabled),
+    .nfs-control-button[data-variant='ghost']:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--nfs-control-color) 8%, var(--nfs-bg));
+    }
+    .nfs-control-button[data-variant='soft']:hover:not(:disabled),
+    .nfs-control-button[data-variant='subtle']:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--nfs-control-color) 15%, var(--nfs-bg));
+    }
+    .nfs-control-button[data-color='neutral'][data-variant='outline'],
+    .nfs-control-button[data-color='neutral'][data-variant='soft'],
+    .nfs-control-button[data-color='neutral'][data-variant='subtle'],
+    .nfs-control-button[data-color='neutral'][data-variant='ghost'] {
+        color: var(--nfs-text);
+    }
+    .nfs-control-button[data-color='neutral'][data-variant='outline'],
+    .nfs-control-button[data-color='neutral'][data-variant='subtle'] {
+        box-shadow: inset 0 0 0 1px var(--nfs-border);
+    }
+    .nfs-control-button:focus-visible,
+    .nfs-control-input:focus-visible,
+    .nfs-control-checkbox:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--nfs-control-color) 25%, transparent);
+        outline-offset: 0;
+    }
+    .nfs-control-button:disabled,
+    .nfs-control-input:disabled,
+    .nfs-control-checkbox:disabled {
+        @apply cursor-not-allowed opacity-75;
+    }
+    .nfs-control-input {
+        @apply w-full min-w-0 transition-colors;
+        border: 0;
+        box-shadow: inset 0 0 0 1px var(--nfs-border);
+        border-radius: var(--nfs-radius);
+        background: var(--nfs-bg);
+        color: var(--nfs-text);
+    }
+    .nfs-control-input[data-size='xs'] {
+        @apply px-2 py-1 text-sm/4;
+    }
+    .nfs-control-input[data-size='sm'] {
+        @apply px-2.5 py-1.5 text-sm/4;
+    }
+    .nfs-control-input[data-size='md'] {
+        @apply px-2.5 py-1.5 text-base/5;
+    }
+    .nfs-control-input[data-size='lg'] {
+        @apply px-3 py-2 text-base/5;
+    }
+    .nfs-control-input[data-size='xl'] {
+        @apply px-3 py-2 text-base;
+    }
+    .nfs-control-input::placeholder {
+        color: var(--ui-text-dimmed, #a1a1aa);
+    }
+    .nfs-control-input[data-variant='soft'] {
+        background: color-mix(in srgb, var(--nfs-bg-elevated) 50%, var(--nfs-bg));
+        box-shadow: none;
+    }
+    .nfs-control-input[data-variant='subtle'] {
+        background: var(--nfs-bg-elevated);
+    }
+    .nfs-control-input[data-variant='ghost'],
+    .nfs-control-input[data-variant='none'] {
+        background: transparent;
+        box-shadow: none;
+    }
+    .nfs-control-select-trigger {
+        @apply inline-flex w-auto items-center gap-2;
+    }
+    .nfs-control-select-content {
+        @apply z-50 min-w-40 border p-1 shadow-xl;
+        border-color: var(--nfs-border);
+        border-radius: var(--nfs-radius);
+        background: var(--nfs-bg);
+        color: var(--nfs-text);
+    }
+    .nfs-control-select-item,
+    .nfs-menu-item {
+        @apply flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none;
+    }
+    .nfs-control-select-item[data-highlighted],
+    .nfs-menu-item[data-highlighted] {
+        background: var(--nfs-bg-muted);
+    }
+    .nfs-control-select-item[data-disabled],
+    .nfs-menu-item[data-disabled] {
+        @apply cursor-not-allowed opacity-50;
+    }
+    .nfs-control-checkbox-label {
+        @apply inline-flex cursor-pointer items-center gap-2 text-sm;
+    }
+    .nfs-control-checkbox-label[data-variant='card'] {
+        @apply rounded-md border p-3;
+        border-color: var(--nfs-border);
+    }
+    .nfs-control-checkbox-label[data-variant='list'] {
+        @apply w-full border-b py-2;
+        border-color: var(--nfs-border);
+    }
+    .nfs-control-checkbox {
+        @apply inline-flex size-4 shrink-0 items-center justify-center border;
+        border-color: var(--nfs-border);
+        border-radius: calc(var(--nfs-radius) / 2);
+        background: var(--nfs-bg);
+    }
+    .nfs-control-checkbox[data-state='checked'] {
+        background: var(--nfs-control-color);
+        color: var(--nfs-inverted);
+        border-color: var(--nfs-control-color);
+    }
+    .nfs-control-progress {
+        @apply relative h-2 w-full overflow-hidden rounded-full;
+        background: var(--nfs-bg-muted);
+    }
+    .nfs-control-progress[data-size='xs'] {
+        @apply h-0.5;
+    }
+    .nfs-control-progress[data-size='sm'] {
+        @apply h-1;
+    }
+    .nfs-control-progress[data-size='lg'] {
+        @apply h-3;
+    }
+    .nfs-control-progress[data-size='xl'] {
+        @apply h-4;
+    }
+    .nfs-control-progress-indicator {
+        @apply block h-full rounded-full transition-[width];
+        background: var(--nfs-control-color);
+    }
+
+    .nfs-stack {
+        @apply flex flex-col gap-3;
+    }
+    .nfs-row {
+        @apply flex min-w-0 flex-wrap items-center gap-2;
+    }
+    .nfs-between {
+        @apply justify-between;
+    }
+    .nfs-grow {
+        @apply min-w-0 flex-1;
+    }
+    .nfs-file-info {
+        @apply flex min-w-0 flex-1 flex-col gap-0.5;
+        flex-basis: 8rem;
+        overflow-wrap: anywhere;
+    }
+    .nfs-muted {
+        color: var(--nfs-text-muted);
+    }
+    .nfs-truncate {
+        @apply truncate;
+    }
+    .nfs-icon {
+        @apply inline-block shrink-0;
+        width: var(--nfs-icon-size, 1.25rem);
+        height: var(--nfs-icon-size, 1.25rem);
+    }
+    .nfs-icon-lg {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+    .nfs-spin {
+        animation: nfs-spin 0.8s linear infinite;
+    }
+
+    .nfs-clickable:hover:not(:disabled) {
+        background: var(--nfs-bg-elevated);
+    }
+    .nfs-clickable:focus-visible {
+        outline: 2px solid var(--nfs-color);
+        outline-offset: 2px;
+    }
+    .nfs-clickable:disabled {
+        @apply cursor-not-allowed opacity-75;
+    }
+    .nfs-selected {
+        border-color: var(--nfs-color);
+        box-shadow: 0 0 0 1px var(--nfs-color);
+    }
+    .nfs-clickable {
+        @apply flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent text-start;
+        border-radius: calc(var(--nfs-radius) - 2px);
+        color: inherit;
+        font: inherit;
+    }
+    .nfs-tile,
+    .nfs-thumbnail {
+        @apply size-10 shrink-0 object-cover;
+        border-radius: calc(var(--nfs-radius) - 2px);
+    }
+    .nfs-tile {
+        @apply inline-flex items-center justify-center;
+        background: var(--nfs-bg-muted);
+        color: var(--nfs-text-muted);
+    }
+    .nfs-loading {
+        @apply flex min-h-32 items-center justify-center gap-2 text-center;
+        color: var(--nfs-text-muted);
+    }
+    .nfs-empty {
+        @apply flex min-h-32 flex-col items-center justify-center gap-2 text-center;
+        color: var(--nfs-text-muted);
+    }
+    .nfs-preview-media {
+        @apply h-auto max-h-72 max-w-full object-contain;
+        border-radius: calc(var(--nfs-radius) - 2px);
+    }
+    .nfs-preview-object {
+        @apply h-72 w-full;
+    }
+    .nfs-preview-text {
+        @apply m-0 max-h-72 w-full min-w-0 overflow-auto whitespace-pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .nfs-dialog-title {
+        @apply m-0 text-base font-semibold;
+        color: var(--nfs-highlighted);
+    }
+    .nfs-dialog-actions {
+        @apply flex flex-wrap justify-end gap-2;
+    }
+    .nfs-sr-only {
+        @apply sr-only;
+    }
+}

@@ -89,6 +89,15 @@ describe('Packed consumer', () => {
             'package/dist/nitro.d.ts',
             'package/dist/runtime.js',
             'package/dist/runtime.d.ts',
+            'package/dist/ui/locale.js',
+            'package/dist/ui/locale.d.ts',
+            'package/dist/ui/styles.css',
+            'package/dist/ui/styles.standalone.css',
+            'package/dist/ui/runtime/component-props.js',
+            'package/dist/ui/components/FilesDropzone.vue',
+            'package/dist/ui/controls/nuxt-ui/Button.vue',
+            'package/dist/ui/controls/standalone/Select.vue',
+            'package/dist/ui/runtime/control-options.d.ts',
         ]) {
             expect(contents).toContain(required)
         }
@@ -108,11 +117,24 @@ describe('Packed consumer', () => {
             peerDependencies: Record<string, string>
             peerDependenciesMeta: Record<string, { optional?: boolean }>
         }
-        expect(Object.keys(packageJson.exports)).toEqual(['.', './config', './nitro', './runtime', './package.json'])
-        expect(packageJson.dependencies['files-sdk']).toBeUndefined()
-        expect(packageJson.devDependencies['files-sdk']).toBe('^2.6.0')
-        expect(packageJson.peerDependencies['files-sdk']).toBe('^2.6.0')
-        expect(packageJson.peerDependenciesMeta['files-sdk']).toBeUndefined()
+        expect(Object.keys(packageJson.exports)).toEqual([
+            '.',
+            './config',
+            './nitro',
+            './runtime',
+            './ui/locale',
+            './package.json',
+        ])
+        expect(packageJson.dependencies['tailwind-variants']).toBe('^3.3.1')
+        expect(packageJson.dependencies['files-sdk']).toBe('^2.6.0')
+        expect(packageJson.dependencies['@nuxt/icon']).toBe('^2.5.1')
+        expect(packageJson.dependencies.tailwindcss).toBe('^4.3.3')
+        expect(packageJson.dependencies['@tailwindcss/vite']).toBe('^4.3.3')
+        expect(packageJson.dependencies['@tailwindcss/postcss']).toBe('^4.3.3')
+        expect(packageJson.dependencies['reka-ui']).toBe('^2.10.4')
+        expect(packageJson.dependencies['@nuxt/ui']).toBeUndefined()
+        expect(packageJson.peerDependencies['@nuxt/ui']).toBe('^4.11.1')
+        expect(packageJson.peerDependenciesMeta['@nuxt/ui']?.optional).toBe(true)
         expect(JSON.stringify(packageJson.dependencies)).not.toMatch(/@aws-sdk|@azure|@google-cloud/u)
     })
 
@@ -178,6 +200,11 @@ describe('Packed consumer', () => {
         }
         for (const forbidden of [
             'files-sdk/vue',
+            '@nuxt/icon',
+            '@nuxt/ui',
+            '@tailwindcss/vite',
+            'tailwind-variants',
+            'tailwindcss',
             'devframe',
             '@nuxt/devtools',
             ...(name === 'nuxt4' ? [] : ['@nuxt/kit']),

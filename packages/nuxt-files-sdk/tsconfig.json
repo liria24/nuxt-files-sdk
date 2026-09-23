@@ -4,5 +4,8 @@
         "rootDir": ".",
         "types": ["node"]
     },
-    "include": ["*.config.ts", "src"]
+    "include": ["*.config.ts", "src/**/*.ts", "src/**/*.vue"],
+    "vueCompilerOptions": {
+        "extensions": [".vue"]
+    }
 }
