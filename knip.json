@@ -8,17 +8,8 @@
             "project": ["*.{ts,vue}", "test/**/*.ts"]
         },
         "packages/nuxt-files-sdk": {
-            "entry": [
-                "src/{module,config,nitro,runtime}.ts",
-                "src/ui/components/*.vue",
-                "src/ui/integration/UTheme.vue"
-            ],
-            "ignoreDependencies": [
-                "@arethetypeswrong/cli",
-                "@iconify-json/lucide",
-                "@tailwindcss/postcss",
-                "@vitejs/devtools-kit"
-            ],
+            "entry": ["src/{module,config,nitro,runtime}.ts"],
+            "ignoreDependencies": ["@arethetypeswrong/cli", "@vitejs/devtools-kit"],
             "ignoreIssues": {
                 "package.json": ["optionalPeerDependencies"]
             },

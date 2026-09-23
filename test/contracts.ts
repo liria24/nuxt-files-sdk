@@ -258,42 +258,6 @@ export const contracts = [
         job: 'test-nuxt4',
     },
     {
-        id: 'UI-001',
-        guarantee: 'The twelve Files UI components auto-register and compile in a real Nuxt application',
-        source: 'test/nuxt/vue.test.ts',
-        job: 'test-nuxt4',
-    },
-    {
-        id: 'UI-002',
-        guarantee: 'UI theme app config, UTheme, component detection, icons, and v-model contracts compile together',
-        source: 'test/nuxt/vue.test.ts',
-        job: 'test-nuxt4',
-    },
-    {
-        id: 'UI-003',
-        guarantee: 'Files locale fallback and Nuxt UI locale context stay reactive and formatted',
-        source: 'test/unit/ui.test.ts',
-        job: 'unit',
-    },
-    {
-        id: 'UI-004',
-        guarantee: 'UI opt-out excludes components, icon, Tailwind, styles, and theme runtimes from server output',
-        source: 'test/bundle/bundle.test.ts',
-        job: 'test-size',
-    },
-    {
-        id: 'UI-005',
-        guarantee: 'The UI overview, theming, i18n, Nuxt UI integration, and component references stay complete',
-        source: 'test/unit/docs.test.ts',
-        job: 'unit',
-    },
-    {
-        id: 'UI-006',
-        guarantee: 'Single and namespace Nuxt UI locales gain Files messages without mutation or key loss',
-        source: 'test/unit/ui.test.ts',
-        job: 'unit',
-    },
-    {
         id: 'NITRO-001',
         guarantee: 'Nitro v2/v3 generate, typecheck, build, and serve the Files route',
         source: 'test/nitro/suite.ts',
@@ -423,7 +387,7 @@ export const contracts = [
     },
     {
         id: 'PKG-003',
-        guarantee: 'Exports and direct/optional dependency boundaries are explicit',
+        guarantee: 'Exports and required peer dependency boundaries are explicit',
         source: 'test/consumer/packed.test.ts',
         job: 'test-consumer',
     },
@@ -484,8 +448,20 @@ export const contracts = [
     },
     {
         id: 'DEV-006',
-        guarantee: 'Stale Files UI and DevTools browser requests are aborted and ignored',
-        source: 'test/unit/ui.test.ts',
+        guarantee: 'Stale browser requests cannot update a different location',
+        source: 'test/unit/devtools-browser.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'DEV-007',
+        guarantee: 'Browser pagination resets on navigation and refresh',
+        source: 'test/unit/devtools-browser.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'DEV-008',
+        guarantee: 'In-flight operations retain their original storage',
+        source: 'test/unit/devtools-browser.test.ts',
         job: 'unit',
     },
 ]

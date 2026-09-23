@@ -1,23 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 
-import {
-    addComponent,
-    addComponentsDir,
-    addImports,
-    addPlugin,
-    addServerImports,
-    createResolver,
-    defineNuxtModule,
-    getNuxtModuleVersion,
-    hasNuxtModule,
-    updateAppConfig,
-} from '@nuxt/kit'
+import { addImports, addServerImports, defineNuxtModule, getNuxtModuleVersion } from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
 
 import { filesDevtoolsWriteEnabled, shouldEnableFilesDevtools, type FilesDevtoolsOptions } from './devtools/enabled'
 import { setupNitroFilesIntegration, type NitroIntegration } from './integration/nitro'
-import { defaultFilesIcons } from './ui/icons'
 
 declare module '@nuxt/schema' {
     interface NuxtHooks {
@@ -31,12 +19,6 @@ export interface ModuleOptions {
     config: string
     /** Enable Files SDK development tools. File writes are enabled unless explicitly disabled. */
     devtools: boolean | FilesDevtoolsOptions
-    /** Register the Files SDK Vue UI and Nuxt UI integration. */
-    ui: boolean
-}
-
-export type FilesUiAppConfig = Partial<Record<keyof typeof import('./ui/runtime/themes').filesThemes, object>> & {
-    files?: { icons?: Partial<Record<keyof typeof defaultFilesIcons, string>> }
 }
 
 /** Install Files SDK storage configuration, server utilities, Vue composables, and development diagnostics in Nuxt. */
@@ -49,14 +31,8 @@ export default defineNuxtModule<ModuleOptions>({
     defaults: {
         config: 'files.config.ts',
         devtools: true,
-        ui: true,
-    },
-    moduleDependencies(nuxt) {
-        const options = (nuxt.options as typeof nuxt.options & { files?: Partial<ModuleOptions> }).files
-        return options?.ui === false ? {} : { '@nuxt/icon': {} }
     },
     async setup(options, nuxt: Nuxt) {
-        const resolver = createResolver(import.meta.url)
         const configPath = resolve(nuxt.options.rootDir, options.config)
         ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
         const paths = ((nuxt.options.typescript.tsConfig.compilerOptions ??= {}).paths ??= {})
@@ -80,57 +56,6 @@ export default defineNuxtModule<ModuleOptions>({
             addImports({ name, from: 'files-sdk/vue' })
         }
 
-        if (options.ui) {
-            const { filesThemes } = await import('./ui/runtime/themes')
-            const filesUiRegistry = Object.entries(filesThemes)
-                .map(([name, theme]) => `export const ${name} = ${JSON.stringify(theme)} as const`)
-                .join('\n')
-            const nuxtUi = hasNuxtModule('@nuxt/ui')
-            if (nuxtUi) {
-                addComponent({
-                    name: 'UTheme',
-                    filePath: resolver.resolve('./ui/integration/UTheme.vue'),
-                    global: true,
-                    priority: 10,
-                })
-            } else {
-                nuxt.hook('vite:extend', async ({ config }) => {
-                    const tailwind = await import('@tailwindcss/vite').then((module) => module.default)
-                    ;(config.plugins ??= []).push(tailwind())
-                })
-                if (nuxt.options.builder !== '@nuxt/vite-builder') {
-                    nuxt.options.postcss.plugins['@tailwindcss/postcss'] = {}
-                }
-            }
-            addPlugin(resolver.resolve(nuxtUi ? './ui/runtime/nuxt-ui-plugin' : './ui/runtime/nuxt-plugin'))
-            addComponentsDir({
-                path: resolver.resolve('./ui/components'),
-                pathPrefix: false,
-                global: true,
-            })
-            nuxt.options.css.push(resolver.resolve(nuxtUi ? './ui/styles.css' : './ui/styles.standalone.css'))
-            updateAppConfig({ ui: { files: { icons: defaultFilesIcons } } })
-
-            nuxt.hook('modules:done', () => {
-                for (const template of nuxt.options.build.templates) {
-                    const getContents = template.getContents
-                    if (!getContents) continue
-                    if (template.filename === 'ui/index.ts') {
-                        template.getContents = async (context) => `${await getContents(context)}\n${filesUiRegistry}\n`
-                    }
-                    if (template.filename === 'types/ui.d.ts') {
-                        template.getContents = async (context) => {
-                            const contents = (await getContents(context)).replace(
-                                'type AppConfigUI = {',
-                                "import type { FilesUiAppConfig } from 'nuxt-files-sdk'\n\ntype AppConfigUI = FilesUiAppConfig & {",
-                            )
-                            return contents
-                        }
-                    }
-                }
-            })
-        }
-
         if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
             const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
             const { setupFilesDevtools } = await import('./devtools')
@@ -141,4 +66,3 @@ export default defineNuxtModule<ModuleOptions>({
 })
 
 export type { FilesDevtoolsOptions } from './devtools/enabled'
-export type { FilesUiProps } from './ui/runtime/theme'

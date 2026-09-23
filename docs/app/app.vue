@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import * as uiLocales from '@nuxt/ui/locale'
-import { withFilesLocales } from 'nuxt-files-sdk/ui/locale'
+import * as locales from '@nuxt/ui/locale'
 
 const { locale } = useI18n()
-const locales = withFilesLocales(uiLocales)
 
 useHead({
     htmlAttrs: {

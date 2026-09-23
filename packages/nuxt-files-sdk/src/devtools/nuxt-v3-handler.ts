@@ -14,13 +14,6 @@ const assets = new Map([
             content: readFile(new URL('./client/app.js', import.meta.url), 'utf8'),
         },
     ],
-    [
-        '/style.css',
-        {
-            contentType: 'text/css; charset=utf-8',
-            content: readFile(new URL('./client/style.css', import.meta.url), 'utf8'),
-        },
-    ],
 ])
 
 export default async (event: { path: string; node: { res: { setHeader(name: string, value: string): void } } }) => {

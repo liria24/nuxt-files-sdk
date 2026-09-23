@@ -35,15 +35,9 @@ describe('Bundle contract', () => {
         ])
     })
 
-    test('[BUNDLE-001][BUNDLE-002][UI-004] server-only Nuxt excludes Vue, Files UI, and development tooling', () => {
+    test('[BUNDLE-001][BUNDLE-002] server-only Nuxt excludes Vue and development tooling', () => {
         for (const forbidden of [
             'files-sdk/vue',
-            '@nuxt/icon',
-            '@nuxt/ui',
-            '@tailwindcss/vite',
-            'tailwind-variants',
-            'tailwindcss',
-            'FilesDropzone',
             'devframe',
             '@nuxt/devtools-kit',
             '@vitejs/devtools',

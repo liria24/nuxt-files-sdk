@@ -97,7 +97,6 @@ void /*global*/useServerFiles()
 const options: ModuleOptions = {
   /*moduleConfig*/config: 'files.config.ts',
   /*devtools*/devtools: { write: false },
-  /*ui*/ui: true,
 }
 void options
 `
@@ -209,7 +208,6 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             global: "Return the project's Files client",
             moduleConfig: 'Path to the Files configuration module',
             devtools: 'Enable Files SDK development tools',
-            ui: 'Register the Files SDK Vue UI',
         })) {
             const offset = hoverSource.indexOf(`/*${marker}*/`) + marker.length + 4
             const lines = hoverSource.slice(0, offset).split('\n')
