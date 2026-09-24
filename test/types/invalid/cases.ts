@@ -59,4 +59,16 @@ export const invalidTypeCases = [
         diagnostic: /error TS2554:/u,
         source: `import { useServerFiles } from 'nuxt-files-sdk/runtime'\nuseServerFiles()\n`,
     },
+    {
+        id: 'TYPE-015',
+        name: 'gateway route without named storage',
+        diagnostic: /error TS2769:/u,
+        source: `import { defineFilesConfig } from 'nuxt-files-sdk/config'\n\ndefineFilesConfig({ storage: { blob: { adapter: 'memory' } }, routes: [{ path: '/api/files' }] })\n`,
+    },
+    {
+        id: 'TYPE-016',
+        name: 'gateway route with unknown storage',
+        diagnostic: /error TS2769:/u,
+        source: `import { defineFilesConfig } from 'nuxt-files-sdk/config'\n\ndefineFilesConfig({ storage: { blob: { adapter: 'memory' } }, routes: [{ path: '/api/files', storage: 'missing' }] })\n`,
+    },
 ] as const

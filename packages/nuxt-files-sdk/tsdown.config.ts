@@ -16,6 +16,7 @@ export default defineConfig([
                 '@nuxt/devtools-kit',
                 'devframe',
                 'files-sdk',
+                'h3',
                 'jiti',
                 'node:crypto',
                 'node:fs',

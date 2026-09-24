@@ -18,5 +18,13 @@ export const nuxtRuntimeSuite = async (name: string, expected: Record<string, un
         test('[CFG-001][NUXT-001] loads the module, root config, Nitro plugin, and configured storage', async () => {
             await expect($fetch('/api/files')).resolves.toEqual(expected)
         })
+
+        test('[GATEWAY-004] serves the configured application gateway route', async () => {
+            const result = await $fetch<{ items: unknown[] }>('/api/gateway', {
+                method: 'POST',
+                body: { op: 'list' },
+            })
+            expect(result.items).toEqual([])
+        })
     })
 }

@@ -464,4 +464,47 @@ export const contracts = [
         source: 'test/unit/devtools-browser.test.ts',
         job: 'unit',
     },
+    {
+        id: 'GATEWAY-001',
+        guarantee: 'Only explicit static routes with valid fixed storage bindings are accepted',
+        source: 'test/unit/generation.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'GATEWAY-002',
+        guarantee: 'Configured gateways generate version-specific Nitro handlers',
+        source: 'test/unit/generation.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'GATEWAY-003',
+        guarantee: 'Production configuration preserves explicit gateway routes',
+        source: 'test/unit/config.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'GATEWAY-004',
+        guarantee: 'Nuxt serves the configured application gateway',
+        source: 'test/nuxt/suite.ts',
+        job: 'test-nuxt4',
+    },
+    {
+        id: 'GATEWAY-005',
+        guarantee:
+            'Nitro v2/v3 gateways isolate authorization and storage and keep upload tokens valid across requests',
+        source: 'test/nitro/suite.ts',
+        job: 'test-nitro2',
+    },
+    {
+        id: 'TYPE-015',
+        guarantee: 'Named storage gateways require a storage name',
+        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        job: 'test-nuxt4',
+    },
+    {
+        id: 'TYPE-016',
+        guarantee: 'Named storage gateways reject unknown storage names',
+        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        job: 'test-nuxt4',
+    },
 ]

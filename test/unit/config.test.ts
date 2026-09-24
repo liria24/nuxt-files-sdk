@@ -118,6 +118,18 @@ describe('configuration types', () => {
         }
     })
 
+    test('[GATEWAY-003] keeps configured application routes in production', () => {
+        const nodeEnvironment = process.env.NODE_ENV
+        process.env.NODE_ENV = 'production'
+        try {
+            const routes = [{ path: '/api/files', operations: ['list'] as const }]
+            expect(defineFilesConfig({ storage: { adapter: 'memory' }, routes })).toMatchObject({ routes })
+        } finally {
+            if (nodeEnvironment === undefined) delete process.env.NODE_ENV
+            else process.env.NODE_ENV = nodeEnvironment
+        }
+    })
+
     test('[TYPE-008] rejects unmatched development names', () => {
         expect.assertions(0)
         defineFilesConfig({

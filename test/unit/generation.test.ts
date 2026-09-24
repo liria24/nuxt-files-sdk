@@ -6,6 +6,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
 import {
+    gatewayRoutes,
     optionalAwsSdkDependencies,
     providerCode,
     selectedAdapters,
@@ -18,6 +19,48 @@ const missingDependency = () => false
 afterAll(() => Promise.all(temporaryDirectories.map((directory) => rm(directory, { recursive: true, force: true }))))
 
 describe('provider generation', () => {
+    test('[GATEWAY-001] validates explicit static routes and fixed storage selection', () => {
+        const single = { storage: { adapter: 'memory' }, routes: [{ path: '/api/files' }] }
+        expect(gatewayRoutes(single, false)).toEqual(single.routes)
+        expect(gatewayRoutes({ storage: single.storage }, false)).toEqual([])
+        expect(() => gatewayRoutes({ ...single, routes: [{ path: '/api/files', storage: 'other' }] }, false)).toThrow(
+            'Invalid storage',
+        )
+        const named = { storage: { first: { adapter: 'memory' } }, routes: [{ path: '/files', storage: 'first' }] }
+        expect(gatewayRoutes(named, false)).toEqual(named.routes)
+        expect(() => gatewayRoutes({ ...named, routes: [{ path: '/files' }] }, false)).toThrow('Invalid storage')
+        expect(() => gatewayRoutes({ ...single, routes: [{ path: 'files' }] }, false)).toThrow('static absolute path')
+        expect(() => gatewayRoutes({ ...single, routes: [{ path: '/files' }, { path: '/files' }] }, false)).toThrow(
+            'Duplicate route',
+        )
+    })
+
+    test('[GATEWAY-002] registers version-specific generated handlers only for configured routes', async () => {
+        const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-gateway-'))
+        temporaryDirectories.push(directory)
+        const configPath = resolve(directory, 'files.config.mjs')
+        await writeFile(
+            configPath,
+            `export default { storage: { adapter: 'memory' }, routes: [{ path: '/api/files', operations: ['list'] }] }`,
+        )
+        for (const majorVersion of [2, 3]) {
+            const nitro: NitroIntegration = {
+                meta: { majorVersion },
+                options: { rootDir: directory, buildDir: resolve(directory, String(majorVersion)), plugins: [] },
+                hooks: { hook: vi.fn<NitroIntegration['hooks']['hook']>() },
+            }
+            await setupNitroFilesIntegration(nitro, { configPath, development: false })
+            expect(nitro.options.handlers).toHaveLength(1)
+            expect(nitro.options.handlers?.[0]?.route).toBe('/api/files')
+            const handler = await readFile(nitro.options.handlers![0]!.handler, 'utf8')
+            expect(handler).toContain('createFilesRouter({')
+            expect(handler).toContain('files: () => getFiles()')
+            expect(handler).toContain(
+                majorVersion === 2 ? 'createRouteHandler(router)(event)' : 'router.handle(event.req)',
+            )
+        }
+    })
+
     test('[CFG-009] selects only providers used in the active runtime mode without resolving credentials', () => {
         expect(() => selectedAdapters(undefined, true)).toThrow(
             '[nuxt-files-sdk:invalid-config] Files configuration must be an object.',
