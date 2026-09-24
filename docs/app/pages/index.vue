@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TreeItem } from '@nuxt/ui'
+import type { TreeItem, TabsItem } from '@nuxt/ui'
 import { highlightText } from 'rangi'
 
 const { docs } = useAppConfig()
@@ -17,32 +17,59 @@ const displayCommand = computed(() => `${packageManagers[selectPM.value].install
 
 const siteUrl = useRuntimeConfig().public.siteUrl.replace(/\/$/u, '')
 
-type PreviewFile = TreeItem & { code?: string; children?: PreviewFile[] }
+type PreviewFile = TreeItem & { id?: string; code?: string; children?: PreviewFile[] }
+
+const findPreviewFile = (files: PreviewFile[], id: string): PreviewFile | undefined => {
+    for (const file of files) {
+        if (file.id === id) return file
+
+        const nested = file.children && findPreviewFile(file.children, id)
+        if (nested) return nested
+    }
+}
 
 const nuxtFilesConfig = `export default defineFilesConfig({
     storage: {
-        adapter: 'fs',
-        config: { root: '.data/files' },
+        adapter: 's3',
+        config: {
+            bucket: "uploads",
+            region: "us-east-1",
+        },
     },
-    $test: { storage: { adapter: 'memory' } },
+    $development: {
+        storage: {
+            adapter: 'fs',
+            config: { root: '.data/files' },
+        }
+    },
 })`
 
 const nitroFilesConfig = `import { defineFilesConfig } from 'nuxt-files-sdk/config'
 
 ${nuxtFilesConfig}`
 
-const examples: { label: string; value: string; files: PreviewFile[] }[] = [
+interface ExampleItem extends TabsItem {
+    files: PreviewFile[]
+}
+
+const examples: ExampleItem[] = [
     {
         label: 'Nuxt 4',
         value: 'nuxt4',
+        icon: 'devicon:nuxt',
         files: [
             {
+                id: 'framework-config',
                 label: 'nuxt.config.ts',
                 code: `export default defineNuxtConfig({
     modules: ['nuxt-files-sdk'],
 })`,
             },
-            { label: 'files.config.ts', code: nuxtFilesConfig },
+            {
+                id: 'files-config',
+                label: 'files.config.ts',
+                code: nuxtFilesConfig,
+            },
             {
                 label: 'server',
                 defaultExpanded: true,
@@ -52,6 +79,7 @@ const examples: { label: string; value: string; files: PreviewFile[] }[] = [
                         defaultExpanded: true,
                         children: [
                             {
+                                id: 'api',
                                 label: 'hello.get.ts',
                                 code: `export default defineEventHandler(async () => {
     const files = useServerFiles()
@@ -68,14 +96,20 @@ const examples: { label: string; value: string; files: PreviewFile[] }[] = [
     {
         label: 'Nuxt 5',
         value: 'nuxt5',
+        icon: 'devicon:nuxt',
         files: [
             {
+                id: 'framework-config',
                 label: 'nuxt.config.ts',
                 code: `export default defineNuxtConfig({
     modules: ['nuxt-files-sdk'],
 })`,
             },
-            { label: 'files.config.ts', code: nuxtFilesConfig },
+            {
+                id: 'files-config',
+                label: 'files.config.ts',
+                code: nuxtFilesConfig,
+            },
             {
                 label: 'server',
                 defaultExpanded: true,
@@ -85,8 +119,9 @@ const examples: { label: string; value: string; files: PreviewFile[] }[] = [
                         defaultExpanded: true,
                         children: [
                             {
+                                id: 'api',
                                 label: 'hello.get.ts',
-                                code: `export default defineEventHandler(async () => {
+                                code: `export default defineHandler(async () => {
     const files = useServerFiles()
     await files.upload('hello.txt', 'Hello from Nuxt 5')
     return (await files.download('hello.txt')).text()
@@ -101,19 +136,26 @@ const examples: { label: string; value: string; files: PreviewFile[] }[] = [
     {
         label: 'Nitro 2',
         value: 'nitro2',
+        icon: 'unjs:nitro',
         files: [
             {
+                id: 'framework-config',
                 label: 'nitro.config.ts',
                 code: `export default defineNitroConfig({
     modules: ['nuxt-files-sdk/nitro'],
 })`,
             },
-            { label: 'files.config.ts', code: nitroFilesConfig },
+            {
+                id: 'files-config',
+                label: 'files.config.ts',
+                code: nitroFilesConfig,
+            },
             {
                 label: 'routes',
                 defaultExpanded: true,
                 children: [
                     {
+                        id: 'api',
                         label: 'hello.ts',
                         code: `import { useServerFiles } from 'nuxt-files-sdk/runtime'
 
@@ -130,8 +172,10 @@ export default defineEventHandler(async () => {
     {
         label: 'Nitro 3',
         value: 'nitro3',
+        icon: 'unjs:nitro',
         files: [
             {
+                id: 'framework-config',
                 label: 'nitro.config.ts',
                 code: `import { defineNitroConfig } from 'nitro/config'
 
@@ -140,17 +184,22 @@ export default defineNitroConfig({
     serverDir: './',
 })`,
             },
-            { label: 'files.config.ts', code: nitroFilesConfig },
+            {
+                id: 'files-config',
+                label: 'files.config.ts',
+                code: nitroFilesConfig,
+            },
             {
                 label: 'routes',
                 defaultExpanded: true,
                 children: [
                     {
+                        id: 'api',
                         label: 'hello.ts',
-                        code: `import { defineEventHandler } from 'nitro/h3'
+                        code: `import { defineHandler } from 'nitro'
 import { useServerFiles } from 'nuxt-files-sdk/runtime'
 
-export default defineEventHandler(async () => {
+export default defineHandler(async () => {
     const files = useServerFiles()
     await files.upload('hello.txt', 'Hello from Nitro 3')
     return (await files.download('hello.txt')).text()
@@ -165,7 +214,9 @@ export default defineEventHandler(async () => {
 const selectedExample = ref('nuxt4')
 const selectedFile = ref<PreviewFile>(examples[0]!.files[1]!)
 watch(selectedExample, (value) => {
-    selectedFile.value = examples.find((example) => example.value === value)!.files[1]!
+    const fileId = selectedFile.value?.id ?? 'files-config'
+    const example = examples.find((e) => e.value === value)!
+    selectedFile.value = findPreviewFile(example.files, fileId) ?? findPreviewFile(example.files, 'files-config')!
 })
 const highlightedCode = computed(() => highlightText(selectedFile.value.code ?? '', { lang: 'ts' }))
 
@@ -185,7 +236,7 @@ useSeoMeta({
             headline="Unofficial Nuxt Integration"
             title="Set up Files SDK easily"
             description="Native-first Files SDK integration for Nuxt and Nitro."
-            :ui="{ container: 'pb-8 sm:pb-8 lg:pb-8' }"
+            :ui="{ container: 'pb-24 sm:pb-24 lg:pb-24' }"
         >
             <template #links>
                 <div class="group relative">
@@ -230,15 +281,19 @@ useSeoMeta({
             </template>
         </UPageHero>
 
-        <UTabs v-model="selectedExample" :items="examples" class="w-full max-w-4xl">
+        <UTabs
+            v-model="selectedExample"
+            :items="examples"
+            size="xs"
+            :ui="{ list: 'bg-transparent max-w-sm' }"
+            class="w-full max-w-3xl"
+        >
             <template #content="{ item }">
-                <div
-                    class="border-muted grid min-h-[340px] overflow-hidden rounded-md border lg:h-[340px] lg:grid-cols-3"
-                >
+                <div class="border-muted grid min-h-85 overflow-hidden rounded-md border lg:h-85 lg:grid-cols-4">
                     <UTree
                         v-model="selectedFile"
                         :items="item.files"
-                        :get-key="(file) => file.label"
+                        :get-key="(file) => file.label ?? ''"
                         class="border-muted max-h-40 overflow-y-auto border-b p-2 lg:max-h-none lg:border-e lg:border-b-0"
                         @select="
                             (event, file) => {
@@ -255,12 +310,12 @@ useSeoMeta({
                             <ProseCodeIcon v-else :filename="file.label" class="size-4" />
                         </template>
                     </UTree>
-                    <div class="min-h-64 min-w-0 overflow-auto lg:col-span-2 lg:min-h-0">
+                    <div class="min-h-64 min-w-0 overflow-auto lg:col-span-3 lg:min-h-0">
                         <div class="border-muted text-muted border-b px-4 py-2 font-mono text-xs">
                             {{ selectedFile.label }}
                         </div>
                         <div
-                            class="overflow-auto p-4 font-mono text-xs leading-6 whitespace-pre [color-scheme:light] dark:[color-scheme:dark]"
+                            class="overflow-auto p-4 font-mono text-xs leading-6 whitespace-pre scheme-light dark:scheme-dark"
                             v-html="highlightedCode"
                         />
                     </div>
