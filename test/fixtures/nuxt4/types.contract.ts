@@ -11,7 +11,7 @@ import { syncFiles as importedSyncFiles, transferFiles as importedTransferFiles 
 
 const switchedConfig = defineFilesConfig({
     storage: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },
-    devStorage: { adapter: 'memory' },
+    $development: { storage: { adapter: 'memory' } },
 })
 const assertSwitchedTypes = (files: SingleStorage<typeof switchedConfig>): void => {
     files.adapter satisfies FsAdapter | MemoryAdapter
@@ -42,7 +42,7 @@ const composedConfig = defineFilesConfig({
             ],
         },
     },
-    devStorage: { uploads: { adapter: 'fs', config: { root: '.' } } },
+    $development: { storage: { uploads: { adapter: 'fs', config: { root: '.' } } } },
 })
 const assertComposedTypes = (files: StorageRegistry<typeof composedConfig>['uploads']): void => {
     files.adapter satisfies ReturnType<typeof custom> | FsAdapter

@@ -60,7 +60,7 @@ export const installFixture = async (name: string): Promise<string> => {
 export const cleanFixture = async (name: string): Promise<void> => {
     const directory = fixtureDirectory(name)
     await Promise.all(
-        ['.nuxt', '.nitro', 'node_modules/.nitro', '.output', '.data'].map((entry) =>
+        ['.nuxt', '.nitro', 'node_modules/.nitro', 'node_modules/.cache/nuxt/.nuxt', '.output', '.data'].map((entry) =>
             rm(resolve(directory, entry), { recursive: true, force: true }),
         ),
     )

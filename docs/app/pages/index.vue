@@ -28,6 +28,7 @@ export default defineFilesConfig({
         adapter: 'fs',
         config: { root: '.data/files' },
     },
+    $test: { storage: { adapter: 'memory' } },
 })
 \`\`\`
 

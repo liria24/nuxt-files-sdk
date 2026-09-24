@@ -19,13 +19,13 @@ export const contracts = [
     },
     {
         id: 'CFG-003',
-        guarantee: 'Production initialization failures never use devStorage as fallback',
+        guarantee: 'Provider initialization failures never switch adapters',
         source: 'test/unit/registry.test.ts',
         job: 'unit',
     },
     {
         id: 'CFG-004',
-        guarantee: 'Development overrides preserve base plugins and native hooks',
+        guarantee: 'Resolved storages preserve plugins and native hooks',
         source: 'test/unit/registry.test.ts',
         job: 'unit',
     },
@@ -49,7 +49,7 @@ export const contracts = [
     },
     {
         id: 'CFG-008',
-        guarantee: 'Unknown development override names fail before provider construction',
+        guarantee: 'Unknown storage names fail before provider construction',
         source: 'test/unit/no-fallback.test.ts',
         job: 'unit',
     },
@@ -67,7 +67,7 @@ export const contracts = [
     },
     {
         id: 'CFG-011',
-        guarantee: 'Development-only storage has declarations in every mode but no production runtime plugin',
+        guarantee: 'Environment-only storage is rejected outside its active environment',
         source: 'test/unit/generation.test.ts',
         job: 'unit',
     },
@@ -115,13 +115,13 @@ export const contracts = [
     },
     {
         id: 'TYPE-004',
-        guarantee: 'devStorage cannot replace plugins',
+        guarantee: 'The removed development storage key fails compilation',
         source: 'test/nuxt/nuxt4-generated-types.test.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-005',
-        guarantee: 'devStorage cannot replace hooks',
+        guarantee: 'Mistyped environment keys fail compilation',
         source: 'test/nuxt/nuxt4-generated-types.test.ts',
         job: 'test-nuxt4',
     },
@@ -139,7 +139,7 @@ export const contracts = [
     },
     {
         id: 'TYPE-008',
-        guarantee: 'Development overrides are limited to declared storage names',
+        guarantee: 'Invalid environment storage shapes fail compilation',
         source: 'test/nuxt/nuxt4-generated-types.test.ts',
         job: 'test-nuxt4',
     },
@@ -344,7 +344,7 @@ export const contracts = [
     },
     {
         id: 'SEC-001',
-        guarantee: 'Dummy secrets and development storage settings are absent from production outputs',
+        guarantee: 'Dummy secrets and inactive environment storage settings are absent from production outputs',
         source: 'test/bundle/bundle.test.ts',
         job: 'test-size',
     },

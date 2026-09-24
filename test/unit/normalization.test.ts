@@ -13,25 +13,20 @@ describe('normalized configuration', () => {
             [],
             { storage: {} },
             { storage: [] },
-            { storage: { adapter: 'memory' }, devStorage: { named: { adapter: 'memory' } } },
-            { storage: { named: { adapter: 'memory' } }, devStorage: { adapter: 'memory' } },
-            { storage: { named: { adapter: 'memory' } }, devStorage: { missing: { adapter: 'memory' } } },
+            { storage: { named: {} } },
+            { storage: { named: { config: {} } } },
         ]) {
-            for (const development of [true, false]) {
-                let error: unknown
-                try {
-                    selectedAdapters(config, development)
-                } catch (failure) {
-                    error = failure
-                }
-                expect(error).toBeInstanceOf(Error)
-                expect(() => new FilesRegistry(config as FilesConfig, { development, factories: { memory } })).toThrow(
-                    error,
-                )
+            let error: unknown
+            try {
+                selectedAdapters(config)
+            } catch (failure) {
+                error = failure
             }
+            expect(error).toBeInstanceOf(Error)
+            expect(() => new FilesRegistry(config as FilesConfig, { factories: { memory } })).toThrow(error)
         }
-        const config = { default: 'unused', storage: { adapter: 'memory' as const } }
-        expect(selectedAdapters(config, false)).toEqual({ single: true, adapters: ['memory'] })
+        const config = { storage: { adapter: 'memory' as const } }
+        expect(selectedAdapters(config)).toEqual({ single: true, adapters: ['memory'] })
         expect(new FilesRegistry(config, { factories: { memory } }).get().adapter.name).toBe('memory')
     })
 

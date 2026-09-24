@@ -55,7 +55,6 @@ const isSnapshot = (value: unknown): value is Snapshot =>
             typeof item.adapter === 'string' &&
             Array.isArray(item.plugins) &&
             item.plugins.every((plugin) => typeof plugin === 'string') &&
-            (item.source === 'storage' || item.source === 'devStorage') &&
             typeof item.initialized === 'boolean',
     ) &&
     Array.isArray(value.diagnostics) &&
@@ -342,12 +341,7 @@ const renderSnapshot = (): void => {
     element('#storages', HTMLTableSectionElement).replaceChildren(
         ...snapshot.storages.map((item) => {
             const row = document.createElement('tr')
-            for (const value of [
-                item.name ?? 'Single storage',
-                item.adapter,
-                item.plugins.join(', ') || '—',
-                item.source,
-            ]) {
+            for (const value of [item.name ?? 'Single storage', item.adapter, item.plugins.join(', ') || '—']) {
                 const cell = document.createElement('td')
                 cell.textContent = value
                 row.append(cell)

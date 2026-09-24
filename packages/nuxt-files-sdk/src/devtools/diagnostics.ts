@@ -19,7 +19,7 @@ export const FILES_DEVTOOLS_DIAGNOSTICS = {
     NUXT_FILES_INVALID_CONFIG: {
         level: 'error',
         message: 'The Files registry rejected the storage configuration.',
-        hint: 'Check the storage and devStorage shapes in files.config.ts.',
+        hint: 'Check the storage shape in the active files.config.ts environment.',
         docs: troubleshooting,
     },
     NUXT_FILES_ADAPTER_INIT_FAILED: {

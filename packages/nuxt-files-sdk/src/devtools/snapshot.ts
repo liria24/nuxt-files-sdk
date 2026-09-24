@@ -7,7 +7,6 @@ export interface FilesDevtoolsSnapshot {
         name?: string
         adapter: string
         plugins: string[]
-        source: 'storage' | 'devStorage'
         initialized: boolean
     }>
     diagnostics: FilesDevtoolsDiagnostic[]

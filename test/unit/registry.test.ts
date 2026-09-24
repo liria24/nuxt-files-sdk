@@ -42,12 +42,11 @@ describe('FilesRegistry', () => {
         }
     })
 
-    test('[CFG-003][ERR-002] preserves factory errors and never uses devStorage as a production fallback', () => {
+    test('[CFG-003][ERR-002] preserves factory errors without switching providers', () => {
         const failure = new FilesError('Provider', 'Missing provider configuration')
         const registry = new FilesRegistry(
             defineFilesConfig({
                 storage: { adapter: 's3', config: { bucket: 'missing' } },
-                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
             {
                 factories: {
@@ -61,19 +60,18 @@ describe('FilesRegistry', () => {
         expect(() => registry.get()).toThrow(failure)
     })
 
-    test('[CFG-004] preserves plugins and hooks with a development provider override', async () => {
+    test('[CFG-004] preserves plugins and hooks on resolved storage', async () => {
         const onAction = vi.fn<(event: unknown) => void>()
         const files = new FilesRegistry(
             defineFilesConfig({
                 storage: {
-                    adapter: 's3',
-                    config: { bucket: 'unused' },
+                    adapter: 'fs',
+                    config: { root: '.data/test-files' },
                     plugins: [versioning()],
                     hooks: { onAction },
                 },
-                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
-            { development: true, factories },
+            { factories },
         ).get()
 
         expect(files.versions).toBeTypeOf('function')
@@ -111,36 +109,33 @@ describe('FilesRegistry', () => {
         await expect(readonly.upload('readonly.txt', 'blocked')).rejects.toMatchObject({ code: 'ReadOnly' })
     })
 
-    test('[CFG-011] supports a complete development-only storage', () => {
+    test('[CFG-011] supports an environment-only storage after resolution', () => {
         const registry = new FilesRegistry(
             defineFilesConfig({
-                devStorage: {
+                storage: {
                     adapter: 'fs',
                     config: { root: '.data/test-files' },
                     plugins: [versioning()],
                 },
             }),
-            { development: true, factories },
+            { factories },
         )
 
         expect(registry.get().versions).toBeTypeOf('function')
-        expect(registry.inspect().storages).toEqual([
-            { adapter: 'fs', plugins: ['versioning'], source: 'devStorage', initialized: true },
-        ])
+        expect(registry.inspect().storages).toEqual([{ adapter: 'fs', plugins: ['versioning'], initialized: true }])
     })
 
-    test('[SEC-002] reports only a secret-free development snapshot', () => {
+    test('[SEC-002] reports only a secret-free snapshot', () => {
         const secret = 'NUXT_FILES_TEST_SECRET_123456'
         const registry = new FilesRegistry(
             defineFilesConfig({
                 storage: {
-                    adapter: 's3',
-                    config: { bucket: 'secret-bucket', secretAccessKey: secret },
+                    adapter: 'fs',
+                    config: { root: '.data/test-files', secretAccessKey: secret } as never,
                     plugins: [versioning()],
                 },
-                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
-            { development: true, factories },
+            { factories },
         )
         expect(registry.get()).toBe(registry.get())
 
@@ -149,7 +144,6 @@ describe('FilesRegistry', () => {
                 {
                     adapter: 'fs',
                     plugins: ['versioning'],
-                    source: 'devStorage',
                     initialized: true,
                 },
             ],
@@ -222,9 +216,8 @@ describe('FilesRegistry', () => {
                         },
                     },
                 },
-                devStorage: { uploads: { adapter: () => memory() } },
             }),
-            { development: true, factories: {} },
+            { factories: {} },
         )
         expect([cold, hot].map((fn) => fn.mock.calls.length)).toEqual([0, 0])
         expect(resolverCalls).toBe(0)
@@ -234,7 +227,7 @@ describe('FilesRegistry', () => {
         expect(registry.inspect().storages.map(({ initialized }) => initialized)).toEqual([false, false, true])
         expect(registry.inspect().storages[2]?.plugins).toEqual(['versioning', 'tiering', 'failover'])
         expect(cold).toHaveBeenCalledOnce()
-        expect(hot).not.toHaveBeenCalled()
+        expect(hot).toHaveBeenCalledOnce()
         expect(resolverCalls).toBe(1)
         await files.upload('archive/old.txt', 'hello')
         expect(await files.exists('archive/old.txt')).toBe(true)

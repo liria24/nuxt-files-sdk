@@ -78,18 +78,19 @@ export const checkPublicExamples = async (directory: string): Promise<void> => {
 }
 
 const hoverSource = `import module, { type ModuleOptions } from 'nuxt-files-sdk'
-import { defineFilesConfig, type SingleFilesConfig, type StorageConfig } from 'nuxt-files-sdk/config'
+import { defineFilesConfig, type FilesConfigInput, type SingleFilesConfig, type StorageConfig } from 'nuxt-files-sdk/config'
 import { useServerFiles as importedUseServerFiles } from 'nuxt-files-sdk/runtime'
 import { useServerFiles as aliasedUseServerFiles } from '#imports'
 
 void /*module*/module
 const config = /*define*/defineFilesConfig({
   storage: { adapter: 'fs', config: { root: '.data/files' } },
-  devStorage: { adapter: 'memory' },
+  $development: { storage: { adapter: 'memory' } },
 })
 declare const documentedConfig: SingleFilesConfig
 void documentedConfig./*storage*/storage
-void documentedConfig./*devStorage*/devStorage
+declare const documentedInput: FilesConfigInput
+void documentedInput./*environment*/$development
 declare const documentedStorage: StorageConfig
 void documentedStorage./*adapter*/adapter
 void documentedStorage./*providerConfig*/config
@@ -200,11 +201,11 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
         })
         for (const [marker, expected] of Object.entries({
             module: 'Install Files SDK storage configuration',
-            define: 'Define one unnamed Files SDK storage',
+            define: 'Preserve storage names, adapters, and plugin literals',
             storage: 'Files SDK storage configuration',
             adapter: 'Files SDK provider slug or a compatible adapter factory',
             providerConfig: 'Native adapter factory options',
-            devStorage: 'Development-only provider settings',
+            environment: 'Overrides applied by the development server',
             imported: "Return the project's unnamed Files client",
             aliased: "Return the project's unnamed Files client",
             global: "Return the project's Files client",

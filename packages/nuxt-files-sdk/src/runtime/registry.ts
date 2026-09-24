@@ -9,15 +9,7 @@ import {
     type ProviderSlug,
 } from 'files-sdk'
 
-import type {
-    DevelopmentOnlyNamedFilesConfig,
-    DevelopmentOnlySingleFilesConfig,
-    DevStorageConfig,
-    FilesConfig,
-    NamedFilesConfig,
-    SingleFilesConfig,
-    StorageConfig,
-} from '../config'
+import type { FilesConfig, FilesConfigInput, StorageConfig } from '../config'
 import type { FilesDevtoolsDiagnosticCode } from '../devtools/diagnostics'
 import { normalizeFilesConfig, type StorageEntry } from './normalize'
 import type { ProviderFactories } from './provider-types'
@@ -28,39 +20,42 @@ type AdapterFor<A> = A extends ProviderSlug
     : A extends (...args: never[]) => Adapter
       ? ReturnType<A>
       : never
-type PluginsFor<T extends StorageConfig> =
-    NonNullable<T['plugins']> extends (...args: never[]) => infer P
+type PluginsFor<T> = T extends { plugins: infer V }
+    ? V extends (...args: never[]) => infer P
         ? P extends readonly import('files-sdk').FilesPlugin[]
             ? P
             : never
-        : NonNullable<T['plugins']> extends readonly import('files-sdk').FilesPlugin[]
-          ? NonNullable<T['plugins']>
+        : V extends readonly import('files-sdk').FilesPlugin[]
+          ? V
           : never
-export type FilesForStorage<T extends StorageConfig, Dev = never> = Files<
-    AdapterFor<T['adapter'] | (Dev extends DevStorageConfig ? Dev['adapter'] : never)>
+    : never
+export type FilesForStorage<T extends { adapter: ProviderSlug | ((...args: never[]) => Adapter) }> = Files<
+    AdapterFor<T['adapter']>
 > &
     ExtensionsOf<PluginsFor<T>>
 
+type StorageOf<C> = C extends { storage: infer S } ? S : never
+type StorageBranch<C> =
+    | StorageOf<C>
+    | StorageOf<C extends { $development: infer E } ? E : never>
+    | StorageOf<C extends { $production: infer E } ? E : never>
+    | StorageOf<C extends { $test: infer E } ? E : never>
+    | StorageOf<C extends { $prerender: infer E } ? E : never>
+    | StorageOf<C extends { $env: infer E } ? E[keyof E] : never>
+type SingleEntry<C> = Extract<StorageBranch<C>, { adapter: ProviderSlug | ((...args: never[]) => Adapter) }>
+type NamedSet<C> = Exclude<StorageBranch<C>, { adapter: unknown }>
+type StorageNames<C> = NamedSet<C> extends infer S ? (S extends object ? keyof S : never) : never
+type NamedEntry<C, Name extends PropertyKey> =
+    NamedSet<C> extends infer S ? (S extends object ? (Name extends keyof S ? S[Name] : never) : never) : never
 /** Map each configured storage name to its native Files client and plugin extensions. */
-export type StorageRegistry<C extends FilesConfig> =
-    C extends NamedFilesConfig<infer Storages, infer Dev>
-        ? {
-              [Name in keyof Storages]: FilesForStorage<
-                  Storages[Name],
-                  'devStorage' extends keyof C ? (Name extends keyof Dev ? Dev[Name] : never) : never
-              >
-          }
-        : C extends DevelopmentOnlyNamedFilesConfig<infer Storages>
-          ? { [Name in keyof Storages]: FilesForStorage<Storages[Name]> }
-          : Record<never, never>
+export type StorageRegistry<C extends FilesConfigInput> = {
+    [Name in StorageNames<C>]: FilesForStorage<
+        Extract<NamedEntry<C, Name>, { adapter: ProviderSlug | ((...args: never[]) => Adapter) }>
+    >
+}
 
 /** Files client returned by an unnamed single-storage configuration. */
-export type SingleStorage<C extends FilesConfig> =
-    C extends SingleFilesConfig<infer Storage, infer Dev>
-        ? FilesForStorage<Storage, 'devStorage' extends keyof C ? Dev : never>
-        : C extends DevelopmentOnlySingleFilesConfig<infer Storage>
-          ? FilesForStorage<Storage>
-          : never
+export type SingleStorage<C extends FilesConfigInput> = FilesForStorage<SingleEntry<C>>
 
 /** Hooks emitted by the Nuxt/Nitro bridge after the storage's native hooks. */
 export interface FilesRuntimeHooks {
@@ -119,13 +114,12 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     constructor(
         config: C,
         options: {
-            development?: boolean
             environment?: ProviderEnvironment
             factories: FilesProviderFactories
             hooks?: FilesRuntimeHooks
         },
     ) {
-        this.#entries = normalizeFilesConfig(config, options.development ?? false)
+        this.#entries = normalizeFilesConfig(config)
         if (!this.#entries.size) throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
         this.#environment = options.environment ?? {}
         this.#factories = options.factories
@@ -133,10 +127,11 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     }
 
     /** Return the client from an unnamed single-storage configuration. */
-    get(...args: C extends SingleFilesConfig | DevelopmentOnlySingleFilesConfig ? [] : [name: never]): SingleStorage<C>
+    get(...args: SingleEntry<C> extends never ? [name: never] : []): SingleStorage<C>
     /** Return one named storage client. */
     get<Name extends Extract<keyof StorageRegistry<C>, string>>(name: Name): StorageRegistry<C>[Name]
-    get(name?: string): Files {
+    get(...args: [] | [string]): unknown {
+        const name = args[0]
         const entry = this.#entry(name)
         const key = entry.name
         const cached = this.#instances.get(key)
@@ -152,7 +147,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             this.#diagnostics.set(key, {
                 code: 'NUXT_FILES_ADAPTER_INIT_FAILED',
                 ...(entry.name === undefined ? {} : { name: entry.name }),
-                adapter: typeof entry.selected.adapter === 'string' ? entry.selected.adapter : 'custom',
+                adapter: typeof entry.storage.adapter === 'string' ? entry.storage.adapter : 'custom',
             })
             throw error
         } finally {
@@ -163,13 +158,12 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     /** Return secret-free storage metadata and initialization state for development diagnostics. */
     inspect() {
         return {
-            storages: [...this.#entries.values()].map(({ name, storage, selected, source }) => ({
+            storages: [...this.#entries.values()].map(({ name, storage }) => ({
                 ...(name === undefined ? {} : { name }),
-                adapter: typeof selected.adapter === 'string' ? selected.adapter : 'custom',
+                adapter: typeof storage.adapter === 'string' ? storage.adapter : 'custom',
                 plugins:
                     this.#pluginNames.get(name) ??
                     (Array.isArray(storage.plugins) ? storage.plugins.map((plugin) => plugin.name) : []),
-                source,
                 initialized: this.#instances.has(name),
             })),
             diagnostics: [...this.#diagnostics.values()],
@@ -208,7 +202,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         )
     }
 
-    #createAdapter({ selected }: StorageEntry): Adapter {
+    #createAdapter({ storage: selected }: StorageEntry): Adapter {
         const factory = typeof selected.adapter === 'string' ? this.#factories[selected.adapter] : selected.adapter
         if (!factory) {
             throw new Error(

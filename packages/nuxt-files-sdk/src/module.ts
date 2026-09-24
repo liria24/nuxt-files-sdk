@@ -40,7 +40,9 @@ export default defineNuxtModule<ModuleOptions>({
         nuxt.hook('nitro:init', (nitro) =>
             setupNitroFilesIntegration(nitro, {
                 configPath,
-                development: nuxt.options.dev,
+                environments: nitro.options.static
+                    ? ['production', 'prerender']
+                    : [nuxt.options.envName || (nuxt.options.dev ? 'development' : 'production')],
             }),
         )
         nuxt.hook('prepare:types', ({ references }) => {

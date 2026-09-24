@@ -41,7 +41,7 @@ describe('Bundle contract', () => {
             'devframe',
             '@nuxt/devtools-kit',
             '@vitejs/devtools',
-            'Check the storage and devStorage shapes',
+            'Check the storage shape in the active',
             '/4.reference/4.troubleshooting.md',
         ]) {
             expect(nuxtOutput.includes(forbidden), forbidden).toBe(false)

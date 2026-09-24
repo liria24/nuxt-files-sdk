@@ -31,7 +31,7 @@ test('documentation pages and internal links stay complete', async () => {
         "from 'files-sdk/versioning'",
         'useServerFiles()',
         "useServerFiles('archive')",
-        'devStorage',
+        '$development',
         'useFiles',
         'useList',
         'nuxt-files-sdk/nitro',

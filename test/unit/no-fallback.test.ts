@@ -6,18 +6,13 @@ import { FilesRegistry } from '../../packages/nuxt-files-sdk/src/runtime/registr
 
 afterEach(() => vi.restoreAllMocks())
 
-test('[CFG-008] rejects unknown development storage references before provider construction', () => {
+test('[CFG-008] rejects unknown storage names before provider construction', () => {
     const factory = vi.fn<() => ReturnType<typeof fs>>(() => fs({ root: '.data/unused' }))
-    expect(
-        () =>
-            new FilesRegistry(
-                {
-                    storage: { blob: { adapter: 'fs', config: { root: '.data/unused' } } },
-                    devStorage: { missing: { adapter: 'fs', config: { root: '.data/unused' } } },
-                } as never,
-                { factories: { fs: factory } },
-            ),
-    ).toThrow('[nuxt-files-sdk:unknown-storage] Unknown storage "missing"')
+    const registry = new FilesRegistry(
+        { storage: { blob: { adapter: 'fs', config: { root: '.data/unused' } } } },
+        { factories: { fs: factory } },
+    )
+    expect(() => registry.get('missing' as never)).toThrow('[nuxt-files-sdk:unknown-storage] Unknown storage "missing"')
     expect(factory).not.toHaveBeenCalled()
 })
 
@@ -31,7 +26,6 @@ test('[CFG-006][ERR-002] failed provider construction makes no HTTP or alternate
     const registry = new FilesRegistry(
         {
             storage: { adapter: 's3', config: { bucket: 'missing' } },
-            devStorage: { adapter: 'fs', config: { root: '.data/unused' } },
         },
         { factories: { s3: failing, fs: fallback } },
     )

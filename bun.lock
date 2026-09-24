@@ -60,6 +60,8 @@
       "dependencies": {
         "@nuxt/devtools-kit": "4.0.0-beta.1",
         "@nuxt/kit": "^4.5.2",
+        "@babel/parser": "^7.29.9",
+        "c12": "^3.3.4",
         "devframe": "^1.0.0",
         "jiti": "^2.7.0",
       },

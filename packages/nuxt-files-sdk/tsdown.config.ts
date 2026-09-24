@@ -14,6 +14,8 @@ export default defineConfig([
             onlyImport: [
                 '@nuxt/kit',
                 '@nuxt/devtools-kit',
+                '@babel/parser',
+                'c12',
                 'devframe',
                 'files-sdk',
                 'h3',
@@ -33,7 +35,7 @@ export default defineConfig([
             nitro: 'src/nitro.ts',
             runtime: 'src/runtime.ts',
             'runtime/internal': 'src/runtime/internal.ts',
-            'integration/config': 'src/integration/config.ts',
+            'config/merge': 'src/config/merge.ts',
             'devtools/files-read': 'src/devtools/files-read.ts',
             'devtools/files-write': 'src/devtools/files-write.ts',
             'devtools/nuxt-v3-handler': 'src/devtools/nuxt-v3-handler.ts',

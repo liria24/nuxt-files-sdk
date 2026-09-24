@@ -20,7 +20,7 @@ export default defineNuxtConfig({
         'nuxt-og-image',
         '@nuxt/ui',
         '@comark/nuxt',
-        'nuxt-files-sdk',
+        ...(process.env.NODE_ENV === 'production' ? [] : ['nuxt-files-sdk']),
         '@vueuse/nuxt',
     ],
 
