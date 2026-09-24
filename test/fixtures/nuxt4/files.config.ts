@@ -17,4 +17,5 @@ export default defineFilesConfig({
     devStorage: {
         blob: { adapter: 'fs', config: { root: '.', urlBaseUrl: 'NUXT_FILES_DEV_ONLY' } },
     },
+    routes: [{ path: '/api/gateway', storage: 'archive', operations: ['capabilities', 'list'] }],
 })

@@ -26,6 +26,7 @@ export default defineConfig([
                 '@tailwindcss/vite',
                 'devframe',
                 'files-sdk',
+                'h3',
                 'jiti',
                 'nuxt',
                 'reka-ui',

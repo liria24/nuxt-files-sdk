@@ -6,4 +6,18 @@ export default defineFilesConfig({
         archive: { adapter: 'fs', config: { root: '.data/default' }, plugins: [versioning()] },
         blob: { adapter: 'fs', config: { root: '.data/files' } },
     },
+    routes: [
+        { path: '/gateway/archive', storage: 'archive', operations: ['capabilities', 'list'] },
+        {
+            path: '/gateway/blob',
+            storage: 'blob',
+            operations: ['capabilities', 'list', 'upload'],
+            authorize: ({ req, event }) => {
+                const user = req.headers.get('x-files-user')
+                if (!user) throw new Error('Unauthorized')
+                event.context.filesUser = user
+                return { keyPrefix: `users/${event.context.filesUser}/` }
+            },
+        },
+    ],
 })

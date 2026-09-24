@@ -17,6 +17,7 @@ export interface NitroIntegration {
         dev?: boolean
         preset?: string
         plugins: string[]
+        handlers?: { route: string; handler: string }[]
         alias?: Record<string, string>
         externals?: { inline?: unknown[] }
     }
@@ -85,6 +86,35 @@ export const selectedAdapters = (
         }
     }
     return { adapters, single }
+}
+
+export const gatewayRoutes = (config: unknown, development: boolean): { path: string; storage?: string }[] => {
+    const routes = config && typeof config === 'object' && 'routes' in config ? config.routes : undefined
+    if (routes === undefined) return []
+    if (!Array.isArray(routes)) throw new Error('[nuxt-files-sdk:invalid-route] routes must be an array.')
+    const storages = normalizeFilesConfig(config, development)
+    if (!storages.size) return []
+    const paths = new Set<string>()
+    const selected: { path: string; storage?: string }[] = []
+    for (const route of routes as unknown[]) {
+        if (
+            !route ||
+            typeof route !== 'object' ||
+            !('path' in route) ||
+            typeof route.path !== 'string' ||
+            !/^\/(?:[\w.~-]+(?:\/[\w.~-]+)*)?$/u.test(route.path)
+        ) {
+            throw new Error('[nuxt-files-sdk:invalid-route] Each route needs a static absolute path.')
+        }
+        if (paths.has(route.path)) throw new Error(`[nuxt-files-sdk:duplicate-route] Duplicate route "${route.path}".`)
+        paths.add(route.path)
+        const name = 'storage' in route ? route.storage : undefined
+        if (storages.has(undefined) ? name !== undefined : typeof name !== 'string' || !storages.has(name)) {
+            throw new Error(`[nuxt-files-sdk:unknown-storage] Invalid storage for route "${route.path}".`)
+        }
+        selected.push(typeof name === 'string' ? { path: route.path, storage: name } : { path: route.path })
+    }
+    return selected
 }
 
 const factoryName = (adapter: ProviderSlug): string =>
@@ -161,6 +191,7 @@ export const setupNitroFilesIntegration = async (
         paths['files-sdk'] ??= [resolve(nitro.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
     })
     if (!selected) return
+    const routes = gatewayRoutes(config, options.development)
     const { adapters } = selected
     const providers = providerCode(adapters)
     const internalPath = fileURLToPath(new URL('../runtime/internal.js', import.meta.url)).replaceAll('\\', '/')
@@ -214,8 +245,14 @@ export const setupNitroFilesIntegration = async (
     // Nitro's single-file dev build would eagerly import every native provider SDK.
     if (!nitro.options.dev) externals.inline.push('files-sdk')
     const pluginPath = resolve(directory, options.development ? 'plugin.dev.mjs' : 'plugin.mjs')
+    const routePaths = routes.map((_, index) =>
+        resolve(directory, `gateway-${index}${options.development ? '.dev' : ''}.mjs`).replaceAll('\\', '/'),
+    )
+    for (const [index, route] of routes.entries()) {
+        ;(nitro.options.handlers ??= []).push({ route: route.path, handler: routePaths[index]! })
+    }
     // Development also externalizes local .mjs files unless explicitly inlined.
-    externals.inline.push(pluginPath.replaceAll('\\', '/'), configPath)
+    externals.inline.push(pluginPath.replaceAll('\\', '/'), configPath, ...routePaths)
     nitro.options.plugins.push(pluginPath.replaceAll('\\', '/'))
     writeRuntime = async (): Promise<void> => {
         await mkdir(directory, { recursive: true })
@@ -236,6 +273,41 @@ export default (nitroApp) => configureFiles(${runtimeConfig}, {
   },
 })
 `,
+        )
+        await Promise.all(
+            routePaths.map((path, index) => {
+                const route = routes[index]!
+                const handler =
+                    nitroMajorVersion(nitro) >= 3 ? 'router.handle(event.req)' : 'createRouteHandler(router)(event)'
+                return writeFile(
+                    path,
+                    `import config from ${JSON.stringify(configPath)}
+import { createFilesRouter } from 'files-sdk/api'
+${nitroMajorVersion(nitro) >= 3 ? '' : "import { createRouteHandler } from 'files-sdk/nitro'"}
+import { getFiles } from ${JSON.stringify(internalPath)}
+
+const route = config.routes[${index}]
+const environmentSecret = typeof process === 'undefined' ? undefined : process.env?.FILES_API_SECRET
+const secret = route.authorize
+  ? route.secret || environmentSecret || crypto.randomUUID() + crypto.randomUUID()
+  : route.secret
+if (route.authorize && !route.secret && !environmentSecret) {
+  console.warn('[nuxt-files-sdk:gateway-secret] Set FILES_API_SECRET for upload tokens shared across processes.')
+}
+let sharedRouter
+const makeRouter = (event) => createFilesRouter({
+  ...route,
+  files: () => getFiles(${route.storage === undefined ? '' : JSON.stringify(route.storage)}),
+  secret,
+  authorize: route.authorize && ((context) => route.authorize({ ...context, event })),
+})
+export default (event) => {
+  const router = route.authorize ? makeRouter(event) : (sharedRouter ??= makeRouter(event))
+  return ${handler}
+}
+`,
+                )
+            }),
         )
     }
     await writeRuntime()

@@ -74,6 +74,7 @@
         "@types/node": "^26.6.2",
         "@vitejs/devtools-kit": "^0.7.5",
         "@vitejs/plugin-vue": "^6.0.8",
+        "h3": "^1.15.11",
         "publint": "^0.3.24",
         "tsdown": "^0.23.0",
         "typescript": "^7.0.2",
@@ -84,10 +85,14 @@
     },
     "peerDependencies": {
         "@nuxt/ui": "^4.11.1",
+        "h3": "^1.15.0 || ^2.0.0-rc.0",
         "nuxt": "^4.0.0 || ^5.0.0"
     },
     "peerDependenciesMeta": {
         "@nuxt/ui": {
+            "optional": true
+        },
+        "h3": {
             "optional": true
         },
         "nuxt": {
