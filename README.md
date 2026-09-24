@@ -17,6 +17,8 @@ Unofficial <a href="https://files-sdk.dev">Files SDK</a> integration for Nuxt an
 Docs: <a href="https://nuxt-files-sdk.liria.me">https://nuxt-files-sdk.liria.me</a>
 </p>
 
+This unofficial project includes independent Vue ports based on the MIT-licensed [Files SDK UI](https://files-sdk.dev/docs/ui). It is not affiliated with, endorsed by, or maintained by Files SDK or its maintainers.
+
 ```bash
 npm i nuxt-files-sdk
 ```

@@ -18,8 +18,8 @@
         "docs:typecheck": "bun run build && bun run --cwd=docs typecheck",
         "format": "oxfmt . --write",
         "format:check": "oxfmt . --check",
-        "lint": "oxlint .",
-        "lint:fix": "oxlint . --fix",
+        "lint": "oxlint . --deny-warnings",
+        "lint:fix": "oxlint . --fix --deny-warnings",
         "preview:package": "pkg-pr-new publish ./packages/nuxt-files-sdk --bun --compact --previewVersion",
         "test": "vitest run",
         "test:unit": "vitest run --project unit",
@@ -37,6 +37,7 @@
     "devDependencies": {
         "@nuxt/schema": "^4.5.2",
         "@nuxt/test-utils": "^4.3.2",
+        "comark": "^0.7.0",
         "files-sdk": "^2.6.0",
         "knip": "^6.37.0",
         "oxfmt": "^0.69.0",

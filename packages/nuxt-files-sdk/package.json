@@ -36,6 +36,11 @@
             "import": "./dist/runtime.js",
             "default": "./dist/runtime.js"
         },
+        "./ui/locale": {
+            "types": "./dist/ui/locale.d.ts",
+            "import": "./dist/ui/locale.js",
+            "default": "./dist/ui/locale.js"
+        },
         "./package.json": "./package.json"
     },
     "publishConfig": {
@@ -43,33 +48,53 @@
         "provenance": true
     },
     "scripts": {
-        "build": "tsdown",
+        "build": "tsdown && vite build --config devtools.vite.config.ts",
         "dev": "tsdown --watch",
         "prepack": "bun run build",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "node typecheck.cjs --noEmit"
     },
     "dependencies": {
+        "@iconify/vue": "^5.0.1",
         "@nuxt/devtools-kit": "4.0.0-beta.1",
+        "@nuxt/icon": "^2.5.1",
         "@nuxt/kit": "^4.5.2",
+        "@tailwindcss/postcss": "^4.3.3",
+        "@tailwindcss/vite": "^4.3.3",
         "devframe": "^1.0.0",
-        "jiti": "^2.7.0"
+        "files-sdk": "^2.6.0",
+        "jiti": "^2.7.0",
+        "reka-ui": "^2.10.4",
+        "tailwind-variants": "^3.3.1",
+        "tailwindcss": "^4.3.3"
     },
     "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.5",
+        "@iconify-json/lucide": "^1.2.135",
         "@nuxt/schema": "^4.5.2",
         "@types/node": "^26.6.2",
         "@vitejs/devtools-kit": "^0.7.5",
-        "files-sdk": "^2.6.0",
+        "@vitejs/plugin-vue": "^6.0.8",
+        "h3": "^1.15.11",
         "publint": "^0.3.24",
         "tsdown": "^0.23.0",
         "typescript": "^7.0.2",
-        "vue": "^3.5.43"
+        "typescriptVue": "npm:typescript@6.0.3",
+        "vite": "^8.3.0",
+        "vue": "^3.5.43",
+        "vue-tsc": "^3.3.11"
     },
     "peerDependencies": {
-        "files-sdk": "^2.6.0",
+        "@nuxt/ui": "^4.11.1",
+        "h3": "^1.15.0 || ^2.0.0-rc.0",
         "nuxt": "^4.0.0 || ^5.0.0"
     },
     "peerDependenciesMeta": {
+        "@nuxt/ui": {
+            "optional": true
+        },
+        "h3": {
+            "optional": true
+        },
         "nuxt": {
             "optional": true
         }
