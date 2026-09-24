@@ -7,7 +7,6 @@ const forbidden = [
     '__nuxt-files-sdk',
     'files-devtools',
     'files-sdk/fs',
-    'nuxt-files-sdk/runtime',
     'configureFiles',
     'comark-docs',
     '@nuxtjs/mcp-toolkit',

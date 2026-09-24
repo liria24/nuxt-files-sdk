@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { TreeItem } from '@nuxt/ui'
+import { highlightText } from 'rangi'
+
 const { docs } = useAppConfig()
 const { copied, copy } = useClipboard()
 
@@ -14,40 +17,157 @@ const displayCommand = computed(() => `${packageManagers[selectPM.value].install
 
 const siteUrl = useRuntimeConfig().public.siteUrl.replace(/\/$/u, '')
 
-const codeTree = `::code-tree{defaultValue="files.config.ts", expandAll=true, class="lg:h-[340px]"}
+type PreviewFile = TreeItem & { code?: string; children?: PreviewFile[] }
 
-\`\`\`ts [nuxt.config.ts]
-export default defineNuxtConfig({
-    modules: ['nuxt-files-sdk'],
-})
-\`\`\`
-
-\`\`\`ts [files.config.ts]
-export default defineFilesConfig({
+const nuxtFilesConfig = `export default defineFilesConfig({
     storage: {
         adapter: 'fs',
         config: { root: '.data/files' },
     },
     $test: { storage: { adapter: 'memory' } },
-})
-\`\`\`
+})`
 
-\`\`\`ts [server/api/hello.get.ts]
+const nitroFilesConfig = `import { defineFilesConfig } from 'nuxt-files-sdk/config'
+
+${nuxtFilesConfig}`
+
+const examples: { label: string; value: string; files: PreviewFile[] }[] = [
+    {
+        label: 'Nuxt 4',
+        value: 'nuxt4',
+        files: [
+            {
+                label: 'nuxt.config.ts',
+                code: `export default defineNuxtConfig({
+    modules: ['nuxt-files-sdk'],
+})`,
+            },
+            { label: 'files.config.ts', code: nuxtFilesConfig },
+            {
+                label: 'server',
+                defaultExpanded: true,
+                children: [
+                    {
+                        label: 'api',
+                        defaultExpanded: true,
+                        children: [
+                            {
+                                label: 'hello.get.ts',
+                                code: `export default defineEventHandler(async () => {
+    const files = useServerFiles()
+    await files.upload('hello.txt', 'Hello from Nuxt 4')
+    return (await files.download('hello.txt')).text()
+})`,
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        label: 'Nuxt 5',
+        value: 'nuxt5',
+        files: [
+            {
+                label: 'nuxt.config.ts',
+                code: `export default defineNuxtConfig({
+    modules: ['nuxt-files-sdk'],
+})`,
+            },
+            { label: 'files.config.ts', code: nuxtFilesConfig },
+            {
+                label: 'server',
+                defaultExpanded: true,
+                children: [
+                    {
+                        label: 'api',
+                        defaultExpanded: true,
+                        children: [
+                            {
+                                label: 'hello.get.ts',
+                                code: `export default defineEventHandler(async () => {
+    const files = useServerFiles()
+    await files.upload('hello.txt', 'Hello from Nuxt 5')
+    return (await files.download('hello.txt')).text()
+})`,
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        label: 'Nitro 2',
+        value: 'nitro2',
+        files: [
+            {
+                label: 'nitro.config.ts',
+                code: `export default defineNitroConfig({
+    modules: ['nuxt-files-sdk/nitro'],
+})`,
+            },
+            { label: 'files.config.ts', code: nitroFilesConfig },
+            {
+                label: 'routes',
+                defaultExpanded: true,
+                children: [
+                    {
+                        label: 'hello.ts',
+                        code: `import { useServerFiles } from 'nuxt-files-sdk/runtime'
+
 export default defineEventHandler(async () => {
     const files = useServerFiles()
+    await files.upload('hello.txt', 'Hello from Nitro 2')
+    return (await files.download('hello.txt')).text()
+})`,
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        label: 'Nitro 3',
+        value: 'nitro3',
+        files: [
+            {
+                label: 'nitro.config.ts',
+                code: `import { defineNitroConfig } from 'nitro/config'
 
-    await files.upload('hello.txt', 'Hello from Nuxt')
-    const file = await files.download('hello.txt')
+export default defineNitroConfig({
+    modules: ['nuxt-files-sdk/nitro'],
+    serverDir: './',
+})`,
+            },
+            { label: 'files.config.ts', code: nitroFilesConfig },
+            {
+                label: 'routes',
+                defaultExpanded: true,
+                children: [
+                    {
+                        label: 'hello.ts',
+                        code: `import { defineEventHandler } from 'nitro/h3'
+import { useServerFiles } from 'nuxt-files-sdk/runtime'
 
-    return {
-        key: file.key,
-        text: await file.text(),
-    }
+export default defineEventHandler(async () => {
+    const files = useServerFiles()
+    await files.upload('hello.txt', 'Hello from Nitro 3')
+    return (await files.download('hello.txt')).text()
+})`,
+                    },
+                ],
+            },
+        ],
+    },
+]
+
+const selectedExample = ref('nuxt4')
+const selectedFile = ref<PreviewFile>(examples[0]!.files[1]!)
+watch(selectedExample, (value) => {
+    selectedFile.value = examples.find((example) => example.value === value)!.files[1]!
 })
-\`\`\`
-
-::
-`
+const highlightedCode = computed(() => highlightText(selectedFile.value.code ?? '', { lang: 'ts' }))
 
 defineOgImage('Docs.takumi')
 useSeoMeta({
@@ -110,9 +230,43 @@ useSeoMeta({
             </template>
         </UPageHero>
 
-        <Markdown class="w-full max-w-4xl">
-            {{ codeTree }}
-        </Markdown>
+        <UTabs v-model="selectedExample" :items="examples" class="w-full max-w-4xl">
+            <template #content="{ item }">
+                <div
+                    class="border-muted grid min-h-[340px] overflow-hidden rounded-md border lg:h-[340px] lg:grid-cols-3"
+                >
+                    <UTree
+                        v-model="selectedFile"
+                        :items="item.files"
+                        :get-key="(file) => file.label"
+                        class="border-muted max-h-40 overflow-y-auto border-b p-2 lg:max-h-none lg:border-e lg:border-b-0"
+                        @select="
+                            (event, file) => {
+                                if (file.children?.length) event.preventDefault()
+                            }
+                        "
+                    >
+                        <template #item-leading="{ item: file, expanded }">
+                            <UIcon
+                                v-if="file.children?.length"
+                                :name="expanded ? 'lucide:folder-open' : 'lucide:folder'"
+                                class="size-4"
+                            />
+                            <ProseCodeIcon v-else :filename="file.label" class="size-4" />
+                        </template>
+                    </UTree>
+                    <div class="min-h-64 min-w-0 overflow-auto lg:col-span-2 lg:min-h-0">
+                        <div class="border-muted text-muted border-b px-4 py-2 font-mono text-xs">
+                            {{ selectedFile.label }}
+                        </div>
+                        <div
+                            class="overflow-auto p-4 font-mono text-xs leading-6 whitespace-pre [color-scheme:light] dark:[color-scheme:dark]"
+                            v-html="highlightedCode"
+                        />
+                    </div>
+                </div>
+            </template>
+        </UTabs>
 
         <UButton
             :to="docs.filesSdk"
