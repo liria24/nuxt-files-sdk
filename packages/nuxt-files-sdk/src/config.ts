@@ -1,40 +1,49 @@
-import type { FilesHooks, FilesOptions, FilesPlugin, ProviderSlug } from 'files-sdk'
+import type { Adapter, FilesHooks, FilesOptions, FilesPlugin, ProviderSlug } from 'files-sdk'
 import type { AuthorizeContext, AuthorizeResult, CreateFilesRouterOptions } from 'files-sdk/api'
 import type { H3Event } from 'h3'
 
 import type { ProviderFactories } from './runtime/provider-types'
 
-type ProviderOptions<Provider extends ProviderSlug> = Parameters<ProviderFactories[Provider]>[0]
-type ConfigValue<Provider extends ProviderSlug> = Exclude<ProviderOptions<Provider>, undefined>
-type ConfigInput<Provider extends ProviderSlug> = ConfigValue<Provider> | (() => ConfigValue<Provider>)
-type ProviderConfig<Provider extends ProviderSlug> = {
-    /** Native provider factory options, or a synchronous runtime resolver for them. */
-    config?: ConfigInput<Provider>
-} & (undefined extends ProviderOptions<Provider> ? unknown : { config: ConfigInput<Provider> })
-type CommonFilesOptions<Provider extends ProviderSlug> = Omit<
-    FilesOptions<ReturnType<ProviderFactories[Provider]>>,
+export type AdapterFactory = (...args: never[]) => Adapter
+type StorageAdapter = ProviderSlug | AdapterFactory
+export type FilesPluginContext = { storage: (name: string) => Adapter }
+type FactoryFor<A extends StorageAdapter> = A extends ProviderSlug ? ProviderFactories[A] : A
+type AdapterOptions<A extends StorageAdapter> =
+    Parameters<FactoryFor<A>> extends []
+        ? undefined
+        : [Parameters<FactoryFor<A>>[0]] extends [never]
+          ? unknown
+          : Parameters<FactoryFor<A>>[0]
+type AdapterConfig<A extends StorageAdapter> = {
+    /** Native adapter factory options, or a synchronous runtime resolver for them. */
+    config?: Exclude<AdapterOptions<A>, undefined> | (() => Exclude<AdapterOptions<A>, undefined>)
+} & (undefined extends AdapterOptions<A>
+    ? unknown
+    : { config: Exclude<AdapterOptions<A>, undefined> | (() => Exclude<AdapterOptions<A>, undefined>) })
+type CommonFilesOptions<A extends StorageAdapter> = Omit<
+    FilesOptions<ReturnType<FactoryFor<A>>>,
     'adapter' | 'hooks' | 'plugins'
 >
 
 /** Configuration for one Files SDK storage. */
 export type StorageConfig<
-    Provider extends ProviderSlug = ProviderSlug,
+    Provider extends StorageAdapter = StorageAdapter,
     Plugins extends readonly FilesPlugin[] = readonly FilesPlugin[],
-> = Provider extends ProviderSlug
+> = Provider extends StorageAdapter
     ? {
-          /** Files SDK provider slug, for example `r2`, `s3`, or `fs`. */
+          /** Files SDK provider slug or a compatible adapter factory. */
           adapter: Provider
           /** Native Files SDK plugins applied in array order. */
-          plugins?: Plugins
+          plugins?: Plugins | ((context: FilesPluginContext) => Plugins)
           /** Native Files SDK lifecycle hooks. */
           hooks?: FilesHooks
       } & CommonFilesOptions<Provider> &
-          ProviderConfig<Provider>
+          AdapterConfig<Provider>
     : never
 
 /** Development-only provider settings for a storage. */
-export type DevStorageConfig<Provider extends ProviderSlug = ProviderSlug> = Provider extends ProviderSlug
-    ? { adapter: Provider } & ProviderConfig<Provider>
+export type DevStorageConfig<Provider extends StorageAdapter = StorageAdapter> = Provider extends StorageAdapter
+    ? { adapter: Provider } & AdapterConfig<Provider>
     : never
 
 /** A Nitro route backed by the native Files SDK gateway. */
@@ -98,16 +107,41 @@ export type FilesConfig =
 
 /** Define one unnamed Files SDK storage while preserving its provider and plugin types. */
 export function defineFilesConfig<
-    const Storage extends StorageConfig,
+    const Factory extends AdapterFactory,
+    const Storage extends StorageConfig<Factory>,
+    const Dev extends DevStorageConfig | undefined = undefined,
+>(
+    config: SingleFilesConfig<Storage, Dev> & {
+        storage: { adapter: Factory } & AdapterConfig<NoInfer<Factory>>
+        devStorage?: Dev & Record<Exclude<keyof Dev, 'adapter' | 'config'>, never>
+    },
+): SingleFilesConfig<Storage, Dev>
+/** Define one unnamed Files SDK storage while preserving its provider and plugin types. */
+export function defineFilesConfig<
+    const Storage extends StorageConfig<ProviderSlug>,
     const Dev extends DevStorageConfig | undefined = undefined,
 >(
     config: SingleFilesConfig<Storage, Dev> & {
         devStorage?: Dev & Record<Exclude<keyof Dev, 'adapter' | 'config'>, never>
     },
 ): SingleFilesConfig<Storage, Dev>
-/** Define named Files SDK storages while preserving their names, providers, and plugin types. */
+/** Define named storages including custom adapter factories. */
 export function defineFilesConfig<
     const Storages extends Record<string, StorageConfig>,
+    const Dev extends Partial<Record<keyof Storages, DevStorageConfig>> = Record<never, never>,
+>(
+    config: NamedFilesConfig<Storages, Dev> & {
+        storage: { [Name in keyof Storages]: Storages[Name] & StorageConfig<NoInfer<Storages[Name]['adapter']>> }
+        devStorage?: {
+            [Name in keyof Dev]: Name extends keyof Storages
+                ? Dev[Name] & Record<Exclude<keyof Dev[Name], 'adapter' | 'config'>, never>
+                : never
+        }
+    },
+): NamedFilesConfig<Storages, Dev>
+/** Define named Files SDK storages while preserving their names, providers, and plugin types. */
+export function defineFilesConfig<
+    const Storages extends Record<string, StorageConfig<ProviderSlug>>,
     const Dev extends Partial<Record<keyof Storages, DevStorageConfig>> = Record<never, never>,
 >(
     config: NamedFilesConfig<Storages, Dev> & {

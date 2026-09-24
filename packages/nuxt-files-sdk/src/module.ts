@@ -50,6 +50,8 @@ export default defineNuxtModule<ModuleOptions>({
         addServerImports([
             { name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' },
             { name: 'useServerFiles', from: 'nuxt-files-sdk/runtime' },
+            { name: 'syncFiles', from: 'nuxt-files-sdk/runtime' },
+            { name: 'transferFiles', from: 'nuxt-files-sdk/runtime' },
         ])
         addImports({ name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' })
         for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {

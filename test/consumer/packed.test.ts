@@ -143,7 +143,7 @@ describe('Packed consumer', () => {
             ],
             { cwd: consumer },
         )
-        expect(JSON.parse(runtimeExports.trim())).toEqual(['useServerFiles'])
+        expect(JSON.parse(runtimeExports.trim())).toEqual(['syncFiles', 'transferFiles', 'useServerFiles'])
         const scripts = name === 'nitro-v3' ? ['build', 'typecheck'] : ['prepare', 'typecheck', 'build']
         for (const script of scripts) {
             const log = await runConsumerScript(consumer, script)

@@ -1,7 +1,9 @@
+import { memory } from 'files-sdk/memory'
 import { listEnvVars } from 'files-sdk/providers'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { withNuxtEnvironment } from '../../packages/nuxt-files-sdk/src/runtime/registry'
+import { FilesRegistry } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 const variables = listEnvVars('s3').map(({ key, aliases }) => [key, ...(aliases ?? [])])
 
@@ -64,5 +66,57 @@ describe('NUXT_ environment bridge', () => {
             expect(process.env.AWS_ACCESS_KEY_ID).toBe('nuxt')
         })
         expect(process.env.AWS_ACCESS_KEY_ID).toBeUndefined()
+    })
+
+    test('passes NUXT_ S3 credentials to a provider that reads after construction', async () => {
+        vi.stubEnv('NUXT_AWS_ACCESS_KEY_ID', 'nuxt-access')
+        vi.stubEnv('NUXT_AWS_SECRET_ACCESS_KEY', 'nuxt-secret')
+        vi.stubEnv('NUXT_AWS_SESSION_TOKEN', 'nuxt-session')
+        vi.stubEnv('AWS_SESSION_TOKEN', 'native-session')
+        vi.stubEnv('AWS_SECRET_ACCESS_KEY', undefined)
+        let delayedRead!: () => Promise<unknown>
+        const registry = new FilesRegistry(
+            { storage: { adapter: 's3', config: { bucket: 'test', region: 'us-east-1' } } },
+            {
+                factories: {
+                    s3: (input) => {
+                        const options = input as { credentials?: unknown }
+                        delayedRead = async () => (await Promise.resolve(), options.credentials)
+                        return memory()
+                    },
+                },
+                environment: { s3: [] },
+            },
+        )
+        registry.get()
+        expect(process.env.AWS_ACCESS_KEY_ID).toBeUndefined()
+        expect(await delayedRead()).toEqual({
+            accessKeyId: 'nuxt-access',
+            secretAccessKey: 'nuxt-secret',
+            sessionToken: 'native-session',
+        })
+
+        vi.stubEnv('AWS_ACCESS_KEY_ID', 'native-access')
+        let nativeOptions: unknown
+        new FilesRegistry(
+            { storage: { adapter: 's3', config: { bucket: 'test', region: 'us-east-1' } } },
+            { factories: { s3: (input) => ((nativeOptions = input), memory()) } },
+        ).get()
+        expect(nativeOptions).not.toHaveProperty('credentials')
+    })
+
+    test('maps Bun S3 chain aliases to options without changing process.env', () => {
+        vi.stubEnv('NUXT_S3_ACCESS_KEY_ID', 'nuxt-access')
+        vi.stubEnv('NUXT_S3_SECRET_ACCESS_KEY', 'nuxt-secret')
+        vi.stubEnv('S3_REGION', 'native-region')
+        vi.stubEnv('NUXT_AWS_REGION', 'nuxt-region')
+        let options: unknown
+        new FilesRegistry(
+            { storage: { adapter: 'bun-s3' } },
+            { factories: { 'bun-s3': (input) => ((options = input), memory()) } },
+        ).get()
+        expect(options).toEqual({ accessKeyId: 'nuxt-access', secretAccessKey: 'nuxt-secret' })
+        expect(process.env.AWS_ACCESS_KEY_ID).toBeUndefined()
+        expect(process.env.S3_ACCESS_KEY_ID).toBeUndefined()
     })
 })

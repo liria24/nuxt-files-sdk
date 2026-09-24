@@ -35,6 +35,8 @@ const uploadButton = element('.upload-button', HTMLElement)
 let snapshot: Snapshot
 let access: Access
 let initializationId = 0
+let initializationController: AbortController | undefined
+let snapshotController: AbortController | undefined
 let devframe: Awaited<ReturnType<typeof connectDevframe>> | undefined
 let bridgeReady: Promise<void>
 let accessToken: AccessToken | undefined
@@ -85,8 +87,8 @@ const getAccessToken = async (): Promise<string> => {
     return accessToken.token
 }
 const authorizationHeaders = async (): Promise<HeadersInit> => ({ authorization: `Bearer ${await getAccessToken()}` })
-const fetchJson = async (url: string): Promise<unknown> => {
-    const response = await fetch(url, { headers: await authorizationHeaders() })
+const fetchJson = async (url: string, signal?: AbortSignal): Promise<unknown> => {
+    const response = await fetch(url, { headers: await authorizationHeaders(), ...(signal && { signal }) })
     if (!response.ok) throw new Error(`DevTools request failed (${response.status}).`)
     return response.json()
 }
@@ -201,7 +203,24 @@ const folderRow = (folder: string): HTMLTableRowElement => {
     return row
 }
 
+const refreshSnapshot = async (request: ReturnType<FilesBrowser['capture']>, force = false): Promise<void> => {
+    if (!force && snapshot.storages.find(({ name }) => name === request.storage)?.initialized) return
+    snapshotController?.abort()
+    const controller = (snapshotController = new AbortController())
+    try {
+        const next = await fetchJson('./snapshot', controller.signal)
+        if (request.current() && !controller.signal.aborted && isSnapshot(next)) {
+            snapshot = next
+            renderSnapshot()
+            void publishDiagnostics()
+        }
+    } catch {
+        // A stale metadata request must not replace a successful file listing.
+    }
+}
+
 const loadFiles = async (): Promise<void> => {
+    snapshotController?.abort()
     const initializing = browser.initializing
     renderBreadcrumbs()
     filesBody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading files…</td></tr>'
@@ -222,6 +241,7 @@ const loadFiles = async (): Promise<void> => {
         showStatus(`${rows.length} item${rows.length === 1 ? '' : 's'}`)
         previousButton.disabled = !browser.hasPrevious
         nextButton.disabled = !browser.hasNext
+        void refreshSnapshot(request)
     } catch (error) {
         if (!request.current()) return
         filesBody.innerHTML = '<tr><td colspan="5" class="empty-state">Unable to load files.</td></tr>'
@@ -236,14 +256,7 @@ const loadFiles = async (): Promise<void> => {
             request.current,
         )
         previousButton.disabled = !browser.hasPrevious
-        try {
-            const nextSnapshot = await fetchJson('./snapshot')
-            if (request.current() && isSnapshot(nextSnapshot)) {
-                snapshot = nextSnapshot
-                renderSnapshot()
-                void publishDiagnostics()
-            }
-        } catch {}
+        await refreshSnapshot(request, true)
     }
 }
 
@@ -251,13 +264,30 @@ const downloadFile = async (key: string): Promise<void> => {
     const request = browser.capture()
     showStatus(`Downloading ${key}…`)
     try {
-        const file = await request.client.download(key, { as: 'blob' })
+        const picker = (
+            window as Window & {
+                showSaveFilePicker?: (options: {
+                    suggestedName: string
+                }) => Promise<{ createWritable: () => Promise<WritableStream<Uint8Array>> }>
+            }
+        ).showSaveFilePicker
+        const name = key.split('/').at(-1) || key
+        const handle = picker ? await picker({ suggestedName: name }) : undefined
+        const file = await request.client.download(key, { as: 'stream' })
+        if (handle) {
+            await file.stream().pipeTo(await handle.createWritable())
+            if (request.current()) showStatus(`Downloaded ${key}`)
+            return
+        }
+        // ponytail: Browsers without streaming save use Blob only for small files; add a streamed endpoint if large downloads are needed there.
+        if (file.size > 64 * 1024 * 1024)
+            throw new Error('Large downloads require a browser with streaming file save support.')
         const url = URL.createObjectURL(await file.blob())
         const link = document.createElement('a')
         link.href = url
-        link.download = key.split('/').at(-1) || key
+        link.download = name
         link.click()
-        setTimeout(() => URL.revokeObjectURL(url))
+        setTimeout(() => URL.revokeObjectURL(url), 60_000)
         if (request.current()) showStatus(`Downloaded ${key}`)
     } catch (error) {
         if (!request.current()) return
@@ -293,9 +323,7 @@ const uploadFile = async (file: File): Promise<void> => {
     }
     const files = request.client
     try {
-        const exists = await files.exists(key)
-        if (!request.current()) return
-        if (exists && !window.confirm(`Replace the existing file ${key}?`)) return
+        if (!window.confirm(`Upload ${key}? This may replace an existing file.`)) return
         showStatus(`Uploading ${key}…`)
         await files.upload(key, file, { contentType: file.type || 'application/octet-stream' })
         if (!request.current()) return
@@ -359,12 +387,15 @@ const renderSnapshot = (): void => {
 
 const initialize = async (): Promise<void> => {
     const id = ++initializationId
+    initializationController?.abort()
+    snapshotController?.abort()
+    const controller = (initializationController = new AbortController())
     browser.reset(true)
     const request = browser.capture()
     try {
         const [snapshotResponse, accessResponse] = await Promise.all([
-            fetchJson('./snapshot'),
-            fetchJson('./files?op=devtools'),
+            fetchJson('./snapshot', controller.signal),
+            fetchJson('./files?op=devtools', controller.signal),
         ])
         if (id !== initializationId || !request.current()) return
         if (!isSnapshot(snapshotResponse) || !isAccess(accessResponse)) {
@@ -438,6 +469,9 @@ const initializeBridge = async (): Promise<void> => {
 }
 
 storageSelect.addEventListener('change', () => {
+    initializationId++
+    initializationController?.abort()
+    snapshotController?.abort()
     browser.navigate(snapshot.storages[storageSelect.selectedIndex]?.name)
     void loadFiles()
 })

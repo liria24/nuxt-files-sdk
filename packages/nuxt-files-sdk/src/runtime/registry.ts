@@ -23,10 +23,23 @@ import { normalizeFilesConfig, type StorageEntry } from './normalize'
 import type { ProviderFactories } from './provider-types'
 
 /** Native Files client plus the methods contributed by a storage's plugins. */
+type AdapterFor<A> = A extends ProviderSlug
+    ? ReturnType<ProviderFactories[A]>
+    : A extends (...args: never[]) => Adapter
+      ? ReturnType<A>
+      : never
+type PluginsFor<T extends StorageConfig> =
+    NonNullable<T['plugins']> extends (...args: never[]) => infer P
+        ? P extends readonly import('files-sdk').FilesPlugin[]
+            ? P
+            : never
+        : NonNullable<T['plugins']> extends readonly import('files-sdk').FilesPlugin[]
+          ? NonNullable<T['plugins']>
+          : never
 export type FilesForStorage<T extends StorageConfig, Dev = never> = Files<
-    ReturnType<ProviderFactories[T['adapter'] | (Dev extends DevStorageConfig ? Dev['adapter'] : never)]>
+    AdapterFor<T['adapter'] | (Dev extends DevStorageConfig ? Dev['adapter'] : never)>
 > &
-    ExtensionsOf<NonNullable<T['plugins']>>
+    ExtensionsOf<PluginsFor<T>>
 
 /** Map each configured storage name to its native Files client and plugin extensions. */
 export type StorageRegistry<C extends FilesConfig> =
@@ -95,8 +108,11 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     readonly #environment: ProviderEnvironment
     readonly #factories: FilesProviderFactories
     readonly #hooks: FilesRuntimeHooks
+    readonly #adapters = new Map<string | undefined, Adapter>()
+    readonly #adapterInitializing = new Set<string | undefined>()
     readonly #instances = new Map<string | undefined, Files>()
-    readonly #initializing = new Set<string | undefined>()
+    readonly #filesInitializing = new Set<string | undefined>()
+    readonly #pluginNames = new Map<string | undefined, string[]>()
     readonly #diagnostics = new Map<string | undefined, RegistryDiagnostic>()
 
     /** Create a registry without constructing a provider. */
@@ -125,10 +141,8 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         const key = entry.name
         const cached = this.#instances.get(key)
         if (cached) return cached
-        if (this.#initializing.has(key)) {
-            throw new Error('[nuxt-files-sdk:circular-initialization] Storage configuration cannot access itself.')
-        }
-        this.#initializing.add(key)
+        if (this.#filesInitializing.has(key)) throw this.#circular(key)
+        this.#filesInitializing.add(key)
         try {
             const files = this.#create(entry)
             this.#instances.set(key, files)
@@ -138,11 +152,11 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             this.#diagnostics.set(key, {
                 code: 'NUXT_FILES_ADAPTER_INIT_FAILED',
                 ...(entry.name === undefined ? {} : { name: entry.name }),
-                adapter: entry.selected.adapter,
+                adapter: typeof entry.selected.adapter === 'string' ? entry.selected.adapter : 'custom',
             })
             throw error
         } finally {
-            this.#initializing.delete(key)
+            this.#filesInitializing.delete(key)
         }
     }
 
@@ -151,8 +165,10 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         return {
             storages: [...this.#entries.values()].map(({ name, storage, selected, source }) => ({
                 ...(name === undefined ? {} : { name }),
-                adapter: selected.adapter,
-                plugins: storage.plugins?.map((plugin) => plugin.name) ?? [],
+                adapter: typeof selected.adapter === 'string' ? selected.adapter : 'custom',
+                plugins:
+                    this.#pluginNames.get(name) ??
+                    (Array.isArray(storage.plugins) ? storage.plugins.map((plugin) => plugin.name) : []),
                 source,
                 initialized: this.#instances.has(name),
             })),
@@ -169,23 +185,61 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         return entry
     }
 
-    #create({ name, storage, selected }: StorageEntry): Files {
-        const factory = this.#factories[selected.adapter]
+    /** Resolve one selected adapter without constructing its Files client. */
+    resolveAdapter(name?: string): Adapter {
+        const entry = this.#entry(name)
+        const key = entry.name
+        const cached = this.#adapters.get(key)
+        if (cached) return cached
+        if (this.#adapterInitializing.has(key)) throw this.#circular(key)
+        this.#adapterInitializing.add(key)
+        try {
+            const adapter = this.#createAdapter(entry)
+            this.#adapters.set(key, adapter)
+            return adapter
+        } finally {
+            this.#adapterInitializing.delete(key)
+        }
+    }
+
+    #circular(name?: string): Error {
+        return new Error(
+            `[nuxt-files-sdk:circular-initialization] Circular storage dependency${name ? ` at "${name}"` : ''}.`,
+        )
+    }
+
+    #createAdapter({ selected }: StorageEntry): Adapter {
+        const factory = typeof selected.adapter === 'string' ? this.#factories[selected.adapter] : selected.adapter
         if (!factory) {
             throw new Error(
-                `[nuxt-files-sdk:adapter-not-generated] Adapter "${selected.adapter}" is not available in this build.`,
+                `[nuxt-files-sdk:adapter-not-generated] Adapter "${typeof selected.adapter === 'string' ? selected.adapter : 'custom'}" is not available in this build.`,
             )
         }
-        const adapter = withNuxtEnvironment(this.#environment[selected.adapter] ?? [], () => {
+        const environment = typeof selected.adapter === 'string' ? (this.#environment[selected.adapter] ?? []) : []
+        return withNuxtEnvironment(environment, () => {
             const input = typeof selected.config === 'function' ? selected.config() : selected.config
             if (input && typeof input === 'object' && 'then' in input) {
                 throw new Error('[nuxt-files-sdk:async-config] Storage config functions must be synchronous.')
             }
+            const value =
+                selected.adapter === 's3'
+                    ? withS3NuxtCredentials(input)
+                    : selected.adapter === 'bun-s3'
+                      ? withBunS3NuxtOptions(input)
+                      : input
             // Generated factories and configs share an adapter key; the broad registry type erases that correlation.
             // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-            return factory(input as never)
+            return factory(value as never)
         })
-        return createFiles({
+    }
+
+    #create({ name, storage }: StorageEntry): Files {
+        const adapter = this.resolveAdapter(name)
+        const plugins =
+            typeof storage.plugins === 'function'
+                ? storage.plugins({ storage: (storageName) => this.resolveAdapter(storageName) })
+                : storage.plugins
+        const files = createFiles({
             adapter,
             ...nativeFilesOptions(storage),
             hooks: {
@@ -205,9 +259,63 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
                         () => this.#hooks.onRetry?.(event, name),
                     ),
             },
-            ...(storage.plugins ? { plugins: storage.plugins } : {}),
+            ...(plugins ? { plugins } : {}),
         })
+        if (plugins)
+            this.#pluginNames.set(
+                name,
+                plugins.map((plugin) => plugin.name),
+            )
+        return files
     }
+}
+
+/** Pass NUXT_ credentials explicitly because the AWS SDK resolves its chain after construction. */
+const withS3NuxtCredentials = (input: unknown): unknown => {
+    if (!input || typeof input !== 'object' || 'credentials' in input) return input
+    if (
+        [
+            'AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY',
+            'AWS_PROFILE',
+            'AWS_WEB_IDENTITY_TOKEN_FILE',
+            'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI',
+            'AWS_CONTAINER_CREDENTIALS_FULL_URI',
+        ].some((key) => process.env[key] !== undefined)
+    )
+        return input
+    const accessKeyId = process.env.NUXT_AWS_ACCESS_KEY_ID
+    const secretAccessKey = process.env.NUXT_AWS_SECRET_ACCESS_KEY
+    if (!accessKeyId || !secretAccessKey) return input
+    return {
+        ...input,
+        credentials: {
+            accessKeyId,
+            secretAccessKey,
+            ...((process.env.AWS_SESSION_TOKEN ?? process.env.NUXT_AWS_SESSION_TOKEN) && {
+                sessionToken: process.env.AWS_SESSION_TOKEN ?? process.env.NUXT_AWS_SESSION_TOKEN,
+            }),
+        },
+    }
+}
+
+/** Bun resolves these environment keys in its own client; pass NUXT_ aliases as explicit options. */
+const withBunS3NuxtOptions = (input: unknown): unknown => {
+    if (input && (typeof input !== 'object' || 'client' in input)) return input
+    const options: Record<string, unknown> = { ...(typeof input === 'object' && input ? input : {}) }
+    for (const [field, key, alias] of [
+        ['accessKeyId', 'AWS_ACCESS_KEY_ID', 'S3_ACCESS_KEY_ID'],
+        ['secretAccessKey', 'AWS_SECRET_ACCESS_KEY', 'S3_SECRET_ACCESS_KEY'],
+        ['sessionToken', 'AWS_SESSION_TOKEN', 'S3_SESSION_TOKEN'],
+        ['region', 'AWS_REGION', 'S3_REGION'],
+        ['bucket', 'AWS_BUCKET', 'S3_BUCKET'],
+    ] as const) {
+        if (Object.hasOwn(options, field) || process.env[key] !== undefined || process.env[alias] !== undefined)
+            continue
+        const value = process.env[`NUXT_${key}`] ?? process.env[`NUXT_${alias}`]
+        if (value !== undefined) options[field] = value
+    }
+    return options
 }
 
 /** Bridge only NUXT_ aliases declared by the configured native provider during synchronous construction. */

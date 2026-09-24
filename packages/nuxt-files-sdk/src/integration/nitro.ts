@@ -79,7 +79,13 @@ export const selectedAdapters = (
     const entries = normalizeFilesConfig(config, development)
     if (!entries.size) return undefined
     const single = entries.has(undefined)
-    const adapters = [...new Set([...entries.values()].map(({ selected }) => selected.adapter))].toSorted()
+    const adapters = [
+        ...new Set(
+            [...entries.values()]
+                .map(({ selected }) => selected.adapter)
+                .filter((adapter): adapter is ProviderSlug => typeof adapter === 'string'),
+        ),
+    ].toSorted()
     for (const adapter of adapters) {
         if (!getProvider(adapter)) {
             throw new Error(`[nuxt-files-sdk:unknown-adapter] Unknown adapter "${adapter}".`)
@@ -198,7 +204,9 @@ export const setupNitroFilesIntegration = async (
     const environment = Object.fromEntries(
         adapters.map((adapter) => [
             adapter,
-            listEnvVars(adapter).map((variable) => [variable.key, ...(variable.aliases ?? [])]),
+            listEnvVars(adapter)
+                .filter((variable) => variable.readBy === 'files-sdk')
+                .map((variable) => [variable.key, ...(variable.aliases ?? [])]),
         ]),
     )
     const runtimeConfig = options.development ? 'config' : '{ storage: config.storage }'
@@ -235,8 +243,9 @@ export const setupNitroFilesIntegration = async (
         name: 'nuxt-files-sdk-jsdoc',
         declaration: (declarations) =>
             declarations.replace(
-                /^(\s*)(const useServerFiles: typeof .*\.useServerFiles)$/mu,
-                "$1/** Return the project's Files client, including its configured plugin extensions. */\n$1const useServerFiles: typeof import('nuxt-files-sdk/runtime').useServerFiles",
+                /^([ \t]*)const (useServerFiles|syncFiles|transferFiles): typeof .*\.\2$/gmu,
+                (_, indent: string, name: string) =>
+                    `${name === 'useServerFiles' ? `${indent}/** Return the project's Files client, including its configured plugin extensions. */\n` : ''}${indent}const ${name}: typeof import('nuxt-files-sdk/runtime').${name}`,
             ),
     })
     // Inline both packages so installed consumers also tree-shake the plugin barrel.

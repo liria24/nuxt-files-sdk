@@ -1,4 +1,4 @@
-import type { Files } from 'files-sdk'
+import { sync, transfer, type Files, type SyncOptions, type TransferOptions } from 'files-sdk'
 
 import { getFiles } from './runtime/internal'
 
@@ -20,3 +20,21 @@ export function useServerFiles<Name extends Extract<keyof NuxtFilesStorageRegist
 export function useServerFiles(name?: string): Files {
     return getFiles(name)
 }
+
+type FilesInput<Name extends string = Extract<keyof NuxtFilesStorageRegistry, string>> = Files | Name
+
+/** Delegate a mirror operation to the native Files SDK. */
+export const syncFiles = (source: FilesInput, destination: FilesInput, options?: SyncOptions) =>
+    sync(
+        typeof source === 'string' ? getFiles(source) : source,
+        typeof destination === 'string' ? getFiles(destination) : destination,
+        options,
+    )
+
+/** Delegate a transfer operation to the native Files SDK. */
+export const transferFiles = (source: FilesInput, destination: FilesInput, options?: TransferOptions) =>
+    transfer(
+        typeof source === 'string' ? getFiles(source) : source,
+        typeof destination === 'string' ? getFiles(destination) : destination,
+        options,
+    )

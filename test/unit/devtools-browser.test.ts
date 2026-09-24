@@ -20,6 +20,7 @@ describe('DevTools file browser', () => {
         browser.navigate('a', 'first/')
         const stale = browser.list()
         browser.navigate('b', 'second/')
+        expect(a.capabilities.mock.lastCall?.[0]?.signal?.aborted).toBe(true)
         await browser.list()
         capabilities.resolve({ delimiter: false } as AdapterCapabilities)
         expect(await stale).toBeUndefined()
@@ -27,12 +28,18 @@ describe('DevTools file browser', () => {
         browser.navigate('a')
         await browser.list()
         expect(a.capabilities).toHaveBeenCalledTimes(2)
-        expect(a.list).toHaveBeenLastCalledWith({ prefix: '', delimiter: '/', limit: 1000 })
+        expect(a.list).toHaveBeenLastCalledWith({
+            prefix: '',
+            delimiter: '/',
+            limit: 1000,
+            signal: expect.any(AbortSignal),
+        })
 
         const listing = Promise.withResolvers<Awaited<ReturnType<FilesClient['list']>>>()
         a.list.mockReturnValueOnce(listing.promise)
         const obsolete = browser.list()
         browser.navigate('b')
+        expect(a.list.mock.lastCall?.[0]?.signal?.aborted).toBe(true)
         await browser.list()
         listing.resolve({ items: [], cursor: 'obsolete' })
         expect(await obsolete).toBeUndefined()
@@ -52,11 +59,22 @@ describe('DevTools file browser', () => {
         expect(browser.hasNext).toBe(true)
         browser.next()
         await browser.list()
-        expect(files.list).toHaveBeenLastCalledWith({ prefix: '', delimiter: '/', limit: 1000, cursor: 'page-2' })
+        expect(files.list).toHaveBeenLastCalledWith({
+            prefix: '',
+            delimiter: '/',
+            limit: 1000,
+            cursor: 'page-2',
+            signal: expect.any(AbortSignal),
+        })
         expect(browser.hasPrevious).toBe(true)
         browser.previous()
         await browser.list()
-        expect(files.list).toHaveBeenLastCalledWith({ prefix: '', delimiter: '/', limit: 1000 })
+        expect(files.list).toHaveBeenLastCalledWith({
+            prefix: '',
+            delimiter: '/',
+            limit: 1000,
+            signal: expect.any(AbortSignal),
+        })
         expect(files.capabilities).toHaveBeenCalledTimes(1)
         browser.next()
         browser.reset(true)
@@ -66,7 +84,12 @@ describe('DevTools file browser', () => {
         browser.next()
         browser.navigate('', 'folder/')
         await browser.list()
-        expect(files.list).toHaveBeenLastCalledWith({ prefix: 'folder/', delimiter: '/', limit: 1000 })
+        expect(files.list).toHaveBeenLastCalledWith({
+            prefix: 'folder/',
+            delimiter: '/',
+            limit: 1000,
+            signal: expect.any(AbortSignal),
+        })
         browser.next()
         browser.reset()
         expect(browser.hasPrevious).toBe(false)

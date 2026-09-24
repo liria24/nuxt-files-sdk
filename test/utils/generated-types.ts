@@ -22,6 +22,8 @@ export const checkGeneratedTypes = async (directory: string): Promise<void> => {
     expect(generated).toContain("declare module 'nuxt-files-sdk/runtime'")
     expect(generated).toContain('StorageRegistry<typeof config>')
     expect(imports).toContain("typeof import('nuxt-files-sdk/runtime').useServerFiles")
+    expect(imports).toContain("const syncFiles: typeof import('nuxt-files-sdk/runtime').syncFiles")
+    expect(imports).toContain("const transferFiles: typeof import('nuxt-files-sdk/runtime').transferFiles")
     expect(imports).toMatch(/const defineFilesConfig: typeof import\(.+\)\.defineFilesConfig/u)
     expect(appImports).toContain('defineFilesConfig')
     expect(imports).not.toMatch(/node_modules\/nuxt-files-sdk\/runtime/u)
@@ -200,8 +202,8 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             module: 'Install Files SDK storage configuration',
             define: 'Define one unnamed Files SDK storage',
             storage: 'Files SDK storage configuration',
-            adapter: 'Files SDK provider slug',
-            providerConfig: 'Native provider factory options',
+            adapter: 'Files SDK provider slug or a compatible adapter factory',
+            providerConfig: 'Native adapter factory options',
             devStorage: 'Development-only provider settings',
             imported: "Return the project's unnamed Files client",
             aliased: "Return the project's unnamed Files client",

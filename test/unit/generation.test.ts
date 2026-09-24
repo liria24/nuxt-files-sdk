@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
+import { memory } from 'files-sdk/memory'
 import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
@@ -86,6 +87,16 @@ describe('provider generation', () => {
         expect(providerCode(['rustfs']).imports).toBe('import { rustfs as provider0 } from "files-sdk/rustfs"')
     })
 
+    test('custom adapters and plugin resolvers generate no unrelated provider imports', () => {
+        const adapter = vi.fn<() => ReturnType<typeof memory>>(() => memory())
+        const plugins = vi.fn<() => []>(() => [])
+        const config = defineFilesConfig({ storage: { adapter, plugins } })
+        expect(selectedAdapters(config, false)).toEqual({ adapters: [], single: true })
+        expect(providerCode([])).toEqual({ imports: '', factories: '' })
+        expect(adapter).not.toHaveBeenCalled()
+        expect(plugins).not.toHaveBeenCalled()
+    })
+
     test('[BUNDLE-007] shims only missing optional AWS engines on Nitro v2 workerd presets', () => {
         const expected = [
             '@aws-sdk/client-s3',
@@ -137,6 +148,36 @@ describe('provider generation', () => {
                 resolvable: (dependency) => dependency === '@aws-sdk/client-s3',
             }),
         ).toEqual(expected.slice(1))
+    })
+
+    test('R2 binding and fetch configs stay lazy with and without AWS SDK on Nitro 2 and 3', () => {
+        for (const config of [
+            { binding: {} as never },
+            {
+                bucket: 'uploads',
+                endpoint: 'https://storage.example',
+                accessKeyId: 'test',
+                secretAccessKey: 'test',
+                client: 'fetch' as const,
+            },
+        ]) {
+            const configResolver = vi.fn<() => typeof config>(() => config)
+            expect(selectedAdapters({ storage: { adapter: 'r2', config: configResolver } }, false)).toEqual({
+                adapters: ['r2'],
+                single: true,
+            })
+            expect(configResolver).not.toHaveBeenCalled()
+            for (const nitroMajor of [2, 3]) {
+                for (const installed of [false, true]) {
+                    const shims = optionalAwsSdkDependencies(['r2'], {
+                        nitroMajor,
+                        preset: 'cloudflare-module',
+                        resolvable: () => installed,
+                    })
+                    expect(shims.length > 0).toBe(nitroMajor === 2 && !installed)
+                }
+            }
+        }
     })
 
     test('[CFG-011] omits development-only storage from production integration', async () => {

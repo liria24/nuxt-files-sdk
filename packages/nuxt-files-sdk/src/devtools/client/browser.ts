@@ -7,6 +7,7 @@ export class FilesBrowser {
     prefix = ''
     readonly #client: (storage?: string) => FilesClient
     readonly #capabilities = new Map<string | undefined, AdapterCapabilities>()
+    #listController: AbortController | undefined
     #revision = 0
     #cursors: (string | undefined)[] = [undefined]
     #next: string | undefined
@@ -32,7 +33,7 @@ export class FilesBrowser {
     }
 
     reset(refreshCapabilities = false): void {
-        this.#revision++
+        this.#invalidate()
         this.#cursors = [undefined]
         this.#next = undefined
         if (refreshCapabilities) this.#capabilities.clear()
@@ -42,13 +43,18 @@ export class FilesBrowser {
         if (!this.hasNext) return
         this.#cursors.push(this.#next)
         this.#next = undefined
-        this.#revision++
+        this.#invalidate()
     }
 
     previous(): void {
         if (!this.hasPrevious) return
         this.#cursors.pop()
         this.#next = undefined
+        this.#invalidate()
+    }
+
+    #invalidate(): void {
+        this.#listController?.abort()
         this.#revision++
     }
 
@@ -63,13 +69,14 @@ export class FilesBrowser {
     }
 
     async list() {
-        this.#revision++
+        this.#invalidate()
+        const controller = (this.#listController = new AbortController())
         const request = this.capture()
         const cursor = this.#cursors.at(-1)
         try {
             let capabilities = this.#capabilities.get(request.storage)
             if (!capabilities) {
-                capabilities = await request.client.capabilities()
+                capabilities = await request.client.capabilities({ signal: controller.signal })
                 if (!request.current()) return undefined
                 this.#capabilities.set(request.storage, capabilities)
             }
@@ -78,6 +85,7 @@ export class FilesBrowser {
                 limit: 1000,
                 ...(cursor === undefined ? {} : { cursor }),
                 ...(capabilities.delimiter ? { delimiter: '/' } : {}),
+                signal: controller.signal,
             })
             if (!request.current()) return undefined
             this.#next = result.cursor || undefined

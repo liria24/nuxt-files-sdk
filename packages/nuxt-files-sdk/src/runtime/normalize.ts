@@ -13,7 +13,7 @@ const isStorage = (value: unknown): value is StorageConfig =>
         typeof value === 'object' &&
         !Array.isArray(value) &&
         'adapter' in value &&
-        typeof value.adapter === 'string',
+        (typeof value.adapter === 'string' || typeof value.adapter === 'function'),
     )
 const isRecord = (value: unknown): value is Record<string, StorageConfig> =>
     Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every(isStorage))

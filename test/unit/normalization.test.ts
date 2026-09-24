@@ -56,6 +56,6 @@ describe('normalized configuration', () => {
     })
 
     test('[API-004] runtime exports only the public accessor', () => {
-        expect(Object.keys(runtime)).toEqual(['useServerFiles'])
+        expect(Object.keys(runtime)).toEqual(['useServerFiles', 'syncFiles', 'transferFiles'])
     })
 })
