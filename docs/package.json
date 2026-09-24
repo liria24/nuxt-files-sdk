@@ -11,11 +11,11 @@
     },
     "dependencies": {
         "@comark/nuxt": "^0.7.0",
-        "@iconify-json/lucide": "^1.2.135",
+        "@iconify-json/lucide": "^1.2.136",
         "@iconify-json/simple-icons": "^1.2.97",
         "@nuxt/fonts": "^0.14.0",
         "@nuxt/image": "^2.1.0",
-        "@nuxt/ui": "^4.11.1",
+        "@nuxt/ui": "^4.11.2",
         "@nuxtjs/i18n": "^10.6.0",
         "@nuxtjs/robots": "^6.2.3",
         "@nuxtjs/sitemap": "^8.5.1",
@@ -29,7 +29,7 @@
         "nuxt": "^4.5.2",
         "nuxt-files-sdk": "workspace:*",
         "nuxt-llms": "https://pkg.pr.new/nuxt-content/nuxt-llms/nuxt-llms@f6a9730",
-        "nuxt-og-image": "^6.8.0",
+        "nuxt-og-image": "^6.9.0",
         "rangi": "^2.2.0",
         "tailwindcss": "^4.3.3",
         "ufo": "^1.6.4",
@@ -39,6 +39,6 @@
         "nuxtseo-layer-devtools": "^5.3.16",
         "typescript6": "npm:typescript@6.0.3",
         "vue-tsc": "^3.3.11",
-        "wrangler": "^4.136.0"
+        "wrangler": "^4.137.0"
     }
 }
