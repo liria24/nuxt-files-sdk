@@ -11,10 +11,6 @@
 }
 
 @layer base {
-    :root {
-        --ui-container: 90rem;
-    }
-
     html {
         @apply scroll-smooth;
     }
@@ -35,6 +31,7 @@
 }
 
 :root {
+    --ui-container: 90rem;
     --ui-radius: 0.5rem;
     --ui-primary: black;
     --ui-bg: white;
