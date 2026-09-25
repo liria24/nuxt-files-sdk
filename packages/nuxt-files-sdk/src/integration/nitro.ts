@@ -214,19 +214,13 @@ export const setupNitroFilesIntegration = async (
             }
         },
     })
-    if (awsShims.length > 0) {
+    const shimFiles = awsShims.map((dependency) => ({
+        dependency,
+        path: resolve(directory, `${dependency.replaceAll(/[^a-z0-9]+/giu, '-')}.mjs`),
+    }))
+    if (shimFiles.length > 0) {
         nitro.options.alias = aliases
-        await mkdir(directory, { recursive: true })
-        await Promise.all(
-            awsShims.map(async (dependency) => {
-                const shimPath = resolve(directory, `${dependency.replaceAll(/[^a-z0-9]+/giu, '-')}.mjs`)
-                aliases[dependency] = shimPath.replaceAll('\\', '/')
-                await writeFile(
-                    shimPath,
-                    `throw new Error(${JSON.stringify(`[nuxt-files-sdk:missing-optional-dependency] ${dependency} is required for this Files SDK operation. Install it or select the provider's fetch client.`)})\n`,
-                )
-            }),
-        )
+        for (const { dependency, path } of shimFiles) aliases[dependency] = path.replaceAll('\\', '/')
     }
     nitro.unimport?.getInternalContext().addons.push({
         name: 'nuxt-files-sdk-jsdoc',
@@ -261,6 +255,14 @@ export const setupNitroFilesIntegration = async (
     nitro.options.plugins.push(pluginPath.replaceAll('\\', '/'))
     writeRuntime = async (): Promise<void> => {
         await mkdir(directory, { recursive: true })
+        await Promise.all(
+            shimFiles.map(({ dependency, path }) =>
+                writeFile(
+                    path,
+                    `throw new Error(${JSON.stringify(`[nuxt-files-sdk:missing-optional-dependency] ${dependency} is required for this Files SDK operation. Install it or select the provider's fetch client.`)})\n`,
+                ),
+            ),
+        )
         const originalSource = await readFile(configPath, 'utf8')
         const importedSource = nitro.unimport
             ? (await nitro.unimport.injectImports(originalSource, configPath)).code

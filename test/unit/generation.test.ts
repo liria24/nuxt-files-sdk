@@ -151,6 +151,37 @@ describe('provider generation', () => {
         ).toEqual(expected.slice(1))
     })
 
+    test('[BUNDLE-007] regenerates AWS shims after Nuxt clears its build directory', async () => {
+        const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-aws-shims-'))
+        temporaryDirectories.push(directory)
+        const configPath = resolve(directory, 'files.config.mjs')
+        await writeFile(configPath, `export default { storage: { adapter: 'r2' } }`)
+        const hook = vi.fn<NitroIntegration['hooks']['hook']>()
+        const nitro: NitroIntegration = {
+            meta: { majorVersion: 2 },
+            options: {
+                rootDir: directory,
+                buildDir: resolve(directory, '.nuxt'),
+                preset: 'cloudflare-module',
+                plugins: [],
+            },
+            hooks: { hook },
+        }
+
+        await setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })
+        const aliases = Object.entries(nitro.options.alias ?? {})
+        expect(aliases).toHaveLength(4)
+        for (const [dependency, path] of aliases) {
+            expect(await readFile(path, 'utf8')).toContain(dependency)
+        }
+
+        await rm(resolve(directory, '.nuxt/nuxt-files-sdk'), { recursive: true, force: true })
+        await hook.mock.calls[0]![1]({})
+        for (const [dependency, path] of aliases) {
+            expect(await readFile(path, 'utf8')).toContain(dependency)
+        }
+    })
+
     test('R2 binding and fetch configs stay lazy with and without AWS SDK on Nitro 2 and 3', () => {
         for (const config of [
             { binding: {} as never },
