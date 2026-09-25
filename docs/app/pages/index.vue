@@ -12,7 +12,10 @@ const packageManagers: Record<packageManager, { label: string; icon: string; ins
     bun: { label: 'Bun', icon: 'simple-icons:bun', install: 'bun add' },
     yarn: { label: 'yarn', icon: 'simple-icons:yarn', install: 'yarn add' },
 }
-const selectPM = useCookie<packageManager>('package-manager', { default: () => 'npm', readonly: import.meta.server })
+const selectPM = useCookie<packageManager>('package-manager', {
+    default: () => 'npm',
+    readonly: import.meta.server ? undefined : false,
+})
 const displayCommand = computed(
     () => `${(packageManagers[selectPM.value] ?? packageManagers.npm).install} nuxt-files-sdk`,
 )
@@ -222,7 +225,7 @@ watch(selectedExample, (value) => {
 })
 const highlightedCode = computed(() => highlightText(selectedFile.value.code ?? '', { lang: 'ts' }))
 
-defineOgImage('Docs.takumi')
+defineOgImage('Home.takumi')
 useSeoMeta({
     title: docs.title,
     description: docs.description,
