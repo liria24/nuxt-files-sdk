@@ -10,13 +10,7 @@ import breaks from 'comark/plugins/breaks'
 import type { H3Event } from 'h3'
 import cloudflareKVBinding from 'unstorage/drivers/cloudflare-kv-binding'
 
-import {
-    fetchContentSha,
-    isFreshRevision,
-    isRevisionState,
-    selectDocsContent,
-    type RevisionState,
-} from './content-revision'
+import { fetchContentSha, isRevisionState, selectDocsContent, type RevisionState } from './content-revision'
 import { buildSearchSections, invalidateSearchSections } from './search'
 import { recordDocsTiming } from './timing'
 
@@ -69,11 +63,11 @@ export async function getDocsContent(event: H3Event): Promise<AnyComarkContent> 
     const config = useRuntimeConfig(event).docs
     const refreshInterval: number = globalThis.Number(config.refreshInterval)
     const now = Date.now()
-    if (!isFreshRevision(localRevision, now, refreshInterval)) {
+    if (!localRevision) {
         const revisionStarted = performance.now()
         const persisted = await readRevision(binding)
         recordDocsTiming(event, 'docs-revision', revisionStarted)
-        if (persisted && (!localRevision || persisted.checkedAt > localRevision.checkedAt)) localRevision = persisted
+        if (persisted) localRevision = persisted
     }
 
     const timing = (name: string, started: number) => recordDocsTiming(event, name, started)
