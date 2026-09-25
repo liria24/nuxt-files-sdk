@@ -50,7 +50,7 @@
     },
     "dependencies": {
         "@babel/parser": "^7.29.9",
-        "@nuxt/devtools-kit": "4.0.0-beta.1",
+        "@nuxt/devtools-kit": "4.0.0-beta.2",
         "@nuxt/kit": "^4.5.2",
         "c12": "^3.3.4",
         "devframe": "^1.0.0",

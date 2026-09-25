@@ -39,6 +39,6 @@
         "nuxtseo-layer-devtools": "^5.3.16",
         "typescript6": "npm:typescript@6.0.3",
         "vue-tsc": "^3.3.11",
-        "wrangler": "^4.137.0"
+        "wrangler": "^4.140.0"
     }
 }
