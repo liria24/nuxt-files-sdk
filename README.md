@@ -37,8 +37,6 @@ export default defineFilesConfig({
 })
 ```
 
-Environment overrides also support `$development`, `$production`, `$prerender`, and `$env.staging`. See the [configuration guide](https://nuxt-files-sdk.liria.me/usage/environment-overrides).
-
 <p align="center">
   <a href="https://github.com/liria24/nuxt-files-sdk/graphs/contributors"><img alt="contributors" src="https://shieldcn.dev/contributors/liria24/nuxt-files-sdk.svg?title=false&amp;mode=dark&amp;font=geist" /></a>
 </p>
