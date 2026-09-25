@@ -31,6 +31,28 @@ const wrangler = await readFile(resolve(output, 'server/wrangler.json'), 'utf8')
 for (const required of ['nuxt-files-sdk-docs', 'nuxt-files-sdk.liria.me', 'DOCS_CACHE']) {
     if (!wrangler.includes(required)) throw new Error(`${required} missing from generated Wrangler config`)
 }
+const config: unknown = JSON.parse(wrangler)
+const cache = config && typeof config === 'object' && 'cache' in config ? config.cache : undefined
+if (config && typeof config === 'object' && 'workers_dev' in config && config.workers_dev === true) {
+    throw new Error('The docs Worker must not expose a workers.dev URL.')
+}
+if (
+    !cache ||
+    typeof cache !== 'object' ||
+    !('enabled' in cache) ||
+    !('cross_version_cache' in cache) ||
+    cache.enabled !== true ||
+    cache.cross_version_cache !== false
+) {
+    throw new Error('Workers Cache must be enabled and isolated per deployment.')
+}
+const headers = await readFile(resolve(output, 'public/_headers'), 'utf8')
+if (/^\/\*\r?\n\s+cache-control:\s*no-store/mu.test(headers)) {
+    throw new Error('A global no-store rule would override static asset caching.')
+}
+if (!/^\/_nuxt\/\*\r?\n\s+cache-control:\s*public, max-age=31536000, immutable/mu.test(headers)) {
+    throw new Error('Immutable Nuxt asset headers are missing.')
+}
 if (existsSync(resolve(output, 'public/llms.txt'))) throw new Error('llms.txt must be generated at runtime')
 if (!hasLlmsRoute) throw new Error('llms.txt runtime route is missing')
 const deployConfig = await readFile(resolve(output, '../.wrangler/deploy/config.json'), 'utf8')

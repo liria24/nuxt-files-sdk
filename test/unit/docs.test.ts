@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 import { expect, test } from 'vitest'
 
+import { docsCacheHeaders } from '../../docs/server/utils/cache-policy'
 import { fetchContentSha, isFreshRevision, isRevisionState } from '../../docs/server/utils/content-revision'
 import { repositoryRoot } from '../utils/fixture'
 
@@ -133,4 +134,30 @@ test('GitHub content revision checks are bounded and validated', async () => {
             fetch: async () => new Response('rate limited', { status: 403 }),
         }),
     ).rejects.toThrow('403')
+})
+
+test('docs cache headers cache only the homepage and static assets', () => {
+    const home = docsCacheHeaders('/', 200)
+    expect(home).toEqual({
+        'cache-control': 'public, max-age=0',
+        'cloudflare-cdn-cache-control': 'public, max-age=86400',
+        vary: 'Cookie',
+    })
+    const noStore = { 'cache-control': 'no-store', 'cloudflare-cdn-cache-control': 'no-store' }
+    for (const [path, status] of [
+        ['/getting-started/installation', 200],
+        ['/raw/index.md', 200],
+        ['/llms.txt', 200],
+        ['/sitemap.xml', 200],
+        ['/_og/d/image', 200],
+        ['/_og/r/resolve', 200],
+        ['/api/content/index', 200],
+        ['/', 404],
+        ['/raw/index.md', 503],
+    ] as const) {
+        expect(docsCacheHeaders(path, status)).toEqual(noStore)
+    }
+    expect(docsCacheHeaders('/other.json', 200)).toEqual(noStore)
+    expect(docsCacheHeaders('/', 200, true)).toEqual(noStore)
+    expect(docsCacheHeaders('/_nuxt/app.js', 200)).toBeUndefined()
 })
