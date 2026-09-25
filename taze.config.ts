@@ -10,4 +10,5 @@ export default defineConfig({
     ignorePaths: ['**/node_modules/**'],
     ignoreOtherWorkspaces: true,
     depFields: { overrides: false },
+    exclude: ['typescript@7', 'h3@2', 'c12@4'],
 })
