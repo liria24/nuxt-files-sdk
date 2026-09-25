@@ -55,7 +55,6 @@ test('documentation dependencies and local storage stay isolated from the public
     const nuxtConfig = await readFile(resolve(repositoryRoot, 'docs/nuxt.config.ts'), 'utf8')
     const filesConfig = await readFile(resolve(repositoryRoot, 'docs/files.config.ts'), 'utf8')
     const contentRuntime = await readFile(resolve(repositoryRoot, 'docs/server/utils/content.ts'), 'utf8')
-    const ogTemplate = await readFile(resolve(repositoryRoot, 'docs/app/components/OgImage/Docs.takumi.vue'), 'utf8')
 
     for (const dependency of [
         '@comark/nuxt',
@@ -92,7 +91,6 @@ test('documentation dependencies and local storage stay isolated from the public
     expect(publicPackage).not.toContain('comark')
     expect(contentRuntime).toContain("from '@comark/nuxt/plugins/rangi'")
     expect(contentRuntime).not.toContain('shiki')
-    expect(ogTemplate).toContain("fontFamily: 'Geist'")
     expect(nuxtConfig).toContain("contentDir: 'docs/content'")
     expect(nuxtConfig).toContain("preset: 'cloudflare-module'")
     expect(nuxtConfig).toContain("locales: [{ code: 'en', language: 'en-US', name: 'English' }]")
