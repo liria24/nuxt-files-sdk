@@ -6,6 +6,27 @@ export interface RevisionState {
 export const isFreshRevision = (state: RevisionState | undefined, now: number, interval: number) =>
     Boolean(state && now - state.checkedAt < interval)
 
+export async function selectDocsContent<T>(options: {
+    state: RevisionState | undefined
+    now: number
+    refreshInterval: number
+    load: (sha: string) => Promise<T>
+    refresh: () => Promise<T>
+    refreshInBackground: () => void
+    onLoadError: (error: unknown) => void
+}): Promise<T> {
+    if (options.state) {
+        try {
+            const content = await options.load(options.state.activeSha)
+            if (!isFreshRevision(options.state, options.now, options.refreshInterval)) options.refreshInBackground()
+            return content
+        } catch (error) {
+            options.onLoadError(error)
+        }
+    }
+    return options.refresh()
+}
+
 export const isRevisionState = (value: unknown): value is RevisionState => {
     if (!value || typeof value !== 'object' || !('activeSha' in value) || !('checkedAt' in value)) return false
     return typeof value.activeSha === 'string' && isCommitSha(value.activeSha) && typeof value.checkedAt === 'number'

@@ -5,13 +5,20 @@ import { comarkContent, type AnyComarkContent, type ContentSource } from 'comark
 import yaml from 'comark-content/plugins/yaml'
 import fs from 'comark-content/sources/fs'
 import github from 'comark-content/sources/github'
-import { withSnapshot } from 'comark-content/sources/snapshot'
+import snapshot from 'comark-content/sources/snapshot'
 import breaks from 'comark/plugins/breaks'
 import type { H3Event } from 'h3'
 import cloudflareKVBinding from 'unstorage/drivers/cloudflare-kv-binding'
 
-import { fetchContentSha, isFreshRevision, isRevisionState, type RevisionState } from './content-revision'
+import {
+    fetchContentSha,
+    isFreshRevision,
+    isRevisionState,
+    selectDocsContent,
+    type RevisionState,
+} from './content-revision'
 import { buildSearchSections, invalidateSearchSections } from './search'
+import { recordDocsTiming } from './timing'
 
 interface DocsKV {
     get(key: string, type: 'json'): Promise<unknown>
@@ -33,7 +40,6 @@ const parserVersion = 'v1'
 const revisionStateKey = `docs:${parserVersion}:revision`
 const contentCacheTtlSeconds = 60 * 60 * 24 * 30
 const instances = new Map<string, Promise<AnyComarkContent>>()
-const storedSnapshots = new Set<string>()
 
 let developmentContent: Promise<AnyComarkContent> | undefined
 let productionBase: AnyComarkContent | undefined
@@ -63,28 +69,63 @@ export async function getDocsContent(event: H3Event): Promise<AnyComarkContent> 
     const config = useRuntimeConfig(event).docs
     const refreshInterval: number = globalThis.Number(config.refreshInterval)
     const now = Date.now()
-    const persisted = await readRevision(binding)
-    if (persisted && (!localRevision || persisted.checkedAt > localRevision.checkedAt)) localRevision = persisted
-    if (isFreshRevision(localRevision, now, refreshInterval)) {
-        try {
-            return await contentAt(localRevision!.activeSha, readyEnvironment)
-        } catch (error) {
-            // oxlint-disable-next-line no-console -- surfaced in Cloudflare Worker logs
-            console.error('[docs] Failed to hydrate the cached content revision.', error)
-            localRevision = { ...localRevision!, checkedAt: 0 }
-        }
+    if (!isFreshRevision(localRevision, now, refreshInterval)) {
+        const revisionStarted = performance.now()
+        const persisted = await readRevision(binding)
+        recordDocsTiming(event, 'docs-revision', revisionStarted)
+        if (persisted && (!localRevision || persisted.checkedAt > localRevision.checkedAt)) localRevision = persisted
     }
 
-    revisionRefresh ??= refreshProductionContent(readyEnvironment, {
-        repository: config.repository,
-        branch: config.branch,
-        contentDir: config.contentDir,
-        refreshInterval,
-    }).finally(() => {
-        revisionRefresh = undefined
-    })
+    const timing = (name: string, started: number) => recordDocsTiming(event, name, started)
+    const refresh = (foreground = false) => {
+        revisionRefresh ??= refreshProductionContent(
+            readyEnvironment,
+            {
+                repository: config.repository,
+                branch: config.branch,
+                contentDir: config.contentDir,
+                refreshInterval,
+            },
+            foreground ? timing : undefined,
+        ).finally(() => {
+            revisionRefresh = undefined
+        })
+        return revisionRefresh
+    }
     try {
-        return await revisionRefresh
+        return await selectDocsContent({
+            state: localRevision,
+            now,
+            refreshInterval,
+            load: async (sha) => {
+                const started = performance.now()
+                try {
+                    return await contentAt(sha, readyEnvironment, config, timing)
+                } finally {
+                    timing('docs-content', started)
+                }
+            },
+            refresh: async () => {
+                const started = performance.now()
+                try {
+                    return await refresh(true)
+                } finally {
+                    timing('docs-refresh', started)
+                }
+            },
+            refreshInBackground: () => {
+                event.waitUntil(
+                    refresh().catch((error: unknown) => {
+                        // oxlint-disable-next-line no-console -- surfaced in Cloudflare Worker logs
+                        console.error('[docs] Background content revision check failed.', error)
+                    }),
+                )
+            },
+            onLoadError: (error) => {
+                // oxlint-disable-next-line no-console -- surfaced in Cloudflare Worker logs
+                console.error('[docs] Failed to hydrate the cached content revision.', error)
+            },
+        })
     } catch (error) {
         setResponseHeader(event, 'retry-after', Math.ceil(refreshInterval / 1000))
         throw error
@@ -115,11 +156,14 @@ async function getDevelopmentContent(): Promise<AnyComarkContent> {
 async function refreshProductionContent(
     environment: Required<Pick<DocsEnvironment, 'DOCS_CACHE'>> & DocsEnvironment,
     config: ProductionContentConfig & { refreshInterval: number },
+    timing?: (name: string, started: number) => void,
 ): Promise<AnyComarkContent> {
     const checkedAt = Date.now()
     try {
+        const githubStarted = performance.now()
         const sha = await fetchContentSha({ ...config, token: environment.GITHUB_TOKEN })
-        const content = await contentAt(sha, environment, config)
+        timing?.('docs-github', githubStarted)
+        const content = await contentAt(sha, environment, config, timing)
         const next = { activeSha: sha, checkedAt }
         localRevision = next
         await writeRevision(environment.DOCS_CACHE, next).catch(logCacheError)
@@ -149,12 +193,28 @@ function contentAt(
     sha: string,
     environment: Required<Pick<DocsEnvironment, 'DOCS_CACHE'>> & DocsEnvironment,
     config: ProductionContentConfig = useRuntimeConfig().docs,
+    timing?: (name: string, started: number) => void,
 ): Promise<AnyComarkContent> {
     const existing = instances.get(sha)
     if (existing) return existing
 
-    productionBase ??= createContent(
-        withSnapshot(
+    const promise = (async () => {
+        const snapshotStarted = performance.now()
+        const stored = await environment.DOCS_CACHE.get(snapshotKey(sha), 'json').catch(logCacheError)
+        timing?.('docs-snapshot', snapshotStarted)
+        if (stored) {
+            try {
+                const initStarted = performance.now()
+                const content = await validateContent(createContent(snapshot(() => stored)).withRef(sha))
+                timing?.('docs-init', initStarted)
+                return content
+            } catch (error) {
+                // oxlint-disable-next-line no-console -- fall back to the pinned GitHub source
+                console.error('[docs] Failed to hydrate the stored content snapshot.', error)
+            }
+        }
+
+        productionBase ??= createContent(
             github({
                 repo: config.repository,
                 branch: config.branch,
@@ -162,31 +222,21 @@ function contentAt(
                 token: environment.GITHUB_TOKEN,
                 ttl: contentCacheTtlSeconds,
             }),
-            async (ref) => {
-                if (!ref) return undefined
-                const value = await environment.DOCS_CACHE.get(snapshotKey(ref), 'json')
-                if (value) storedSnapshots.add(ref)
-                return value
-            },
-        ),
-        cacheDriver(environment.DOCS_CACHE),
-    )
-
-    const instance = productionBase.withRef(sha)
-    const promise = validateContent(instance)
-        .then(async (content) => {
-            if (!storedSnapshots.has(sha)) {
-                await environment.DOCS_CACHE.put(snapshotKey(sha), JSON.stringify(await content.snapshot()), {
-                    expirationTtl: contentCacheTtlSeconds,
-                })
-                storedSnapshots.add(sha)
-            }
-            return content
+            cacheDriver(environment.DOCS_CACHE),
+        )
+        const initStarted = performance.now()
+        const content = await validateContent(productionBase.withRef(sha))
+        timing?.('docs-init', initStarted)
+        const writeStarted = performance.now()
+        await environment.DOCS_CACHE.put(snapshotKey(sha), JSON.stringify(await content.snapshot()), {
+            expirationTtl: contentCacheTtlSeconds,
         })
-        .catch((error) => {
-            instances.delete(sha)
-            throw error
-        })
+        timing?.('docs-snapshot-write', writeStarted)
+        return content
+    })().catch((error) => {
+        instances.delete(sha)
+        throw error
+    })
     instances.set(sha, promise)
 
     while (instances.size > 2) instances.delete(instances.keys().next().value!)

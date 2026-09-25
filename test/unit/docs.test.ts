@@ -4,7 +4,12 @@ import { resolve } from 'node:path'
 import { expect, test } from 'vitest'
 
 import { docsCacheHeaders } from '../../docs/server/utils/cache-policy'
-import { fetchContentSha, isFreshRevision, isRevisionState } from '../../docs/server/utils/content-revision'
+import {
+    fetchContentSha,
+    isFreshRevision,
+    isRevisionState,
+    selectDocsContent,
+} from '../../docs/server/utils/content-revision'
 import { repositoryRoot } from '../utils/fixture'
 
 const contentDirectory = resolve(repositoryRoot, 'docs/content')
@@ -134,6 +139,49 @@ test('GitHub content revision checks are bounded and validated', async () => {
             fetch: async () => new Response('rate limited', { status: 403 }),
         }),
     ).rejects.toThrow('403')
+})
+
+test('stale docs serve the active revision while a refresh runs in the background', async () => {
+    const sha = 'a'.repeat(40)
+    const calls: string[] = []
+    const pendingRefresh = new Promise<void>(() => {})
+    const options = {
+        state: { activeSha: sha, checkedAt: 10_000 },
+        now: 70_000,
+        refreshInterval: 60_000,
+        load: async (activeSha: string) => {
+            calls.push(`load:${activeSha}`)
+            return 'active'
+        },
+        refresh: async () => {
+            calls.push('refresh')
+            return 'next'
+        },
+        refreshInBackground: () => {
+            calls.push('background')
+            return pendingRefresh
+        },
+        onLoadError: () => calls.push('load-error'),
+    }
+
+    await expect(selectDocsContent(options)).resolves.toBe('active')
+    expect(calls).toEqual([`load:${sha}`, 'background'])
+
+    await expect(selectDocsContent({ ...options, now: 69_999 })).resolves.toBe('active')
+    expect(calls.at(-1)).toBe(`load:${sha}`)
+
+    await expect(selectDocsContent({ ...options, state: undefined })).resolves.toBe('next')
+    expect(calls.at(-1)).toBe('refresh')
+
+    await expect(
+        selectDocsContent({
+            ...options,
+            load: async () => {
+                throw new Error('invalid snapshot')
+            },
+        }),
+    ).resolves.toBe('next')
+    expect(calls.slice(-2)).toEqual(['load-error', 'refresh'])
 })
 
 test('docs cache headers cache only the homepage and static assets', () => {
