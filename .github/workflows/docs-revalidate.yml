@@ -1,0 +1,53 @@
+name: Revalidate docs content
+
+on:
+    push:
+        branches: [main]
+        paths: ['docs/content/**']
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: docs-revalidate-main
+    cancel-in-progress: true
+
+jobs:
+    revalidate:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Activate content revision and purge docs cache
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  DOCS_REVALIDATE_TOKEN: ${{ secrets.DOCS_REVALIDATE_TOKEN }}
+              run: |
+                  if [ -z "$DOCS_REVALIDATE_TOKEN" ]; then
+                    echo 'DOCS_REVALIDATE_TOKEN is not configured.' >&2
+                    exit 1
+                  fi
+                  sha=$(gh api "repos/$GITHUB_REPOSITORY/commits?sha=main&path=docs/content&per_page=1" --jq '.[0].sha')
+                  if [[ ! "$sha" =~ ^[a-f0-9]{40,64}$ ]]; then
+                    echo 'No valid docs content commit SHA was found.' >&2
+                    exit 1
+                  fi
+                  for attempt in 1 2 3 4 5; do
+                    status=$(curl --silent --show-error --output "$RUNNER_TEMP/docs-revalidate-response" --write-out '%{http_code}' \
+                      --connect-timeout 10 --max-time 30 \
+                      --header "Authorization: Bearer $DOCS_REVALIDATE_TOKEN" \
+                      --header 'Content-Type: application/json' \
+                      --data "{\"sha\":\"$sha\"}" \
+                      https://nuxt-files-sdk.liria.me/api/internal/revalidate-docs) || status=000
+                    if [ "$status" = 200 ]; then
+                      cat "$RUNNER_TEMP/docs-revalidate-response"
+                      exit 0
+                    fi
+                    if [ "$status" != 408 ] && [ "$status" != 409 ] && [ "$status" != 429 ] && [ "$status" != 000 ] && [ "${status:0:1}" != 5 ]; then
+                      cat "$RUNNER_TEMP/docs-revalidate-response" >&2
+                      exit 1
+                    fi
+                    if [ "$attempt" -lt 5 ]; then sleep 5; fi
+                  done
+                  cat "$RUNNER_TEMP/docs-revalidate-response" >&2 || true
+                  echo "Docs revalidation failed after retries (HTTP $status)." >&2
+                  exit 1

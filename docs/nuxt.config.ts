@@ -41,6 +41,7 @@ export default defineNuxtConfig({
 
     nitro: {
         preset: 'cloudflare-module',
+        errorHandler: fileURLToPath(new URL('./server/error.ts', import.meta.url)).replaceAll('\\', '/'),
         cloudflare: {
             deployConfig: true,
             wrangler: {
@@ -48,6 +49,8 @@ export default defineNuxtConfig({
                 compatibility_date: '2026-09-04',
                 compatibility_flags: ['nodejs_compat'],
                 preview_urls: false,
+                // oxlint-disable-next-line unicorn/no-useless-spread -- Nitro's Wrangler type omits Workers Cache options.
+                ...{ cache: { enabled: true, cross_version_cache: false } },
                 routes: [{ pattern: 'nuxt-files-sdk.liria.me', custom_domain: true }],
                 kv_namespaces: [
                     {
@@ -61,7 +64,6 @@ export default defineNuxtConfig({
             },
         },
         routeRules: {
-            '/**': { headers: { 'cache-control': 'no-store' } },
             '/_nuxt/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
         },
     },

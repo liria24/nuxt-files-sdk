@@ -1,12 +1,7 @@
 <script setup lang="ts">
-import type { NavigationItem } from 'comark-content'
-
 const { docs } = useAppConfig()
-const client = useDocsContent()
 const searchOpen = ref(false)
-const { data: navigation, error } = await useAsyncData<NavigationItem[]>('docs-navigation', () => client.navigation())
-if (error.value) throw error.value
-const menuItems = computed(() => toMenuItems(navigation.value ?? []))
+const menuItems = [{ label: 'Documentation', to: '/getting-started/installation' }]
 </script>
 
 <template>

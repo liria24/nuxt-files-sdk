@@ -12,8 +12,10 @@ const packageManagers: Record<packageManager, { label: string; icon: string; ins
     bun: { label: 'Bun', icon: 'simple-icons:bun', install: 'bun add' },
     yarn: { label: 'yarn', icon: 'simple-icons:yarn', install: 'yarn add' },
 }
-const selectPM = useCookie<packageManager>('package-manager', { default: () => 'npm' })
-const displayCommand = computed(() => `${packageManagers[selectPM.value].install} nuxt-files-sdk`)
+const selectPM = useCookie<packageManager>('package-manager', { default: () => 'npm', readonly: import.meta.server })
+const displayCommand = computed(
+    () => `${(packageManagers[selectPM.value] ?? packageManagers.npm).install} nuxt-files-sdk`,
+)
 
 const siteUrl = useRuntimeConfig().public.siteUrl.replace(/\/$/u, '')
 

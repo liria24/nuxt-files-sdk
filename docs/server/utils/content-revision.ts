@@ -13,6 +13,25 @@ export const isRevisionState = (value: unknown): value is RevisionState => {
 
 export const isCommitSha = (value: string) => /^[a-f0-9]{40,64}$/u.test(value)
 
+export const isAuthorizedDocsRevalidation = (authorization: string | undefined, token: string | undefined) =>
+    Boolean(token && authorization === `Bearer ${token}`)
+
+export async function revalidateContentRevision(
+    requestedSha: string,
+    steps: {
+        latest: () => Promise<string>
+        validate: () => Promise<void>
+        save: () => Promise<void>
+        purge: () => Promise<{ success: boolean }>
+    },
+): Promise<boolean> {
+    if ((await steps.latest()) !== requestedSha) return false
+    await steps.validate()
+    await steps.save()
+    if (!(await steps.purge()).success) throw new Error('Cloudflare cache purge failed.')
+    return true
+}
+
 export async function fetchContentSha(options: {
     repository: string
     branch: string

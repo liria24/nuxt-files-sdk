@@ -21,6 +21,7 @@ interface DocsKV {
 interface DocsEnvironment {
     DOCS_CACHE?: DocsKV
     GITHUB_TOKEN?: string
+    DOCS_REVALIDATE_TOKEN?: string
 }
 
 interface ProductionContentConfig {
@@ -89,6 +90,23 @@ export async function getDocsContent(event: H3Event): Promise<AnyComarkContent> 
         setResponseHeader(event, 'retry-after', Math.ceil(refreshInterval / 1000))
         throw error
     }
+}
+
+export async function validateDocsRevision(event: H3Event, sha: string): Promise<void> {
+    const environment = getDocsEnvironment(event.context)
+    if (!environment.DOCS_CACHE) {
+        throw createError({ statusCode: 503, statusMessage: 'The DOCS_CACHE binding is unavailable.' })
+    }
+    const config = useRuntimeConfig(event).docs
+    await contentAt(sha, { ...environment, DOCS_CACHE: environment.DOCS_CACHE }, config)
+}
+
+export async function saveDocsRevision(event: H3Event, sha: string): Promise<void> {
+    const binding = getDocsEnvironment(event.context).DOCS_CACHE
+    if (!binding) throw createError({ statusCode: 503, statusMessage: 'The DOCS_CACHE binding is unavailable.' })
+    const next = { activeSha: sha, checkedAt: Date.now() }
+    await writeRevision(binding, next)
+    localRevision = next
 }
 
 async function getDevelopmentContent(): Promise<AnyComarkContent> {
@@ -236,7 +254,7 @@ function logCacheError(error: unknown) {
     return undefined
 }
 
-function getDocsEnvironment(context: unknown): DocsEnvironment {
+export function getDocsEnvironment(context: unknown): DocsEnvironment {
     if (!context || typeof context !== 'object' || !('cloudflare' in context)) return {}
     const cloudflare = context.cloudflare
     if (!cloudflare || typeof cloudflare !== 'object' || !('env' in cloudflare)) return {}
@@ -249,7 +267,11 @@ function getDocsEnvironment(context: unknown): DocsEnvironment {
         'GITHUB_TOKEN' in environment && typeof environment.GITHUB_TOKEN === 'string'
             ? environment.GITHUB_TOKEN
             : undefined
-    return { DOCS_CACHE, GITHUB_TOKEN }
+    const DOCS_REVALIDATE_TOKEN =
+        'DOCS_REVALIDATE_TOKEN' in environment && typeof environment.DOCS_REVALIDATE_TOKEN === 'string'
+            ? environment.DOCS_REVALIDATE_TOKEN
+            : undefined
+    return { DOCS_CACHE, GITHUB_TOKEN, DOCS_REVALIDATE_TOKEN }
 }
 
 function isDocsKV(value: unknown): value is DocsKV {

@@ -3,7 +3,15 @@ import { resolve } from 'node:path'
 
 import { expect, test } from 'vitest'
 
-import { fetchContentSha, isFreshRevision, isRevisionState } from '../../docs/server/utils/content-revision'
+import { docsCacheHeaders } from '../../docs/server/utils/cache-policy'
+import {
+    fetchContentSha,
+    isAuthorizedDocsRevalidation,
+    isCommitSha,
+    isFreshRevision,
+    isRevisionState,
+    revalidateContentRevision,
+} from '../../docs/server/utils/content-revision'
 import { repositoryRoot } from '../utils/fixture'
 
 const contentDirectory = resolve(repositoryRoot, 'docs/content')
@@ -133,4 +141,88 @@ test('GitHub content revision checks are bounded and validated', async () => {
             fetch: async () => new Response('rate limited', { status: 403 }),
         }),
     ).rejects.toThrow('403')
+})
+
+test('docs cache headers separate homepage, content, API, errors, and static assets', () => {
+    const home = docsCacheHeaders('/', 200, 'text/html')
+    expect(home).toEqual({
+        'cache-control': 'public, max-age=0',
+        'cloudflare-cdn-cache-control': 'public, max-age=86400',
+        vary: 'Cookie',
+    })
+    for (const path of ['/getting-started/installation', '/raw/index.md', '/llms.txt', '/sitemap.xml']) {
+        expect(docsCacheHeaders(path, 200, path.endsWith('.md') ? 'text/markdown' : 'text/html')).toEqual({
+            'cache-control': 'public, max-age=0',
+            'cloudflare-cdn-cache-control': 'public, max-age=60',
+            'cache-tag': 'nuxt-files-sdk-docs',
+        })
+    }
+    const noStore = { 'cache-control': 'no-store', 'cloudflare-cdn-cache-control': 'no-store' }
+    for (const [path, status] of [
+        ['/api/content/index', 200],
+        ['/api/internal/revalidate-docs', 200],
+        ['/', 404],
+        ['/raw/index.md', 503],
+    ] as const) {
+        expect(docsCacheHeaders(path, status, 'text/html')).toEqual(noStore)
+    }
+    expect(docsCacheHeaders('/other.json', 200, 'application/json')).toEqual(noStore)
+    expect(docsCacheHeaders('/', 200, 'text/html', true)).toEqual(noStore)
+    expect(docsCacheHeaders('/_nuxt/app.js', 200, 'text/javascript')).toBeUndefined()
+})
+
+test('docs revalidation authenticates and validates before saving and purging', async () => {
+    const sha = 'a'.repeat(40)
+    expect(isAuthorizedDocsRevalidation(`Bearer secret`, 'secret')).toBe(true)
+    expect(isAuthorizedDocsRevalidation('Bearer wrong', 'secret')).toBe(false)
+    expect(isAuthorizedDocsRevalidation(undefined, 'secret')).toBe(false)
+    expect(isAuthorizedDocsRevalidation('Bearer secret', undefined)).toBe(false)
+    expect(isCommitSha(sha)).toBe(true)
+    expect(isCommitSha('../main')).toBe(false)
+
+    const order: string[] = []
+    const steps = {
+        latest: async () => {
+            order.push('latest')
+            return sha
+        },
+        validate: async () => {
+            order.push('validate')
+        },
+        save: async () => {
+            order.push('save')
+        },
+        purge: async () => {
+            order.push('purge')
+            return { success: true }
+        },
+    }
+    expect(await revalidateContentRevision(sha, steps)).toBe(true)
+    expect(order).toEqual(['latest', 'validate', 'save', 'purge'])
+
+    order.length = 0
+    expect(await revalidateContentRevision('b'.repeat(40), steps)).toBe(false)
+    expect(order).toEqual(['latest'])
+
+    for (const failedStep of ['validate', 'save', 'purge'] as const) {
+        order.length = 0
+        const failing = {
+            ...steps,
+            [failedStep]: async () => {
+                order.push(failedStep)
+                throw new Error(`${failedStep} failed`)
+            },
+        }
+        await expect(revalidateContentRevision(sha, failing)).rejects.toThrow(`${failedStep} failed`)
+        expect(order).toEqual(
+            failedStep === 'validate'
+                ? ['latest', 'validate']
+                : failedStep === 'save'
+                  ? ['latest', 'validate', 'save']
+                  : ['latest', 'validate', 'save', 'purge'],
+        )
+    }
+    await expect(revalidateContentRevision(sha, { ...steps, purge: async () => ({ success: false }) })).rejects.toThrow(
+        'purge failed',
+    )
 })
