@@ -37,16 +37,18 @@ export default defineNuxtModule<ModuleOptions>({
         ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
         const paths = ((nuxt.options.typescript.tsConfig.compilerOptions ??= {}).paths ??= {})
         paths['files-sdk'] ??= [resolve(nuxt.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
-        nuxt.hook('nitro:init', (nitro) =>
-            setupNitroFilesIntegration(nitro, {
+        let active = false
+        nuxt.hook('nitro:init', async (nitro) => {
+            active = await setupNitroFilesIntegration(nitro, {
                 configPath,
                 environments: nitro.options.static
                     ? ['production', 'prerender']
                     : [nuxt.options.envName || (nuxt.options.dev ? 'development' : 'production')],
-            }),
-        )
+            })
+        })
         nuxt.hook('prepare:types', ({ references }) => {
-            references.push({ path: resolve(nuxt.options.buildDir, 'nuxt-files-sdk/storage-registry.d.ts') })
+            if (active)
+                references.push({ path: resolve(nuxt.options.buildDir, 'nuxt-files-sdk/storage-registry.d.ts') })
         })
 
         addServerImports([

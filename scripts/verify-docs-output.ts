@@ -8,6 +8,7 @@ const forbidden = [
     'files-devtools',
     'files-sdk/fs',
     'configureFiles',
+    'The Files registry has not been configured.',
     'comark-docs',
     '@nuxtjs/mcp-toolkit',
     'Files SDK, wired for Nuxt',

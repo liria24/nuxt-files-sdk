@@ -162,7 +162,7 @@ export {}
 export const setupNitroFilesIntegration = async (
     nitro: NitroIntegration,
     options: NitroFilesIntegrationOptions,
-): Promise<void> => {
+): Promise<boolean> => {
     const configPath = options.configPath.replaceAll('\\', '/')
     const config = await loadFilesConfig({
         configPath,
@@ -170,6 +170,7 @@ export const setupNitroFilesIntegration = async (
         alias: nitro.options.alias,
         injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
     })
+    if (!config) return false
     const selected = selectedAdapters(config)
     const directory = resolve(nitro.options.rootDir, nitro.options.buildDir, 'nuxt-files-sdk')
     const typesPath = resolve(directory, 'storage-registry.d.ts')
@@ -330,4 +331,5 @@ export default (event) => {
         )
     }
     await writeRuntime()
+    return true
 }

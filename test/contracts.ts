@@ -67,7 +67,7 @@ export const contracts = [
     },
     {
         id: 'CFG-011',
-        guarantee: 'Environment-only storage is rejected outside its active environment',
+        guarantee: 'Environment-only storage skips runtime integration outside its active environment',
         source: 'test/unit/generation.test.ts',
         job: 'unit',
     },

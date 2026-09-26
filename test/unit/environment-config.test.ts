@@ -28,15 +28,15 @@ test('c12 selects base, built-in, custom, and ordered prerender environments', a
       $prerender: { storage: { config: { root: 'prerender' } } },
       $env: { staging: { storage: { adapter: 'memory', prefix: 'staging' } } },
     }`
-    expect((await load(source, [])).storage).toMatchObject({ adapter: 'memory', prefix: 'base' })
-    expect((await load(source, ['development'])).storage).toMatchObject({ adapter: 'fs', config: { root: 'dev' } })
-    expect((await load(source, ['production'])).storage).toMatchObject({
+    expect((await load(source, []))!.storage).toMatchObject({ adapter: 'memory', prefix: 'base' })
+    expect((await load(source, ['development']))!.storage).toMatchObject({ adapter: 'fs', config: { root: 'dev' } })
+    expect((await load(source, ['production']))!.storage).toMatchObject({
         adapter: 'fs',
         config: { root: 'production' },
     })
-    expect((await load(source, ['test'])).storage).toMatchObject({ adapter: 'memory', prefix: 'test' })
-    expect((await load(source, ['staging'])).storage).toMatchObject({ adapter: 'memory', prefix: 'staging' })
-    expect((await load(source, ['production', 'prerender'])).storage).toMatchObject({
+    expect((await load(source, ['test']))!.storage).toMatchObject({ adapter: 'memory', prefix: 'test' })
+    expect((await load(source, ['staging']))!.storage).toMatchObject({ adapter: 'memory', prefix: 'staging' })
+    expect((await load(source, ['production', 'prerender']))!.storage).toMatchObject({
         adapter: 'fs',
         config: { root: 'prerender' },
     })
@@ -78,24 +78,31 @@ test('provider switches discard old config; common options inherit and arrays re
 })
 
 test('named environments override one storage and add environment-only names', async () => {
-    const config = await load(
+    const config = (await load(
         `export default {
       storage: { uploads: { adapter: 'memory' }, archive: { adapter: 'memory' } },
       $development: { storage: { uploads: { adapter: 'fs', config: { root: 'uploads' } }, debug: { adapter: 'memory' } } },
     }`,
         ['development'],
-    )
+    ))!
     expect([...normalizeFilesConfig(config).keys()]).toEqual(['uploads', 'archive', 'debug'])
     expect(config.storage).toMatchObject({
         uploads: { adapter: 'fs', config: { root: 'uploads' } },
         archive: { adapter: 'memory' },
         debug: { adapter: 'memory' },
     })
-    const only = await load(`export default { $test: { storage: { debug: { adapter: 'memory' } } } }`, ['test'])
+    const only = (await load(`export default { $test: { storage: { debug: { adapter: 'memory' } } } }`, ['test']))!
     expect([...normalizeFilesConfig(only).keys()]).toEqual(['debug'])
-    await expect(load(`export default { $test: { storage: { adapter: 'memory' } } }`, ['production'])).rejects.toThrow(
-        'At least one storage',
-    )
+    await expect(
+        load(`export default { $test: { storage: { adapter: 'memory' } } }`, ['production']),
+    ).resolves.toBeUndefined()
+    await expect(
+        load(`export default { $env: { staging: { storage: { adapter: 'memory' } } } }`, ['production']),
+    ).resolves.toBeUndefined()
+    await expect(load(`export default {}`, ['production'])).rejects.toThrow('At least one storage')
+    await expect(
+        load(`export default { storage: {}, $test: { storage: { adapter: 'memory' } } }`, ['production']),
+    ).rejects.toThrow('At least one storage')
 })
 
 test('auto-import injection works and provider resolvers remain lazy', async () => {
@@ -111,7 +118,7 @@ test('auto-import injection works and provider resolvers remain lazy', async () 
         environments: ['development'],
         injectImports: async (source) => ({ code: `const defineFilesConfig = (value) => value\n${source}` }),
     })
-    expect(typeof (config.storage as { config: unknown }).config).toBe('function')
+    expect(typeof (config!.storage as { config: unknown }).config).toBe('function')
 })
 
 test('generated config source excludes inactive environment literals', () => {

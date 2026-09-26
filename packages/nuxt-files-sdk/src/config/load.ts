@@ -23,13 +23,22 @@ const isResolvedFilesConfig = (value: unknown): value is FilesConfig => {
     return true
 }
 
+const hasEnvironmentStorage = (config: Record<string, unknown>): boolean =>
+    [
+        config.$development,
+        config.$production,
+        config.$test,
+        config.$prerender,
+        ...(isObject(config.$env) ? Object.values(config.$env) : []),
+    ].some((branch) => isObject(branch) && branch.storage !== undefined)
+
 /** c12 selects the first environment; a later prerender override is applied with the same merger. */
 export const loadFilesConfig = async ({
     configPath,
     environments,
     alias,
     injectImports,
-}: FilesConfigLoaderOptions): Promise<FilesConfig> => {
+}: FilesConfigLoaderOptions): Promise<FilesConfig | undefined> => {
     const jiti = createJiti(import.meta.url, {
         alias: {
             ...alias,
@@ -66,6 +75,7 @@ export const loadFilesConfig = async ({
         )
     }
     const result: unknown = Object.fromEntries(Object.entries(resolved).filter(([key]) => !key.startsWith('$')))
+    if (isObject(result) && result.storage === undefined && hasEnvironmentStorage(resolved)) return undefined
     if (!isResolvedFilesConfig(result))
         throw new Error('[nuxt-files-sdk:invalid-config] Invalid resolved configuration.')
     return result

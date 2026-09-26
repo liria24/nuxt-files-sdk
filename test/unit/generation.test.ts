@@ -212,7 +212,7 @@ describe('provider generation', () => {
         }
     })
 
-    test('[CFG-011] rejects an environment-only config outside its environment', async () => {
+    test('[CFG-011] skips an environment-only config outside its environment', async () => {
         const config = defineFilesConfig({ $test: { storage: { adapter: 'memory' } } })
         expect(selectedAdapters(config.$test)).toEqual({ adapters: ['memory'], single: true })
         expect(() => selectedAdapters(config)).toThrow('At least one storage is required')
@@ -227,10 +227,14 @@ describe('provider generation', () => {
             hooks: { hook },
         }
 
-        await expect(setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })).rejects.toThrow(
-            'At least one storage is required',
+        await expect(setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })).resolves.toBe(
+            false,
         )
-        await setupNitroFilesIntegration(nitro, { configPath, environments: ['test'] })
+        expect(nitro.options.plugins).toEqual([])
+        expect(nitro.options.handlers).toBeUndefined()
+        expect(nitro.options.externals).toBeUndefined()
+        expect(hook).not.toHaveBeenCalled()
+        await expect(setupNitroFilesIntegration(nitro, { configPath, environments: ['test'] })).resolves.toBe(true)
         expect(await readFile(nitro.options.plugins[0]!, 'utf8')).toContain('files-sdk/memory')
         expect(hook).toHaveBeenCalledOnce()
         const typesPath = resolve(directory, 'nuxt-files-sdk/storage-registry.d.ts')
