@@ -35,17 +35,8 @@ const findPreviewFile = (files: PreviewFile[], id: string): PreviewFile | undefi
 
 const nuxtFilesConfig = `export default defineFilesConfig({
     storage: {
-        adapter: 's3',
-        config: {
-            bucket: "uploads",
-            region: "us-east-1",
-        },
-    },
-    $development: {
-        storage: {
-            adapter: 'fs',
-            config: { root: '.data/files' },
-        }
+        adapter: 'fs',
+        config: { root: '.data/files' },
     },
 })`
 
@@ -85,11 +76,10 @@ const examples: ExampleItem[] = [
                         children: [
                             {
                                 id: 'api',
-                                label: 'hello.get.ts',
+                                label: 'files.get.ts',
                                 code: `export default defineEventHandler(async () => {
     const files = useServerFiles()
-    await files.upload('hello.txt', 'Hello from Nuxt 4')
-    return (await files.download('hello.txt')).text()
+    return files.list({ limit: 20 })
 })`,
                             },
                         ],
@@ -99,7 +89,7 @@ const examples: ExampleItem[] = [
         ],
     },
     {
-        label: 'Nuxt 5',
+        label: 'Nuxt 5 nightly',
         value: 'nuxt5',
         icon: 'devicon:nuxt',
         files: [
@@ -125,11 +115,10 @@ const examples: ExampleItem[] = [
                         children: [
                             {
                                 id: 'api',
-                                label: 'hello.get.ts',
+                                label: 'files.get.ts',
                                 code: `export default defineHandler(async () => {
     const files = useServerFiles()
-    await files.upload('hello.txt', 'Hello from Nuxt 5')
-    return (await files.download('hello.txt')).text()
+    return files.list({ limit: 20 })
 })`,
                             },
                         ],
@@ -161,13 +150,12 @@ const examples: ExampleItem[] = [
                 children: [
                     {
                         id: 'api',
-                        label: 'hello.ts',
+                        label: 'files.ts',
                         code: `import { useServerFiles } from 'nuxt-files-sdk/runtime'
 
 export default defineEventHandler(async () => {
     const files = useServerFiles()
-    await files.upload('hello.txt', 'Hello from Nitro 2')
-    return (await files.download('hello.txt')).text()
+    return files.list({ limit: 20 })
 })`,
                     },
                 ],
@@ -200,14 +188,13 @@ export default defineNitroConfig({
                 children: [
                     {
                         id: 'api',
-                        label: 'hello.ts',
+                        label: 'files.ts',
                         code: `import { defineHandler } from 'nitro'
 import { useServerFiles } from 'nuxt-files-sdk/runtime'
 
 export default defineHandler(async () => {
     const files = useServerFiles()
-    await files.upload('hello.txt', 'Hello from Nitro 3')
-    return (await files.download('hello.txt')).text()
+    return files.list({ limit: 20 })
 })`,
                     },
                 ],
@@ -240,7 +227,7 @@ useSeoMeta({
         <UPageHero
             headline="Unofficial Nuxt Integration"
             title="Set up Files SDK easily"
-            description="Native-first Files SDK integration for Nuxt and Nitro."
+            :description="docs.description"
             :ui="{ container: 'pb-24 sm:pb-24 lg:pb-24' }"
         >
             <template #links>

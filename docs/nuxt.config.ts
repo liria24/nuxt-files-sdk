@@ -104,7 +104,7 @@ export default defineNuxtConfig({
     llms: {
         domain: siteUrl,
         title: 'Nuxt Files SDK',
-        description: 'Native-first Files SDK integration for Nuxt and Nitro.',
+        description: 'Files SDK integration for Nuxt with DevTools.',
         sections: [],
         prerender: false,
     },

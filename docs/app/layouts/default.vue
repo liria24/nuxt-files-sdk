@@ -81,7 +81,7 @@ const menuItems = [{ label: 'Documentation', to: '/getting-started/installation'
 
         <UFooter>
             <template #left>
-                <UButton :to="docs.repository" label="MIT License." color="neutral" variant="link" />
+                <UButton :to="docs.repository" label="MIT License" color="neutral" variant="link" />
             </template>
             <template #right>
                 <UTheme :props="{ button: { color: 'neutral', variant: 'link' } }">

@@ -99,7 +99,7 @@ provide('docs-navigation', navigation)
 
         <UFooter>
             <template #left>
-                <UButton :to="docs.repository" label="MIT License." color="neutral" variant="link" />
+                <UButton :to="docs.repository" label="MIT License" color="neutral" variant="link" />
             </template>
             <template #right>
                 <UTheme :props="{ button: { color: 'neutral', variant: 'link' } }">

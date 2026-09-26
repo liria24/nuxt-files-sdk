@@ -1,7 +1,7 @@
 export default defineAppConfig({
     docs: {
         title: 'Nuxt Files SDK',
-        description: 'Native-first Files SDK integration for Nuxt and Nitro.',
+        description: 'Files SDK integration for Nuxt with DevTools.',
         repository: 'https://github.com/liria24/nuxt-files-sdk',
         filesSdk: 'https://files-sdk.dev',
     },
