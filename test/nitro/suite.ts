@@ -151,7 +151,6 @@ export const nitroSuite = (
                         [
                             'wrangler',
                             'deploy',
-                            '.output/server/index.mjs',
                             '--name',
                             'nuxt-files-sdk-nitro-v2-fixture',
                             '--dry-run',

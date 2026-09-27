@@ -49,6 +49,8 @@ export default defineNuxtConfig({
                 compatibility_date: '2026-09-04',
                 compatibility_flags: ['nodejs_compat'],
                 preview_urls: false,
+                // oxlint-disable-next-line unicorn/no-useless-spread -- Nitro's Wrangler type omits Workers Previews.
+                ...{ previews: {} },
                 // oxlint-disable-next-line unicorn/no-useless-spread -- Nitro's Wrangler type omits Workers Cache options.
                 ...{ cache: { enabled: true, cross_version_cache: false } },
                 routes: [{ pattern: 'nuxt-files-sdk.liria.me', custom_domain: true }],
