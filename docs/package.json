@@ -3,6 +3,7 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "postinstall": "bun --filter nuxt-files-sdk build && nuxt prepare",
         "build": "nuxt build",
         "dev": "nuxt dev",
         "deploy": "wrangler deploy",
