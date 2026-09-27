@@ -429,6 +429,12 @@ export const contracts = [
         job: 'unit',
     },
     {
+        id: 'REL-003',
+        guarantee: 'Workspace lockfile version matches the package manifest before release',
+        source: 'test/unit/contracts.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'CFG-013',
         guarantee: 'Preparation and runtime share structural configuration validation',
         source: 'test/unit/normalization.test.ts',

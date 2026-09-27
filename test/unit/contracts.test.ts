@@ -56,3 +56,14 @@ test('[REL-002] mandatory jobs and the release artifact fail closed', async () =
     expect(release.indexOf('Verify the exact release artifact')).toBeLessThan(release.indexOf('    publish:'))
     expect(release.slice(release.indexOf('    publish:'))).toContain('needs: pack')
 })
+
+test('[REL-003] package and workspace lockfile versions agree', async () => {
+    const manifest = JSON.parse(
+        await readFile(resolve(repositoryRoot, 'packages/nuxt-files-sdk/package.json'), 'utf8'),
+    ) as { version: string }
+    const lock = await readFile(resolve(repositoryRoot, 'bun.lock'), 'utf8')
+    const lockedVersion = lock.match(
+        /"packages\/nuxt-files-sdk": \{\s*"name": "nuxt-files-sdk",\s*"version": "([^"]+)"/u,
+    )?.[1]
+    expect(lockedVersion).toBe(manifest.version)
+})

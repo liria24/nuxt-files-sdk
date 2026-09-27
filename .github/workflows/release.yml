@@ -16,6 +16,41 @@ jobs:
               with:
                   packages: packages/nuxt-files-sdk
                   token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Find the stable release PR
+              id: release-pr
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  branch=$(gh pr list --base "$GITHUB_REF_NAME" --state open --limit 100 --json headRefName,headRepositoryOwner |
+                    jq -r --arg owner "$GITHUB_REPOSITORY_OWNER" '[.[] | select(.headRepositoryOwner.login == $owner) | .headRefName | select(test("^release/v[0-9]+\\.[0-9]+\\.[0-9]+$"))] | if length == 0 then "" elif length == 1 then .[0] else error("Multiple stable release PRs") end')
+                  echo "branch=$branch" >> "$GITHUB_OUTPUT"
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              if: steps.release-pr.outputs.branch != ''
+              with:
+                  fetch-depth: 0
+                  ref: ${{ steps.release-pr.outputs.branch }}
+            - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+              if: steps.release-pr.outputs.branch != ''
+              with: { bun-version-file: package.json }
+            - name: Sync the release branch
+              if: steps.release-pr.outputs.branch != ''
+              env:
+                  RELEASE_BRANCH: ${{ steps.release-pr.outputs.branch }}
+              run: |
+                  git config user.name 'github-actions[bot]'
+                  git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+                  git fetch origin "$GITHUB_REF_NAME"
+                  if ! git merge --no-commit --no-ff "origin/$GITHUB_REF_NAME"; then
+                    [[ "$(git diff --name-only --diff-filter=U)" == bun.lock ]]
+                    git checkout --theirs -- bun.lock
+                    git add bun.lock
+                  fi
+                  bun install --lockfile-only --ignore-scripts
+                  git add bun.lock
+                  if git rev-parse -q --verify MERGE_HEAD >/dev/null || ! git diff --cached --quiet; then
+                    git commit -m 'chore: sync release branch with main'
+                    git push origin "HEAD:refs/heads/$RELEASE_BRANCH"
+                  fi
     release:
         if: github.event_name == 'pull_request' && github.event.pull_request.merged ==
             true && startsWith(github.event.pull_request.head.ref, 'release/v') &&
