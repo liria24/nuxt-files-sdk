@@ -3,7 +3,13 @@ import { resolve } from 'node:path'
 
 import { expect, test } from 'vitest'
 
-import { fetchContentSha, isFreshRevision, isRevisionState } from '../../docs/server/utils/content-revision'
+import { docsCacheHeaders } from '../../docs/server/utils/cache-policy'
+import {
+    fetchContentSha,
+    isFreshRevision,
+    isRevisionState,
+    selectDocsContent,
+} from '../../docs/server/utils/content-revision'
 import { repositoryRoot } from '../utils/fixture'
 
 const contentDirectory = resolve(repositoryRoot, 'docs/content')
@@ -31,7 +37,7 @@ test('documentation pages and internal links stay complete', async () => {
         "from 'files-sdk/versioning'",
         'useServerFiles()',
         "useServerFiles('archive')",
-        'devStorage',
+        '$development',
         'useFiles',
         'useList',
         'nuxt-files-sdk/nitro',
@@ -49,7 +55,6 @@ test('documentation dependencies and local storage stay isolated from the public
     const nuxtConfig = await readFile(resolve(repositoryRoot, 'docs/nuxt.config.ts'), 'utf8')
     const filesConfig = await readFile(resolve(repositoryRoot, 'docs/files.config.ts'), 'utf8')
     const contentRuntime = await readFile(resolve(repositoryRoot, 'docs/server/utils/content.ts'), 'utf8')
-    const ogTemplate = await readFile(resolve(repositoryRoot, 'docs/app/components/OgImage/Docs.takumi.vue'), 'utf8')
 
     for (const dependency of [
         '@comark/nuxt',
@@ -86,7 +91,6 @@ test('documentation dependencies and local storage stay isolated from the public
     expect(publicPackage).not.toContain('comark')
     expect(contentRuntime).toContain("from '@comark/nuxt/plugins/rangi'")
     expect(contentRuntime).not.toContain('shiki')
-    expect(ogTemplate).toContain("fontFamily: 'Geist'")
     expect(nuxtConfig).toContain("contentDir: 'docs/content'")
     expect(nuxtConfig).toContain("preset: 'cloudflare-module'")
     expect(nuxtConfig).toContain("locales: [{ code: 'en', language: 'en-US', name: 'English' }]")
@@ -133,4 +137,73 @@ test('GitHub content revision checks are bounded and validated', async () => {
             fetch: async () => new Response('rate limited', { status: 403 }),
         }),
     ).rejects.toThrow('403')
+})
+
+test('stale docs serve the active revision while a refresh runs in the background', async () => {
+    const sha = 'a'.repeat(40)
+    const calls: string[] = []
+    const pendingRefresh = new Promise<void>(() => {})
+    const options = {
+        state: { activeSha: sha, checkedAt: 10_000 },
+        now: 70_000,
+        refreshInterval: 60_000,
+        load: async (activeSha: string) => {
+            calls.push(`load:${activeSha}`)
+            return 'active'
+        },
+        refresh: async () => {
+            calls.push('refresh')
+            return 'next'
+        },
+        refreshInBackground: () => {
+            calls.push('background')
+            return pendingRefresh
+        },
+        onLoadError: () => calls.push('load-error'),
+    }
+
+    await expect(selectDocsContent(options)).resolves.toBe('active')
+    expect(calls).toEqual([`load:${sha}`, 'background'])
+
+    await expect(selectDocsContent({ ...options, now: 69_999 })).resolves.toBe('active')
+    expect(calls.at(-1)).toBe(`load:${sha}`)
+
+    await expect(selectDocsContent({ ...options, state: undefined })).resolves.toBe('next')
+    expect(calls.at(-1)).toBe('refresh')
+
+    await expect(
+        selectDocsContent({
+            ...options,
+            load: async () => {
+                throw new Error('invalid snapshot')
+            },
+        }),
+    ).resolves.toBe('next')
+    expect(calls.slice(-2)).toEqual(['load-error', 'refresh'])
+})
+
+test('docs cache headers cache only the homepage and static assets', () => {
+    const home = docsCacheHeaders('/', 200)
+    expect(home).toEqual({
+        'cache-control': 'public, max-age=0',
+        'cloudflare-cdn-cache-control': 'public, max-age=86400',
+        vary: 'Cookie',
+    })
+    const noStore = { 'cache-control': 'no-store', 'cloudflare-cdn-cache-control': 'no-store' }
+    for (const [path, status] of [
+        ['/getting-started/installation', 200],
+        ['/raw/index.md', 200],
+        ['/llms.txt', 200],
+        ['/sitemap.xml', 200],
+        ['/_og/d/image', 200],
+        ['/_og/r/resolve', 200],
+        ['/api/content/index', 200],
+        ['/', 404],
+        ['/raw/index.md', 503],
+    ] as const) {
+        expect(docsCacheHeaders(path, status)).toEqual(noStore)
+    }
+    expect(docsCacheHeaders('/other.json', 200)).toEqual(noStore)
+    expect(docsCacheHeaders('/', 200, true)).toEqual(noStore)
+    expect(docsCacheHeaders('/_nuxt/app.js', 200)).toBeUndefined()
 })

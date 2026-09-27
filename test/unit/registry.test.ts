@@ -2,12 +2,15 @@ import { rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { FilesError } from 'files-sdk'
+import { failover } from 'files-sdk/failover'
 import { fs } from 'files-sdk/fs'
+import { memory } from 'files-sdk/memory'
+import { tiering } from 'files-sdk/tiering'
 import { versioning } from 'files-sdk/versioning'
 import { afterAll, describe, expect, test, vi } from 'vitest'
 
-import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
-import { useServerFiles } from '../../packages/nuxt-files-sdk/src/runtime'
+import { defineFilesConfig, type FilesPluginContext } from '../../packages/nuxt-files-sdk/src/config'
+import { syncFiles, transferFiles, useServerFiles } from '../../packages/nuxt-files-sdk/src/runtime'
 import { configureFiles } from '../../packages/nuxt-files-sdk/src/runtime/internal'
 import { FilesRegistry, type FilesProviderFactories } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
@@ -39,12 +42,11 @@ describe('FilesRegistry', () => {
         }
     })
 
-    test('[CFG-003][ERR-002] preserves factory errors and never uses devStorage as a production fallback', () => {
+    test('[CFG-003][ERR-002] preserves factory errors without switching providers', () => {
         const failure = new FilesError('Provider', 'Missing provider configuration')
         const registry = new FilesRegistry(
             defineFilesConfig({
                 storage: { adapter: 's3', config: { bucket: 'missing' } },
-                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
             {
                 factories: {
@@ -58,19 +60,18 @@ describe('FilesRegistry', () => {
         expect(() => registry.get()).toThrow(failure)
     })
 
-    test('[CFG-004] preserves plugins and hooks with a development provider override', async () => {
+    test('[CFG-004] preserves plugins and hooks on resolved storage', async () => {
         const onAction = vi.fn<(event: unknown) => void>()
         const files = new FilesRegistry(
             defineFilesConfig({
                 storage: {
-                    adapter: 's3',
-                    config: { bucket: 'unused' },
+                    adapter: 'fs',
+                    config: { root: '.data/test-files' },
                     plugins: [versioning()],
                     hooks: { onAction },
                 },
-                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
-            { development: true, factories },
+            { factories },
         ).get()
 
         expect(files.versions).toBeTypeOf('function')
@@ -108,36 +109,33 @@ describe('FilesRegistry', () => {
         await expect(readonly.upload('readonly.txt', 'blocked')).rejects.toMatchObject({ code: 'ReadOnly' })
     })
 
-    test('[CFG-011] supports a complete development-only storage', () => {
+    test('[CFG-011] supports an environment-only storage after resolution', () => {
         const registry = new FilesRegistry(
             defineFilesConfig({
-                devStorage: {
+                storage: {
                     adapter: 'fs',
                     config: { root: '.data/test-files' },
                     plugins: [versioning()],
                 },
             }),
-            { development: true, factories },
+            { factories },
         )
 
         expect(registry.get().versions).toBeTypeOf('function')
-        expect(registry.inspect().storages).toEqual([
-            { adapter: 'fs', plugins: ['versioning'], source: 'devStorage', initialized: true },
-        ])
+        expect(registry.inspect().storages).toEqual([{ adapter: 'fs', plugins: ['versioning'], initialized: true }])
     })
 
-    test('[SEC-002] reports only a secret-free development snapshot', () => {
+    test('[SEC-002] reports only a secret-free snapshot', () => {
         const secret = 'NUXT_FILES_TEST_SECRET_123456'
         const registry = new FilesRegistry(
             defineFilesConfig({
                 storage: {
-                    adapter: 's3',
-                    config: { bucket: 'secret-bucket', secretAccessKey: secret },
+                    adapter: 'fs',
+                    config: { root: '.data/test-files', secretAccessKey: secret } as never,
                     plugins: [versioning()],
                 },
-                devStorage: { adapter: 'fs', config: { root: '.data/test-files' } },
             }),
-            { development: true, factories },
+            { factories },
         )
         expect(registry.get()).toBe(registry.get())
 
@@ -146,7 +144,6 @@ describe('FilesRegistry', () => {
                 {
                     adapter: 'fs',
                     plugins: ['versioning'],
-                    source: 'devStorage',
                     initialized: true,
                 },
             ],
@@ -193,6 +190,92 @@ describe('FilesRegistry', () => {
         )
         expect(registry.get('archive')).not.toBe(registry.get('blob'))
         expect(registry.get('archive')).toBe(registry.get('archive'))
+    })
+
+    test('custom adapters and composition resolve adapters lazily before Files clients', async () => {
+        const cold = vi.fn<() => ReturnType<typeof memory>>(() => memory())
+        const hot = vi.fn<() => ReturnType<typeof memory>>(() => memory())
+        let resolverCalls = 0
+        const registry = new FilesRegistry(
+            defineFilesConfig({
+                storage: {
+                    archive: { adapter: cold },
+                    backup: { adapter: () => memory() },
+                    uploads: {
+                        adapter: hot,
+                        plugins: ({ storage }) => {
+                            resolverCalls++
+                            return [
+                                versioning(),
+                                tiering({
+                                    cold: storage('archive'),
+                                    route: ({ key }) => (key.startsWith('archive/') ? 'cold' : 'hot'),
+                                }),
+                                failover({ secondaries: storage('backup') }),
+                            ] as const
+                        },
+                    },
+                },
+            }),
+            { factories: {} },
+        )
+        expect([cold, hot].map((fn) => fn.mock.calls.length)).toEqual([0, 0])
+        expect(resolverCalls).toBe(0)
+        const files = registry.get('uploads')
+        expect(files.versions).toBeTypeOf('function')
+        expect(files.tierOf).toBeTypeOf('function')
+        expect(registry.inspect().storages.map(({ initialized }) => initialized)).toEqual([false, false, true])
+        expect(registry.inspect().storages[2]?.plugins).toEqual(['versioning', 'tiering', 'failover'])
+        expect(cold).toHaveBeenCalledOnce()
+        expect(hot).toHaveBeenCalledOnce()
+        expect(resolverCalls).toBe(1)
+        await files.upload('archive/old.txt', 'hello')
+        expect(await files.exists('archive/old.txt')).toBe(true)
+    })
+
+    test('detects a cross-storage adapter dependency cycle', () => {
+        let registry!: FilesRegistry
+        registry = new FilesRegistry(
+            {
+                storage: {
+                    first: { adapter: () => (registry.resolveAdapter('second'), memory()) },
+                    second: { adapter: () => (registry.resolveAdapter('first'), memory()) },
+                },
+            },
+            { factories: {} },
+        )
+        expect(() => registry.resolveAdapter('first')).toThrow('[nuxt-files-sdk:circular-initialization]')
+    })
+
+    test('detects a plugin resolver cycle through another storage', () => {
+        let registry!: FilesRegistry
+        registry = new FilesRegistry(
+            {
+                storage: {
+                    uploads: {
+                        adapter: () => memory(),
+                        plugins: ({ storage }: FilesPluginContext) => [failover({ secondaries: storage('archive') })],
+                    },
+                    archive: { adapter: () => (registry.get('uploads' as never), memory()) },
+                },
+            },
+            { factories: {} },
+        )
+        expect(() => registry.get('uploads' as never)).toThrow('[nuxt-files-sdk:circular-initialization]')
+    })
+
+    test('delegates sync and transfer between names and native Files instances', async () => {
+        const registry = configureFiles(
+            { storage: { source: { adapter: 'memory' }, destination: { adapter: 'memory' } } },
+            { factories: { memory } },
+        )
+        await registry.get('source').upload('one.txt', 'one')
+        expect(await syncFiles(registry.get('source'), 'destination' as never, { compare: 'size' })).toMatchObject({
+            uploaded: ['one.txt'],
+        })
+        expect(await transferFiles(registry.get('source'), 'destination' as never, { overwrite: false })).toMatchObject(
+            { skipped: ['one.txt'] },
+        )
     })
 
     test('[RUNTIME-003] a construction failure is retried', () => {

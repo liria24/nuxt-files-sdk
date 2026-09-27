@@ -14,8 +14,11 @@ export default defineFilesConfig({
             prefix: '.data/files/',
         },
     },
-    devStorage: {
-        blob: { adapter: 'fs', config: { root: '.', urlBaseUrl: 'NUXT_FILES_DEV_ONLY' } },
+    $development: {
+        storage: { blob: { adapter: 'fs', config: { root: '.', urlBaseUrl: 'NUXT_FILES_DEV_ONLY' } } },
     },
+    $production: { storage: { archive: { adapter: 'fs', config: { root: '.data/production-archive' } } } },
+    $prerender: { storage: { archive: { adapter: 'memory' } } },
+    $env: { staging: { storage: { archive: { adapter: 'memory' } } } },
     routes: [{ path: '/api/gateway', storage: 'archive', operations: ['capabilities', 'list'] }],
 })

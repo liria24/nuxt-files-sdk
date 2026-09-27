@@ -1,21 +1,20 @@
 <script setup lang="ts">
-import type { NavigationItem } from 'comark-content'
-
 const { docs } = useAppConfig()
-const client = useDocsContent()
 const searchOpen = ref(false)
-const { data: navigation, error } = await useAsyncData<NavigationItem[]>('docs-navigation', () => client.navigation())
-if (error.value) throw error.value
-const menuItems = computed(() => toMenuItems(navigation.value ?? []))
+const menuItems = [{ label: 'Documentation', to: '/getting-started/installation' }]
 </script>
 
 <template>
     <div class="flex min-h-dvh flex-col">
         <UHeader :title="docs.title" to="/" :ui="{ center: 'flex-1' }">
             <template #left>
-                <NuxtLink to="/" class="text-highlighted font-semibold">
-                    {{ docs.title }}
-                </NuxtLink>
+                <div class="flex items-center gap-5">
+                    <NuxtLink to="/" class="text-highlighted text-lg font-semibold">
+                        {{ docs.title }}
+                    </NuxtLink>
+
+                    <ULink to="/getting-started/installation">Docs</ULink>
+                </div>
             </template>
 
             <UButton
@@ -33,23 +32,22 @@ const menuItems = computed(() => toMenuItems(navigation.value ?? []))
             </UButton>
 
             <template #right>
-                <UButton
-                    :to="docs.filesSdk"
-                    target="_blank"
-                    label="Files SDK"
-                    trailing-icon="mingcute:arrow-right-up-line"
-                    color="neutral"
-                    variant="link"
-                />
-                <UColorModeButton color="neutral" variant="ghost" />
-                <UButton
-                    icon="i-simple-icons-github"
-                    :to="docs.repository"
-                    target="_blank"
-                    color="neutral"
-                    variant="ghost"
-                    aria-label="GitHub repository"
-                />
+                <UTheme :props="{ button: { variant: 'ghost', color: 'neutral' } }">
+                    <UButton
+                        :to="docs.filesSdk"
+                        target="_blank"
+                        label="Files SDK"
+                        trailing-icon="mingcute:arrow-right-up-line"
+                        variant="link"
+                    />
+                    <UColorModeButton />
+                    <UButton
+                        :to="docs.repository"
+                        target="_blank"
+                        icon="i-simple-icons-github"
+                        aria-label="GitHub repository"
+                    />
+                </UTheme>
             </template>
 
             <template #body>
@@ -83,7 +81,7 @@ const menuItems = computed(() => toMenuItems(navigation.value ?? []))
 
         <UFooter>
             <template #left>
-                <UButton :to="docs.repository" label="MIT License." color="neutral" variant="link" />
+                <UButton :to="docs.repository" label="MIT License" color="neutral" variant="link" />
             </template>
             <template #right>
                 <UTheme :props="{ button: { color: 'neutral', variant: 'link' } }">

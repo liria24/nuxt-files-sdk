@@ -11,6 +11,8 @@ export default {
     setup: (nitro: NitroIntegration) =>
         setupNitroFilesIntegration(nitro, {
             configPath: resolve(nitro.options.rootDir, 'files.config.ts'),
-            development: Boolean(nitro.options.dev),
+            environments: nitro.options.static
+                ? ['production', 'prerender']
+                : [nitro.options.dev ? 'development' : 'production'],
         }),
 }

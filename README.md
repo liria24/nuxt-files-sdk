@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="nuxt-files-sdk" src="https://shieldcn.dev/header/transparent.svg?title=Nuxt+Files+SDK&amp;subtitle=Native-first+Files+SDK+integration+for+Nuxt+and+Nitro.&amp;logo=nuxt&amp;mode=dark&amp;font=geist&amp;border=false" />
+  <img alt="nuxt-files-sdk" src="https://shieldcn.dev/header/transparent.svg?title=Nuxt+Files+SDK&amp;subtitle=Files+SDK+integration+for+Nuxt+with+DevTools.&amp;logo=nuxt&amp;mode=dark&amp;font=geist&amp;border=false" />
 </p>
 
 <p align="center">
@@ -33,6 +33,7 @@ export default defineFilesConfig({
         adapter: 'fs',
         config: { root: '.data/files-devtools' },
     },
+    $test: { storage: { adapter: 'memory' } },
 })
 ```
 

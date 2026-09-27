@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
+import { memory } from 'files-sdk/memory'
 import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
@@ -21,16 +22,16 @@ afterAll(() => Promise.all(temporaryDirectories.map((directory) => rm(directory,
 describe('provider generation', () => {
     test('[GATEWAY-001] validates explicit static routes and fixed storage selection', () => {
         const single = { storage: { adapter: 'memory' }, routes: [{ path: '/api/files' }] }
-        expect(gatewayRoutes(single, false)).toEqual(single.routes)
-        expect(gatewayRoutes({ storage: single.storage }, false)).toEqual([])
-        expect(() => gatewayRoutes({ ...single, routes: [{ path: '/api/files', storage: 'other' }] }, false)).toThrow(
+        expect(gatewayRoutes(single)).toEqual(single.routes)
+        expect(gatewayRoutes({ storage: single.storage })).toEqual([])
+        expect(() => gatewayRoutes({ ...single, routes: [{ path: '/api/files', storage: 'other' }] })).toThrow(
             'Invalid storage',
         )
         const named = { storage: { first: { adapter: 'memory' } }, routes: [{ path: '/files', storage: 'first' }] }
-        expect(gatewayRoutes(named, false)).toEqual(named.routes)
-        expect(() => gatewayRoutes({ ...named, routes: [{ path: '/files' }] }, false)).toThrow('Invalid storage')
-        expect(() => gatewayRoutes({ ...single, routes: [{ path: 'files' }] }, false)).toThrow('static absolute path')
-        expect(() => gatewayRoutes({ ...single, routes: [{ path: '/files' }, { path: '/files' }] }, false)).toThrow(
+        expect(gatewayRoutes(named)).toEqual(named.routes)
+        expect(() => gatewayRoutes({ ...named, routes: [{ path: '/files' }] })).toThrow('Invalid storage')
+        expect(() => gatewayRoutes({ ...single, routes: [{ path: 'files' }] })).toThrow('static absolute path')
+        expect(() => gatewayRoutes({ ...single, routes: [{ path: '/files' }, { path: '/files' }] })).toThrow(
             'Duplicate route',
         )
     })
@@ -49,7 +50,7 @@ describe('provider generation', () => {
                 options: { rootDir: directory, buildDir: resolve(directory, String(majorVersion)), plugins: [] },
                 hooks: { hook: vi.fn<NitroIntegration['hooks']['hook']>() },
             }
-            await setupNitroFilesIntegration(nitro, { configPath, development: false })
+            await setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })
             expect(nitro.options.handlers).toHaveLength(1)
             expect(nitro.options.handlers?.[0]?.route).toBe('/api/files')
             const handler = await readFile(nitro.options.handlers![0]!.handler, 'utf8')
@@ -62,7 +63,7 @@ describe('provider generation', () => {
     })
 
     test('[CFG-009] selects only providers used in the active runtime mode without resolving credentials', () => {
-        expect(() => selectedAdapters(undefined, true)).toThrow(
+        expect(() => selectedAdapters(undefined)).toThrow(
             '[nuxt-files-sdk:invalid-config] Files configuration must be an object.',
         )
         const runtimeConfig = vi.fn<() => { binding: never }>(() => ({ binding: undefined as never }))
@@ -71,19 +72,30 @@ describe('provider generation', () => {
                 files: { adapter: 'r2', config: runtimeConfig },
                 temporary: { adapter: 'memory' },
             },
-            devStorage: {
-                files: { adapter: 'fs', config: { root: '.data/files' } },
-            },
+            $development: { storage: { files: { adapter: 'fs', config: { root: '.data/files' } } } },
         })
 
-        expect(selectedAdapters(config, false)).toEqual({ adapters: ['memory', 'r2'], single: false })
-        expect(selectedAdapters(config, true)).toEqual({ adapters: ['fs', 'memory'], single: false })
+        expect(selectedAdapters(config)).toEqual({ adapters: ['memory', 'r2'], single: false })
+        expect(selectedAdapters({ storage: { ...config.storage, ...config.$development.storage } })).toEqual({
+            adapters: ['fs', 'memory'],
+            single: false,
+        })
         expect(runtimeConfig).not.toHaveBeenCalled()
 
         const generated = providerCode(['r2'])
         expect(generated.imports).toBe('import { r2 as provider0 } from "files-sdk/r2"')
         expect(generated.factories).toBe('"r2": provider0')
         expect(providerCode(['rustfs']).imports).toBe('import { rustfs as provider0 } from "files-sdk/rustfs"')
+    })
+
+    test('custom adapters and plugin resolvers generate no unrelated provider imports', () => {
+        const adapter = vi.fn<() => ReturnType<typeof memory>>(() => memory())
+        const plugins = vi.fn<() => []>(() => [])
+        const config = defineFilesConfig({ storage: { adapter, plugins } })
+        expect(selectedAdapters(config)).toEqual({ adapters: [], single: true })
+        expect(providerCode([])).toEqual({ imports: '', factories: '' })
+        expect(adapter).not.toHaveBeenCalled()
+        expect(plugins).not.toHaveBeenCalled()
     })
 
     test('[BUNDLE-007] shims only missing optional AWS engines on Nitro v2 workerd presets', () => {
@@ -139,51 +151,91 @@ describe('provider generation', () => {
         ).toEqual(expected.slice(1))
     })
 
-    test('[CFG-011] omits development-only storage from production integration', async () => {
-        const config = defineFilesConfig({ devStorage: { adapter: 'memory' } })
-        expect(selectedAdapters(config, true)).toEqual({ adapters: ['memory'], single: true })
-        expect(selectedAdapters(config, false)).toBeUndefined()
-        expect(
-            selectedAdapters(
-                defineFilesConfig({
-                    devStorage: {
-                        cache: { adapter: 'memory' },
-                        uploads: { adapter: 'fs', config: { root: '.data/uploads' } },
-                    },
-                }),
-                true,
-            ),
-        ).toEqual({ adapters: ['fs', 'memory'], single: false })
+    test('[BUNDLE-007] regenerates AWS shims after Nuxt clears its build directory', async () => {
+        const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-aws-shims-'))
+        temporaryDirectories.push(directory)
+        const configPath = resolve(directory, 'files.config.mjs')
+        await writeFile(configPath, `export default { storage: { adapter: 'r2' } }`)
+        const hook = vi.fn<NitroIntegration['hooks']['hook']>()
+        const nitro: NitroIntegration = {
+            meta: { majorVersion: 2 },
+            options: {
+                rootDir: directory,
+                buildDir: resolve(directory, '.nuxt'),
+                preset: 'cloudflare-module',
+                plugins: [],
+            },
+            hooks: { hook },
+        }
+
+        await setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })
+        const aliases = Object.entries(nitro.options.alias ?? {})
+        expect(aliases).toHaveLength(4)
+        for (const [dependency, path] of aliases) {
+            expect(await readFile(path, 'utf8')).toContain(dependency)
+        }
+
+        await rm(resolve(directory, '.nuxt/nuxt-files-sdk'), { recursive: true, force: true })
+        await hook.mock.calls[0]![1]({})
+        for (const [dependency, path] of aliases) {
+            expect(await readFile(path, 'utf8')).toContain(dependency)
+        }
+    })
+
+    test('R2 binding and fetch configs stay lazy with and without AWS SDK on Nitro 2 and 3', () => {
+        for (const config of [
+            { binding: {} as never },
+            {
+                bucket: 'uploads',
+                endpoint: 'https://storage.example',
+                accessKeyId: 'test',
+                secretAccessKey: 'test',
+                client: 'fetch' as const,
+            },
+        ]) {
+            const configResolver = vi.fn<() => typeof config>(() => config)
+            expect(selectedAdapters({ storage: { adapter: 'r2', config: configResolver } })).toEqual({
+                adapters: ['r2'],
+                single: true,
+            })
+            expect(configResolver).not.toHaveBeenCalled()
+            for (const nitroMajor of [2, 3]) {
+                for (const installed of [false, true]) {
+                    const shims = optionalAwsSdkDependencies(['r2'], {
+                        nitroMajor,
+                        preset: 'cloudflare-module',
+                        resolvable: () => installed,
+                    })
+                    expect(shims.length > 0).toBe(nitroMajor === 2 && !installed)
+                }
+            }
+        }
+    })
+
+    test('[CFG-011] skips an environment-only config outside its environment', async () => {
+        const config = defineFilesConfig({ $test: { storage: { adapter: 'memory' } } })
+        expect(selectedAdapters(config.$test)).toEqual({ adapters: ['memory'], single: true })
+        expect(() => selectedAdapters(config)).toThrow('At least one storage is required')
 
         const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-development-only-'))
         temporaryDirectories.push(directory)
         const configPath = resolve(directory, 'files.config.mjs')
-        await writeFile(
-            configPath,
-            `import { defineFilesConfig } from 'nuxt-files-sdk/config'
-export default defineFilesConfig({ devStorage: { adapter: 'memory' } })`,
-        )
+        await writeFile(configPath, `export default { $test: { storage: { adapter: 'memory' } } }`)
         const hook = vi.fn<NitroIntegration['hooks']['hook']>()
         const nitro: NitroIntegration = {
             options: { rootDir: directory, buildDir: directory, dev: false, plugins: [] },
             hooks: { hook },
         }
 
-        vi.stubEnv('NODE_ENV', 'production')
-        try {
-            await setupNitroFilesIntegration(nitro, { configPath, development: false })
-            const devNitro: NitroIntegration = {
-                options: { rootDir: directory, buildDir: directory, dev: true, plugins: [] },
-                hooks: { hook: vi.fn<NitroIntegration['hooks']['hook']>() },
-            }
-            await setupNitroFilesIntegration(devNitro, { configPath, development: true })
-            expect(await readFile(devNitro.options.plugins[0]!, 'utf8')).toContain('files-sdk/memory')
-        } finally {
-            vi.unstubAllEnvs()
-        }
-
+        await expect(setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })).resolves.toBe(
+            false,
+        )
         expect(nitro.options.plugins).toEqual([])
+        expect(nitro.options.handlers).toBeUndefined()
         expect(nitro.options.externals).toBeUndefined()
+        expect(hook).not.toHaveBeenCalled()
+        await expect(setupNitroFilesIntegration(nitro, { configPath, environments: ['test'] })).resolves.toBe(true)
+        expect(await readFile(nitro.options.plugins[0]!, 'utf8')).toContain('files-sdk/memory')
         expect(hook).toHaveBeenCalledOnce()
         const typesPath = resolve(directory, 'nuxt-files-sdk/storage-registry.d.ts')
         const declarations = await readFile(typesPath, 'utf8')
@@ -204,7 +256,7 @@ export default defineFilesConfig({ devStorage: { adapter: 'memory' } })`,
             configPath,
             `export default {
   storage: { adapter: 'r2', config: () => { throw new Error('production config resolved') } },
-  devStorage: { adapter: 'fs', config: { root: '.data/files' } },
+  $development: { storage: { adapter: 'fs', config: { root: '.data/files' } } },
 }`,
         )
 
@@ -214,7 +266,10 @@ export default defineFilesConfig({ devStorage: { adapter: 'memory' } })`,
                 options: { rootDir: directory, buildDir: directory, dev: development, plugins: [] },
                 hooks: { hook: (_name, callback) => (extendTypes = callback) },
             } as NitroIntegration
-            await setupNitroFilesIntegration(nitro, { configPath, development })
+            await setupNitroFilesIntegration(nitro, {
+                configPath,
+                environments: [development ? 'development' : 'production'],
+            })
             const types = {
                 tsConfig: {
                     include: [] as string[],
@@ -240,7 +295,7 @@ export default defineFilesConfig({ devStorage: { adapter: 'memory' } })`,
         expect(developmentSource).toMatch(/import \{ configureFiles \} from "[^"\n]+\/runtime\/internal\.js"/u)
         expect(developmentSource).not.toContain("from 'nuxt-files-sdk/runtime'")
         expect(productionSource).toContain('from "files-sdk/r2"')
-        expect(productionSource).toContain('configureFiles({ storage: config.storage },')
+        expect(productionSource).toContain('configureFiles(config,')
         const environment = JSON.parse(/environment: (.+),/u.exec(productionSource)![1]!) as Record<string, string[][]>
         expect(Object.keys(environment)).toEqual(['r2'])
         expect(environment.r2?.flat()).toContain('R2_ACCESS_KEY_ID')

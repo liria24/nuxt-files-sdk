@@ -89,8 +89,8 @@ describe('Nuxt DevFrame development endpoint', async () => {
             headers: { authorization },
         })
         expect(snapshot.storages).toEqual([
-            { name: 'archive', adapter: 'fs', plugins: ['versioning'], source: 'storage', initialized: true },
-            { name: 'blob', adapter: 'fs', plugins: [], source: 'devStorage', initialized: true },
+            { name: 'archive', adapter: 'fs', plugins: ['versioning'], initialized: true },
+            { name: 'blob', adapter: 'fs', plugins: [], initialized: true },
         ])
         expect(snapshot.diagnostics).toEqual([])
     })

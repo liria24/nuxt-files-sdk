@@ -1,6 +1,7 @@
 import { fs } from 'files-sdk/fs'
 import type { FsAdapter } from 'files-sdk/fs'
 import type { MemoryAdapter } from 'files-sdk/memory'
+import type { R2Adapter } from 'files-sdk/r2'
 import type { RustfsAdapter } from 'files-sdk/rustfs'
 import { versioning } from 'files-sdk/versioning'
 import { describe, expect, expectTypeOf, test } from 'vitest'
@@ -13,83 +14,55 @@ import {
 } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 describe('configuration types', () => {
-    test('[TYPE-001] preserves both providers and base plugins across environments', () => {
+    test('[TYPE-001][TYPE-013] unions adapters and retains base plugins across every environment', () => {
         const single = defineFilesConfig({
-            storage: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },
-            devStorage: { adapter: 'memory' },
+            storage: { adapter: 'r2', config: { bucket: 'files' }, plugins: [versioning()] },
+            $development: { storage: { adapter: 'fs', config: { root: '.' } } },
+            $production: { storage: { adapter: 'r2', config: { bucket: 'production' } } },
+            $test: { storage: { adapter: 'memory' } },
+            $prerender: { storage: { adapter: 'fs', config: { root: 'dist' } } },
+            $env: { preview: { storage: { adapter: 'memory' } } },
         })
+        expectTypeOf<SingleStorage<typeof single>['adapter']>().toEqualTypeOf<R2Adapter | FsAdapter | MemoryAdapter>()
+        expectTypeOf<SingleStorage<typeof single>>().toHaveProperty('versions')
+        expect(single.$env.preview.storage.adapter).toBe('memory')
+    })
+
+    test('[TYPE-001][API-002][API-003] unions named and environment-only storages', () => {
         const named = defineFilesConfig({
             storage: {
-                archive: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },
-                same: { adapter: 'fs', config: { root: '.' } },
-                untouched: { adapter: 'fs', config: { root: '.' } },
+                archive: { adapter: 'fs', config: { root: 'archive' }, plugins: [versioning()] },
+                blob: { adapter: 'memory' },
             },
-            devStorage: { archive: { adapter: 'memory' }, same: { adapter: 'fs', config: { root: './dev' } } },
+            $development: { storage: { archive: { adapter: 'memory' }, debug: { adapter: 'memory' } } },
+            $env: { staging: { storage: { blob: { adapter: 'fs', config: { root: 'staging' } } } } },
         })
-        expectTypeOf(single.devStorage!.adapter).toEqualTypeOf<'memory'>()
-        expectTypeOf<SingleStorage<typeof single>['adapter']>().toEqualTypeOf<FsAdapter | MemoryAdapter>()
-        expectTypeOf<SingleStorage<typeof single>>().toHaveProperty('versions')
         expectTypeOf<StorageRegistry<typeof named>['archive']['adapter']>().toEqualTypeOf<FsAdapter | MemoryAdapter>()
+        expectTypeOf<StorageRegistry<typeof named>['blob']['adapter']>().toEqualTypeOf<MemoryAdapter | FsAdapter>()
+        expectTypeOf<StorageRegistry<typeof named>>().toHaveProperty('debug')
         expectTypeOf<StorageRegistry<typeof named>['archive']>().toHaveProperty('versions')
-        expectTypeOf<StorageRegistry<typeof named>['same']['adapter']>().toEqualTypeOf<FsAdapter>()
-        expectTypeOf<StorageRegistry<typeof named>['untouched']['adapter']>().toEqualTypeOf<FsAdapter>()
-        expectTypeOf<
-            SingleStorage<{ storage: { adapter: 'fs'; config: { root: string } } }>['adapter']
-        >().toEqualTypeOf<FsAdapter>()
-        expectTypeOf<
-            StorageRegistry<{ storage: { archive: { adapter: 'fs'; config: { root: string } } } }>['archive']['adapter']
-        >().toEqualTypeOf<FsAdapter>()
-    })
-    test('[TYPE-001][TYPE-013][API-002][API-003] preserves single, named, provider, and plugin types', () => {
-        const single = defineFilesConfig({
-            storage: { adapter: 'fs', config: { root: '.data/files' }, plugins: [versioning()] },
-        })
-        const named = defineFilesConfig({
-            storage: {
-                archive: { adapter: 'fs', config: { root: '.data/archive' }, plugins: [versioning()] },
-                blob: { adapter: 'fs', config: { root: '.data/files' } },
-            },
-        })
-        const developmentOnly = defineFilesConfig({
-            devStorage: { adapter: 'fs', config: { root: '.data/development' }, plugins: [versioning()] },
-        })
-        const namedDevelopmentOnly = defineFilesConfig({
-            devStorage: {
-                archive: { adapter: 'fs', config: { root: '.data/development-archive' } },
-                blob: { adapter: 'fs', config: { root: '.data/development' } },
-            },
-        })
-
-        expect(single.storage.config.root).toBe('.data/files')
-        expectTypeOf<SingleStorage<typeof single>>().toHaveProperty('versions')
-        expectTypeOf<SingleStorage<typeof developmentOnly>>().toHaveProperty('versions')
-        expectTypeOf<StorageRegistry<typeof namedDevelopmentOnly>>().toHaveProperty('archive')
-        expectTypeOf<StorageRegistry<typeof named>['archive']>().toHaveProperty('versions')
-        expectTypeOf(new FilesRegistry(single, { factories: { fs } }).get()).toEqualTypeOf<
-            SingleStorage<typeof single>
-        >()
-        const namedRegistry = new FilesRegistry(named, { factories: { fs } })
-        expectTypeOf(namedRegistry.get('blob')).toEqualTypeOf<StorageRegistry<typeof named>['blob']>()
-        const assertNamedRequiresName = (): void => {
+        const registry = new FilesRegistry({ storage: named.storage }, { factories: { fs } })
+        const requiresName = (): void => {
             // @ts-expect-error named registries require a storage name
-            namedRegistry.get()
+            registry.get()
         }
-        void assertNamedRequiresName
+        void requiresName
+        const only = defineFilesConfig({ $test: { storage: { adapter: 'memory' } } })
+        expectTypeOf<SingleStorage<typeof only>['adapter']>().toEqualTypeOf<MemoryAdapter>()
     })
 
-    test('[CFG-005] accepts provider config objects and synchronous resolvers', () => {
-        const direct = defineFilesConfig({ storage: { adapter: 'fs', config: { root: '.data/files' } } })
-        const resolved = defineFilesConfig({
-            storage: { adapter: 'fs', config: () => ({ root: '.data/files', urlBaseUrl: 'https://files.test' }) },
-            devStorage: { adapter: 'memory' },
+    test('[CFG-005][GATEWAY-003] is a pure identity helper with lazy resolvers and routes', () => {
+        const config = defineFilesConfig({
+            storage: { adapter: 'fs', config: () => ({ root: '.data/files' }) },
+            routes: [{ path: '/api/files', operations: ['list'] }],
+            $development: { routes: [{ path: '/api/files', operations: ['list', 'upload'] }] },
         })
-
-        expect(direct.storage.adapter).toBe('fs')
-        expect(typeof resolved.storage.config).toBe('function')
+        expect(config.storage.adapter).toBe('fs')
+        expect(typeof config.storage.config).toBe('function')
+        expect(config.$development.routes).toHaveLength(1)
     })
 
-    test('[TYPE-014] preserves RustFS, native common options, and provider raw types', () => {
-        const controller = new AbortController()
+    test('[TYPE-014] preserves RustFS and native common options', () => {
         const rustfs = defineFilesConfig({
             storage: {
                 adapter: 'rustfs',
@@ -98,46 +71,15 @@ describe('configuration types', () => {
                 readonly: true,
                 receipts: { sha256: true },
                 retries: { max: 2, backoff: () => 0 },
-                signal: controller.signal,
-                timeout: 1000,
             },
         })
-
-        expect(rustfs.storage.adapter).toBe('rustfs')
         expectTypeOf<SingleStorage<typeof rustfs>['adapter']>().toEqualTypeOf<RustfsAdapter>()
+        expect(rustfs.storage.prefix).toBe('uploads')
     })
 
-    test('[CFG-011] strips a development-only storage safely in production', () => {
-        const nodeEnvironment = process.env.NODE_ENV
-        process.env.NODE_ENV = 'production'
-        try {
-            expect(defineFilesConfig({ devStorage: { adapter: 'memory' } })).toEqual({ storage: undefined })
-        } finally {
-            if (nodeEnvironment === undefined) delete process.env.NODE_ENV
-            else process.env.NODE_ENV = nodeEnvironment
-        }
-    })
-
-    test('[GATEWAY-003] keeps configured application routes in production', () => {
-        const nodeEnvironment = process.env.NODE_ENV
-        process.env.NODE_ENV = 'production'
-        try {
-            const routes = [{ path: '/api/files', operations: ['list'] as const }]
-            expect(defineFilesConfig({ storage: { adapter: 'memory' }, routes })).toMatchObject({ routes })
-        } finally {
-            if (nodeEnvironment === undefined) delete process.env.NODE_ENV
-            else process.env.NODE_ENV = nodeEnvironment
-        }
-    })
-
-    test('[TYPE-008] rejects unmatched development names', () => {
-        expect.assertions(0)
-        defineFilesConfig({
-            // @ts-expect-error devStorage keys must name a declared storage
-            storage: { blob: { adapter: 'fs', config: { root: '.data/files' } } },
-            devStorage: {
-                missing: { adapter: 'fs', config: { root: '.data/missing' } },
-            },
-        })
+    test('[CFG-011][TYPE-008] permits environment-only named storage', () => {
+        const config = defineFilesConfig({ $test: { storage: { debug: { adapter: 'memory' } } } })
+        expectTypeOf<StorageRegistry<typeof config>>().toHaveProperty('debug')
+        expect(config.$test.storage.debug.adapter).toBe('memory')
     })
 })

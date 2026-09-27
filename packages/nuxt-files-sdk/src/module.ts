@@ -37,19 +37,25 @@ export default defineNuxtModule<ModuleOptions>({
         ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
         const paths = ((nuxt.options.typescript.tsConfig.compilerOptions ??= {}).paths ??= {})
         paths['files-sdk'] ??= [resolve(nuxt.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
-        nuxt.hook('nitro:init', (nitro) =>
-            setupNitroFilesIntegration(nitro, {
+        let active = false
+        nuxt.hook('nitro:init', async (nitro) => {
+            active = await setupNitroFilesIntegration(nitro, {
                 configPath,
-                development: nuxt.options.dev,
-            }),
-        )
+                environments: nitro.options.static
+                    ? ['production', 'prerender']
+                    : [nuxt.options.envName || (nuxt.options.dev ? 'development' : 'production')],
+            })
+        })
         nuxt.hook('prepare:types', ({ references }) => {
-            references.push({ path: resolve(nuxt.options.buildDir, 'nuxt-files-sdk/storage-registry.d.ts') })
+            if (active)
+                references.push({ path: resolve(nuxt.options.buildDir, 'nuxt-files-sdk/storage-registry.d.ts') })
         })
 
         addServerImports([
             { name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' },
             { name: 'useServerFiles', from: 'nuxt-files-sdk/runtime' },
+            { name: 'syncFiles', from: 'nuxt-files-sdk/runtime' },
+            { name: 'transferFiles', from: 'nuxt-files-sdk/runtime' },
         ])
         addImports({ name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' })
         for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {
