@@ -122,10 +122,17 @@ test('auto-import injection works and provider resolvers remain lazy', async () 
 })
 
 test('generated config source excludes inactive environment literals', () => {
-    const source = `import { versioning } from './plugins'\nexport default defineFilesConfig({ storage: { adapter: 'memory' }, $development: { storage: { adapter: 'fs', config: { root: 'DEV_SECRET' } } }, $env: { staging: { storage: { adapter: 'memory', prefix: 'staging' } }, preview: { storage: { adapter: 'memory', prefix: 'PREVIEW_SECRET' } } } })`
-    const selected = pruneFilesConfigSource(source, 'E:/project/files.config.ts', ['staging'])
+    const source = `// 😀\nimport { versioning } from './plugins'\nconst files = (({ storage: { adapter: 'memory' }, $production: { storage: { adapter: 'memory', prefix: 'production' } }, $development: { storage: { adapter: 'fs', config: { root: 'DEV_SECRET' } } }, $env: { staging: { storage: { adapter: 'memory', prefix: 'staging' } }, preview: { storage: { adapter: 'memory', prefix: 'PREVIEW_SECRET' } } } } as const) satisfies object)\nexport default files`
+    const selected = pruneFilesConfigSource(source, 'E:/project/files.config.ts', ['production', 'staging'])
     expect(selected).not.toContain('DEV_SECRET')
     expect(selected).not.toContain('PREVIEW_SECRET')
+    expect(selected).toContain("prefix: 'production'")
     expect(selected).toContain("prefix: 'staging'")
     expect(selected).toContain('E:/project/plugins')
+})
+
+test('generated config source rejects parser errors', () => {
+    expect(() => pruneFilesConfigSource('export default { storage:', 'files.config.ts', [])).toThrow(
+        '[nuxt-files-sdk:invalid-config]',
+    )
 })

@@ -14,12 +14,12 @@ export default defineConfig([
             onlyImport: [
                 '@nuxt/kit',
                 '@nuxt/devtools-kit',
-                '@babel/parser',
                 'c12',
                 'devframe',
                 'files-sdk',
                 'h3',
                 'jiti',
+                'oxc-parser',
                 'node:crypto',
                 'node:fs',
                 'node:fs/promises',
