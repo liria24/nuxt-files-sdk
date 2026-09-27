@@ -227,9 +227,9 @@ export const setupNitroFilesIntegration = async (
         name: 'nuxt-files-sdk-jsdoc',
         declaration: (declarations) =>
             declarations.replace(
-                /^([ \t]*)const (useServerFiles|syncFiles|transferFiles): typeof .*\.\2$/gmu,
+                /^([ \t]*)const (defineFilesConfig|useServerFiles|syncFiles|transferFiles): typeof .*\.\2$/gmu,
                 (_, indent: string, name: string) =>
-                    `${name === 'useServerFiles' ? `${indent}/** Return the project's Files client, including its configured plugin extensions. */\n` : ''}${indent}const ${name}: typeof import('nuxt-files-sdk/runtime').${name}`,
+                    `${name === 'useServerFiles' ? `${indent}/** Return the project's Files client, including its configured plugin extensions. */\n` : ''}${indent}const ${name}: typeof import('nuxt-files-sdk/${name === 'defineFilesConfig' ? 'config' : 'runtime'}').${name}`,
             ),
     })
     // Inline both packages so installed consumers also tree-shake the plugin barrel.
