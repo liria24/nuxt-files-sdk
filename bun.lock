@@ -58,12 +58,12 @@
       "name": "nuxt-files-sdk",
       "version": "0.1.1",
       "dependencies": {
-        "@babel/parser": "^7.29.9",
         "@nuxt/devtools-kit": "4.0.0-beta.2",
         "@nuxt/kit": "^4.5.2",
         "c12": "^3.3.4",
         "devframe": "^1.1.0",
         "jiti": "^2.7.0",
+        "oxc-parser": "^0.150.0",
       },
       "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.5",

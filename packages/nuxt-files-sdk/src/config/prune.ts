@@ -1,6 +1,6 @@
 import { dirname, resolve } from 'node:path'
 
-import { parse } from '@babel/parser'
+import { parseSync } from 'oxc-parser'
 
 interface SyntaxNode {
     type: string
@@ -30,11 +30,13 @@ const keyOf = (node: SyntaxNode): string | undefined =>
 
 /** Remove inactive environment literals before bundling the user config. */
 export const pruneFilesConfigSource = (source: string, configPath: string, environments: readonly string[]): string => {
-    // Babel's node union is wider than the fields inspected here.
+    const parsed = parseSync(configPath, source, { sourceType: 'module', lang: 'ts' })
+    if (parsed.errors.length > 0) {
+        throw new Error(`[nuxt-files-sdk:invalid-config] ${parsed.errors[0]!.message}`)
+    }
+    // Oxc's node union is wider than the fields inspected here.
     // oxlint-disable typescript/no-unsafe-type-assertion
-    const body = (
-        parse(source, { sourceType: 'module', plugins: ['typescript'] }) as unknown as { program: SyntaxNode }
-    ).program.body!
+    const body = (parsed.program as unknown as SyntaxNode).body!
     // oxlint-enable typescript/no-unsafe-type-assertion
     const exported = body.find((node) => node.type === 'ExportDefaultDeclaration')?.declaration
     if (!exported) throw new Error('[nuxt-files-sdk:invalid-config] files.config.ts needs a default export.')
