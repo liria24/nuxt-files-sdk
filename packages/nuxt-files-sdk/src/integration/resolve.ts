@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { resolveModulePath } from 'exsolve'
-import { resolveModule } from 'local-pkg'
+import { getPackageInfoSync, resolveModule } from 'local-pkg'
 import { exports as resolveExports } from 'resolve.exports'
 
 export interface PackageManifest {
@@ -30,21 +30,20 @@ const packageName = (specifier: string): string =>
         .slice(0, specifier.startsWith('@') ? 2 : 1)
         .join('/')
 
-/** Discover metadata without local-pkg's getPackageInfo/isPackageExists error logging. */
+/** Resolve first to keep local-pkg silent when an optional dependency is absent. */
 export const packageInfo = (specifier: string, from: URL): PackageInfo | undefined => {
     const name = packageName(specifier)
     const entry = resolveModule(specifier, { paths: [from.href] })
-    const candidates: string[] = []
     if (entry) {
-        for (let directory = dirname(entry); dirname(directory) !== directory; directory = dirname(directory)) {
-            candidates.push(join(directory, 'package.json'))
+        const info = getPackageInfoSync(entry)
+        if (info?.packageJson.name === name) {
+            const manifestPath = realpathSync(info.packageJsonPath)
+            return { manifest: info.packageJson as PackageManifest, manifestPath, root: dirname(manifestPath) }
         }
     }
     // A package can expose only subpaths. Failed root resolution does not prove absence.
     for (const directory of createRequire(from).resolve.paths(name) ?? []) {
-        candidates.push(join(directory, name, 'package.json'))
-    }
-    for (const path of candidates) {
+        const path = join(directory, name, 'package.json')
         if (!existsSync(path)) continue
         const manifest: PackageManifest = JSON.parse(readFileSync(path, 'utf8'))
         if (manifest.name !== name) continue
@@ -58,7 +57,10 @@ export const resolvePackage = (
     specifier: string,
     from: URL,
     conditions: string[] = ['node', 'import'],
-): { status: 'resolved' | 'missing' | 'unresolved'; entry?: string; package?: PackageInfo } => {
+):
+    | { status: 'resolved'; entry: string; package: PackageInfo }
+    | { status: 'unresolved'; package: PackageInfo }
+    | { status: 'missing' } => {
     const info = packageInfo(specifier, from)
     if (!info) return { status: 'missing' }
     const entry = publicEntry(info, specifier, conditions)
@@ -69,7 +71,7 @@ export const resolvePackage = (
 
 export const resolveOwnedSdk = (from = import.meta.url): PackageInfo => {
     const result = resolvePackage('files-sdk', new URL(from))
-    if (result.status !== 'resolved' || !result.package) {
+    if (result.status !== 'resolved') {
         throw new Error('[nuxt-files-sdk:sdk-resolution] The owned Files SDK dependency could not be resolved.')
     }
     return result.package

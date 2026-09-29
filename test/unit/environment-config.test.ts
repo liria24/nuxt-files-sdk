@@ -77,7 +77,7 @@ test('provider switches discard old config; common options inherit and arrays re
     )
 })
 
-test('named environments override one storage and add environment-only names', async () => {
+test('[CFG-011] named environments override one storage and add environment-only names', async () => {
     const config = (await load(
         `export default {
       storage: { uploads: { adapter: 'memory' }, archive: { adapter: 'memory' } },
@@ -103,6 +103,26 @@ test('named environments override one storage and add environment-only names', a
     await expect(
         load(`export default { storage: {}, $test: { storage: { adapter: 'memory' } } }`, ['production']),
     ).rejects.toThrow('At least one storage')
+})
+
+test('direct and named overrides merge before the next environment, matching generated runtime resolution', async () => {
+    const raw = {
+        storage: { uploads: { adapter: 'r2', config: { bucket: 'base' }, prefix: 'base', plugins: [] } },
+        $production: { storage: { uploads: { config: { bucket: 'production' } }, archive: { adapter: 'memory' } } },
+        $env: {
+            production: { storage: { uploads: { prefix: 'production' } } },
+            prerender: { storage: { uploads: { config: { root: 'named' } } } },
+        },
+        $prerender: { storage: { uploads: { adapter: 'fs', config: { root: 'direct' } } } },
+    }
+    const config = await load(`export default ${JSON.stringify(raw)}`, ['production', 'prerender'])
+    const runtime = mergeFilesConfig(raw.$env.prerender, raw.$prerender, raw.$env.production, raw.$production, raw)
+    expect(config!.storage).toEqual(runtime.storage)
+    expect(config!.storage).toEqual({
+        uploads: { adapter: 'fs', config: { root: 'named' }, prefix: 'production', plugins: [] },
+        archive: { adapter: 'memory' },
+    })
+    expect(Object.keys(config!)).toEqual(['storage'])
 })
 
 test('auto-import injection works and provider resolvers remain lazy', async () => {

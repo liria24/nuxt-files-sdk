@@ -41,7 +41,7 @@ export const diagnoseDependencies = (
             requirement.conditions,
         )
         if (resolved.status !== 'resolved') return { ...base, status: resolved.status }
-        const version = resolved.package?.manifest.version
+        const version = resolved.package.manifest.version
         if (!version || !range) return { ...base, status: 'unknown' }
         try {
             return { ...base, version, status: satisfies(version, range) ? 'satisfied' : 'incompatible' }
