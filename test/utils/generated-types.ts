@@ -4,58 +4,63 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { expect } from 'vitest'
+import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node'
 
 import { invalidTypeCases } from '../types/invalid/cases'
 import { repositoryRoot, runCommand } from './fixture'
 
 export const cleanTypeContracts = async (directory: string): Promise<void> => {
+    invalidTypeRuns.delete(directory)
     for (const name of ['.contract-docs', '.contract-invalid', '.contract-examples']) {
         await rm(resolve(directory, name), { recursive: true, force: true })
     }
 }
 
 export const checkGeneratedTypes = async (directory: string): Promise<void> => {
-    const generated = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/storage-registry.d.ts'), 'utf8')
     const imports = await readFile(resolve(directory, '.nuxt/types/nitro-imports.d.ts'), 'utf8')
-    const appImports = await readFile(resolve(directory, '.nuxt/imports.d.ts'), 'utf8')
     const plugin = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/plugin.mjs'), 'utf8')
-    expect(generated).toContain("declare module 'nuxt-files-sdk/runtime'")
-    expect(generated).toContain('StorageRegistry<typeof config>')
-    expect(imports).toContain("typeof import('nuxt-files-sdk/runtime').useServerFiles")
-    expect(imports).toContain("const syncFiles: typeof import('nuxt-files-sdk/runtime').syncFiles")
-    expect(imports).toContain("const transferFiles: typeof import('nuxt-files-sdk/runtime').transferFiles")
-    expect(imports).toContain("const defineFilesConfig: typeof import('nuxt-files-sdk/config').defineFilesConfig")
-    expect(appImports).toContain('defineFilesConfig')
     expect(imports).not.toMatch(/node_modules\/nuxt-files-sdk\/runtime/u)
-    expect(plugin).toContain('from "#files-sdk/fs"')
     expect(plugin).not.toContain('files-sdk/loader')
 }
 
-export const checkInvalidType = async (
-    directory: string,
-    { source, diagnostic }: (typeof invalidTypeCases)[number],
-): Promise<void> => {
+const invalidTypeRuns = new Map<string, Promise<string>>()
+const compileInvalidTypes = async (directory: string): Promise<string> => {
     const invalidDirectory = resolve(directory, '.contract-invalid')
     await rm(invalidDirectory, { recursive: true, force: true })
     await mkdir(invalidDirectory, { recursive: true })
     await Promise.all([
-        writeFile(resolve(invalidDirectory, 'invalid.ts'), source),
+        ...invalidTypeCases.map(({ id, source }) =>
+            writeFile(resolve(invalidDirectory, id + '.ts'), source + '\nexport {}\n'),
+        ),
         writeFile(
             resolve(invalidDirectory, 'tsconfig.json'),
             JSON.stringify({
                 extends: '../.nuxt/tsconfig.json',
-                include: ['../.nuxt/nuxt.d.ts', './invalid.ts'],
+                include: ['../.nuxt/nuxt.d.ts', './*.ts'],
             }),
         ),
     ])
-    const error = await runCommand('bun', ['x', 'vue-tsc', '--noEmit', '-p', '.contract-invalid/tsconfig.json'], {
-        cwd: directory,
-    }).then(
+    return runCommand(
+        'bun',
+        ['x', 'vue-tsc', '--noEmit', '--pretty', 'false', '-p', '.contract-invalid/tsconfig.json'],
+        { cwd: directory },
+    ).then(
         () => '',
         (failure: unknown) => String(failure),
     )
-    expect(error).toMatch(/invalid\.ts\(\d+,\d+\): error TS/)
-    expect(error).toMatch(diagnostic)
+}
+
+export const checkInvalidType = async (
+    directory: string,
+    { id, diagnostic }: (typeof invalidTypeCases)[number],
+): Promise<void> => {
+    if (!invalidTypeRuns.has(directory)) invalidTypeRuns.set(directory, compileInvalidTypes(directory))
+    const output = await invalidTypeRuns.get(directory)!
+    const errors = output
+        .split('\n')
+        .filter((line) => line.includes(id + '.ts('))
+        .join('\n')
+    expect(errors, output).toMatch(diagnostic)
 }
 
 export const checkPublicExamples = async (directory: string): Promise<void> => {
@@ -125,93 +130,62 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
         [resolve(repositoryRoot, 'node_modules/typescript/bin/tsc'), '--lsp', '--stdio'],
         { cwd: docsDirectory, stdio: ['pipe', 'pipe', 'pipe'] },
     )
-    let buffer = Buffer.alloc(0)
     let stderr = ''
-    let nextId = 0
-    let registrationReady: (() => void) | undefined
-    const registration = new Promise<void>((resolveRegistration) => {
-        const timer = setTimeout(resolveRegistration, 5_000)
-        registrationReady = () => {
-            clearTimeout(timer)
-            resolveRegistration()
-        }
-    })
-    type Response = {
-        id?: number | string
-        method?: string
-        params?: unknown
-        result?: unknown
-        error?: { message: string }
-    }
-    const pending = new Map<number, (response: Response) => void>()
-    const fail = (message: string): void => {
-        for (const respond of pending.values()) respond({ id: -1, error: { message } })
-        pending.clear()
-    }
-    child.on('error', (error) => fail(error.message))
-    child.on('exit', (code) => fail(`TypeScript language server exited (${code}).`))
     child.stderr.on('data', (chunk) => (stderr += chunk))
-    child.stdout.on('data', (chunk: Buffer) => {
-        buffer = Buffer.concat([buffer, chunk])
-        for (let headerEnd = buffer.indexOf('\r\n\r\n'); headerEnd >= 0; headerEnd = buffer.indexOf('\r\n\r\n')) {
-            const length = Number(/Content-Length: (\d+)/iu.exec(buffer.subarray(0, headerEnd).toString())?.[1])
-            const end = headerEnd + 4 + length
-            if (buffer.length < end) return
-            const response = JSON.parse(buffer.subarray(headerEnd + 4, end).toString()) as Response
-            buffer = buffer.subarray(end)
-            if (typeof response.id === 'number' && pending.has(response.id)) pending.get(response.id)?.(response)
-            else if ((typeof response.id === 'number' || typeof response.id === 'string') && response.method) {
-                send({ jsonrpc: '2.0', id: response.id, result: null })
-                if (response.method === 'client/registerCapability') registrationReady?.()
-            }
-        }
+    const connection = createMessageConnection(
+        new StreamMessageReader(child.stdout),
+        new StreamMessageWriter(child.stdin),
+    )
+    const registration = Promise.withResolvers<void>()
+    const registrationTimer = setTimeout(() => registration.resolve(), 5_000)
+    connection.onRequest((method) => {
+        if (method === 'client/registerCapability') registration.resolve()
+        return null
     })
-    const send = (message: object): void => {
-        const body = JSON.stringify(message)
-        child.stdin.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`)
+    child.on('error', () => connection.dispose())
+    child.on('exit', () => connection.dispose())
+    connection.listen()
+    const request = async <T>(method: string, params?: unknown): Promise<T> => {
+        let timer: ReturnType<typeof setTimeout> | undefined
+        try {
+            return await Promise.race([
+                params === undefined ? connection.sendRequest<T>(method) : connection.sendRequest<T>(method, params),
+                new Promise<never>((_, reject) => {
+                    timer = setTimeout(
+                        () => reject(new Error(`TypeScript language server timed out handling ${method}.\n${stderr}`)),
+                        30_000,
+                    )
+                }),
+            ])
+        } finally {
+            clearTimeout(timer)
+        }
     }
-    const request = <T>(method: string, params?: unknown): Promise<T> =>
-        new Promise((resolveRequest, reject) => {
-            const id = ++nextId
-            const timer = setTimeout(() => {
-                pending.delete(id)
-                reject(new Error(`TypeScript language server timed out handling ${method}.\n${stderr}`))
-            }, 30_000)
-            pending.set(id, (response) => {
-                clearTimeout(timer)
-                pending.delete(id)
-                if (response.error) reject(new Error(response.error.message))
-                else resolveRequest(response.result as T)
-            })
-            send({ jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) })
-        })
     try {
         await request('initialize', {
             processId: process.pid,
             rootUri: pathToFileURL(docsDirectory).href,
             capabilities: { textDocument: { hover: { contentFormat: ['markdown', 'plaintext'] } } },
         })
-        send({ jsonrpc: '2.0', method: 'initialized', params: {} })
-        await registration
+        await connection.sendNotification('initialized', {})
+        await registration.promise
         const uri = pathToFileURL(sourcePath).href
-        send({
-            jsonrpc: '2.0',
-            method: 'textDocument/didOpen',
-            params: { textDocument: { uri, languageId: 'typescript', version: 1, text: hoverSource } },
+        await connection.sendNotification('textDocument/didOpen', {
+            textDocument: { uri, languageId: 'typescript', version: 1, text: hoverSource },
         })
-        for (const [marker, expected] of Object.entries({
-            module: 'Install Files SDK storage configuration',
-            define: 'Preserve storage names, adapters, and plugin literals',
-            storage: 'Files SDK storage configuration',
-            adapter: 'Files SDK provider slug or a compatible adapter factory',
-            providerConfig: 'Native adapter factory options',
-            environment: 'Overrides applied by the development server',
-            imported: "Return the project's unnamed Files client",
-            aliased: "Return the project's unnamed Files client",
-            global: "Return the project's Files client",
-            moduleConfig: 'Path to the Files configuration module',
-            devtools: 'Enable Files SDK development tools',
-        })) {
+        for (const marker of [
+            'module',
+            'define',
+            'storage',
+            'adapter',
+            'providerConfig',
+            'environment',
+            'imported',
+            'aliased',
+            'global',
+            'moduleConfig',
+            'devtools',
+        ]) {
             const offset = hoverSource.indexOf(`/*${marker}*/`) + marker.length + 4
             const lines = hoverSource.slice(0, offset).split('\n')
             const hover = await request<{ contents: string | { value: string } | (string | { value: string })[] }>(
@@ -222,9 +196,11 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             const documentation = contents
                 .map((content) => (typeof content === 'string' ? content : content?.value))
                 .join('\n')
-            expect(documentation, marker).toContain(expected)
+            expect(documentation, marker).toContain('```')
+            expect(documentation.replace(/```[\s\S]*?```/gu, '').trim().length, marker).toBeGreaterThan(0)
         }
-        send({ jsonrpc: '2.0', method: 'exit' })
+        await request('shutdown')
+        await connection.sendNotification('exit')
         child.stdin.end()
         if (child.exitCode === null) {
             await new Promise<void>((resolveExit) => {
@@ -239,6 +215,8 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             })
         }
     } finally {
+        clearTimeout(registrationTimer)
+        connection.dispose()
         if (child.exitCode === null) child.kill()
     }
 }

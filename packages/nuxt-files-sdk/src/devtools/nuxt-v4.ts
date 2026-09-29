@@ -1,3 +1,5 @@
+// Load the official Nuxt hook augmentation without a runtime dependency on the kit.
+// oxlint-disable-next-line import/no-empty-named-blocks, unicorn/require-module-specifiers
 import type {} from '@nuxt/devtools-kit'
 import type { Nuxt } from '@nuxt/schema'
 import { createEmbedded } from 'devframe/adapters/embedded'

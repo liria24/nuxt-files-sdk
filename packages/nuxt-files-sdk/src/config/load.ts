@@ -61,7 +61,7 @@ export const loadFilesConfig = async ({
             return jiti.evalModule(code, { filename: id, async: true })
         },
     })
-    if (config.storage === undefined && layers?.some(({ config }) => config && hasEnvironmentStorage(config)))
+    if (config.storage === undefined && layers?.some(({ config: layer }) => layer && hasEnvironmentStorage(layer)))
         return undefined
     normalizeFilesConfig(config)
     // Storage is validated above; route validation follows during preparation.

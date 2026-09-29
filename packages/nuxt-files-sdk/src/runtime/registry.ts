@@ -159,11 +159,10 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
                 ...(name === undefined ? {} : { name }),
                 adapter: typeof storage.adapter === 'string' ? storage.adapter : 'custom',
                 plugins:
-                    pluginNames ??
-                    (Array.isArray(storage.plugins) ? storage.plugins.map((plugin) => plugin.name) : []),
+                    pluginNames ?? (Array.isArray(storage.plugins) ? storage.plugins.map((plugin) => plugin.name) : []),
                 initialized: !!files,
             })),
-            diagnostics: [...this.#entries.values()].flatMap(({ diagnostic }) => diagnostic ? [diagnostic] : []),
+            diagnostics: [...this.#entries.values()].flatMap(({ diagnostic }) => (diagnostic ? [diagnostic] : [])),
             dependencies: this.#dependencies,
         }
     }

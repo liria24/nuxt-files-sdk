@@ -90,16 +90,22 @@ type EnvironmentStorage<T> =
     | StorageOf<T extends { $prerender: infer E } ? E : never>
     | StorageOf<T extends { $env: infer E } ? E[keyof E] : never>
 type OverrideEntry<Base, Override> = Omit<Base, keyof Override> & Override
- type OverrideStorage<Base, Override> = Override extends { adapter: unknown }
+type OverrideStorage<Base, Override> = Override extends { adapter: unknown }
     ? OverrideEntry<Base, Override>
     : Override extends object
-      ? { [K in keyof Base | keyof Override]: K extends keyof Override
-          ? OverrideEntry<K extends keyof Base ? Base[K] : {}, Override[K]>
-          : K extends keyof Base ? Base[K] : never }
+      ? {
+            [K in keyof Base | keyof Override]: K extends keyof Override
+                ? OverrideEntry<K extends keyof Base ? Base[K] : {}, Override[K]>
+                : K extends keyof Base
+                  ? Base[K]
+                  : never
+        }
       : never
 
 /** Possible storage shapes after inheriting common options into each environment. */
-export type StorageBranches<T> = StorageOf<T> | OverrideStorage<[StorageOf<T>] extends [never] ? {} : StorageOf<T>, EnvironmentStorage<T>>
+export type StorageBranches<T> =
+    | StorageOf<T>
+    | OverrideStorage<[StorageOf<T>] extends [never] ? {} : StorageOf<T>, EnvironmentStorage<T>>
 export type StorageNames<T> =
     StorageBranches<T> extends infer S
         ? S extends { adapter: unknown }

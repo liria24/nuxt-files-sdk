@@ -37,7 +37,9 @@ test('[CFG-006][ERR-002] failed provider construction makes no HTTP or alternate
 
 test('[CFG-007][ERR-002] native operation failures never switch storage or wrap the error', async () => {
     const failure = new FilesError('Unauthorized', 'Provider denied the operation')
-    const selected = vi.fn<() => ReturnType<typeof fs>>(() => fs({ root: '.data/unused' }))
+    const adapter = fs({ root: '.data/unused' })
+    vi.spyOn(adapter, 'upload').mockRejectedValue(failure)
+    const selected = vi.fn<() => typeof adapter>(() => adapter)
     const fallback = vi.fn<() => ReturnType<typeof fs>>(() => fs({ root: '.data/unused' }))
     const registry = new FilesRegistry(
         {

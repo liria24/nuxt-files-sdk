@@ -24,7 +24,11 @@ const field = (object: unknown, key: string): unknown => {
 }
 
 /** Pure structural analysis: never calls config resolvers, clients, factories or credentials. */
-export const storageDependencies = (entry: StorageEntry, target: FilesTarget, imports: readonly DependencyRequirement[]): DependencyRequirement[] => {
+export const storageDependencies = (
+    entry: StorageEntry,
+    target: FilesTarget,
+    imports: readonly DependencyRequirement[],
+): DependencyRequirement[] => {
     const adapter = entry.storage.adapter
     if (typeof adapter !== 'string') return []
     const subpath = `files-sdk/${adapter}`
@@ -41,7 +45,10 @@ export const storageDependencies = (entry: StorageEntry, target: FilesTarget, im
         stage,
         reason,
     })
-    const result = imports.map((entryImport) => ({ ...entryImport, ...(entry.name === undefined ? {} : { storage: entry.name }) }))
+    const result = imports.map((entryImport) => ({
+        ...entryImport,
+        ...(entry.name === undefined ? {} : { storage: entry.name }),
+    }))
     let usesAws: boolean | undefined = imports.some(({ dependency }) => dependency === '@aws-sdk/client-s3')
     if (adapter === 'r2' || adapter === 'minio' || adapter === 'rustfs') {
         const binding = adapter === 'r2' ? field(entry.storage.config, 'binding') : undefined
