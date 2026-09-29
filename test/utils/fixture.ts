@@ -198,9 +198,6 @@ export const copyPackedConsumer = async (fixture: string, directory: string, tar
     }
     packageJson.dependencies['nuxt-files-sdk'] = `file:${tarball.replaceAll('\\', '/')}`
     delete packageJson.dependencies['files-sdk']
-    if (process.env.NUXT_FILES_SDK_VERSION) {
-        packageJson.dependencies['files-sdk'] = process.env.NUXT_FILES_SDK_VERSION
-    }
     if (fixture === 'nuxt4' && process.env.NUXT_FILES_NUXT_VERSION) {
         packageJson.dependencies.nuxt = process.env.NUXT_FILES_NUXT_VERSION
     }

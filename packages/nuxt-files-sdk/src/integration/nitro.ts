@@ -130,7 +130,7 @@ export const providerCode = (adapters: ProviderSlug[]): { imports: string; facto
     imports: adapters
         .map(
             (adapter, index) =>
-                `import { ${factoryName(adapter)} as provider${index} } from ${JSON.stringify(`files-sdk/${adapter}`)}`,
+                `import { ${factoryName(adapter)} as provider${index} } from ${JSON.stringify(`#files-sdk/${adapter}`)}`,
         )
         .join('\n'),
     factories: adapters.map((adapter, index) => `${JSON.stringify(adapter)}: provider${index}`).join(', '),
@@ -139,9 +139,9 @@ export const providerCode = (adapters: ProviderSlug[]): { imports: string; facto
 const hookTypes = (moduleName: 'nitropack/types' | 'nitro/types'): string => `
 declare module ${JSON.stringify(moduleName)} {
   interface NitroRuntimeHooks {
-    'files:action': (payload: { event: import('files-sdk').FilesActionEvent; storage?: string }) => void | Promise<void>
-    'files:error': (payload: { event: import('files-sdk').FilesErrorEvent; storage?: string }) => void | Promise<void>
-    'files:retry': (payload: { event: import('files-sdk').FilesRetryEvent; storage?: string }) => void | Promise<void>
+    'files:action': (payload: { event: import('#files-sdk').FilesActionEvent; storage?: string }) => void | Promise<void>
+    'files:error': (payload: { event: import('#files-sdk').FilesErrorEvent; storage?: string }) => void | Promise<void>
+    'files:retry': (payload: { event: import('#files-sdk').FilesRetryEvent; storage?: string }) => void | Promise<void>
   }
 }
 `
@@ -201,7 +201,6 @@ export const setupNitroFilesIntegration = async (
         ;(tsConfig.include ??= []).push(typesPath)
         const paths = ((tsConfig.compilerOptions ??= {}).paths ??= {})
         Object.assign(paths, sdkTypePaths(sdk))
-        paths['files-sdk'] ??= [resolve(nitro.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
     })
     const routes = gatewayRoutes(config)
     const { adapters } = selected
@@ -317,8 +316,8 @@ export default (nitroApp) => configureFiles(config, {
                 return writeFile(
                     path,
                     `import config from ${JSON.stringify(resolvedPath.replaceAll('\\', '/'))}
-import { createFilesRouter } from 'files-sdk/api'
-${nitroMajorVersion(nitro) >= 3 ? '' : "import { createRouteHandler } from 'files-sdk/nitro'"}
+import { createFilesRouter } from '#files-sdk/api'
+${nitroMajorVersion(nitro) >= 3 ? '' : "import { createRouteHandler } from '#files-sdk/nitro'"}
 import { getFiles } from ${JSON.stringify(internalPath)}
 
 const route = config.routes[${index}]

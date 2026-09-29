@@ -50,7 +50,7 @@ describe('Bundle contract', () => {
 
     test('[BUNDLE-003] fs-only output excludes unrelated native SDKs', () => {
         expect(paths.filter((path) => /node_modules\/(?:@aws-sdk|@azure|@google-cloud)\//u.test(path))).toEqual([])
-        expect(generatedOutput).toContain('from "files-sdk/fs"')
+        expect(generatedOutput).toContain('from "#files-sdk/fs"')
         for (const provider of ['appwrite', 'azure', 'gcs', 'google-drive', 'r2', 's3']) {
             expect(generatedOutput).not.toContain(`files-sdk/${provider}`)
         }

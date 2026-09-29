@@ -110,9 +110,9 @@ describe('Packed consumer', () => {
             peerDependenciesMeta: Record<string, { optional?: boolean }>
         }
         expect(Object.keys(packageJson.exports)).toEqual(['.', './config', './nitro', './runtime', './package.json'])
-        expect(packageJson.dependencies['files-sdk']).toBeUndefined()
-        expect(packageJson.devDependencies['files-sdk']).toBe('^2.6.2')
-        expect(packageJson.peerDependencies['files-sdk']).toBe('^2.6.0')
+        expect(packageJson.dependencies['files-sdk']).toBe('2.6.2')
+        expect(packageJson.devDependencies['files-sdk']).toBeUndefined()
+        expect(packageJson.peerDependencies['files-sdk']).toBeUndefined()
         expect(packageJson.peerDependenciesMeta['files-sdk']).toBeUndefined()
         expect(JSON.stringify(packageJson.dependencies)).not.toMatch(/@aws-sdk|@azure|@google-cloud/u)
     })
@@ -133,7 +133,7 @@ describe('Packed consumer', () => {
         const consumerPackage = JSON.parse(await readFile(resolve(consumer, 'package.json'), 'utf8')) as {
             dependencies: Record<string, string>
         }
-        expect(consumerPackage.dependencies['files-sdk']).toBe(process.env.NUXT_FILES_SDK_VERSION)
+        expect(consumerPackage.dependencies['files-sdk']).toBeUndefined()
         await installConsumer(consumer)
         const runtimeExports = await runCommand(
             'node',

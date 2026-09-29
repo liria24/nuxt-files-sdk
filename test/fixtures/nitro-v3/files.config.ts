@@ -1,5 +1,5 @@
-import { memory } from 'files-sdk/memory'
-import { versioning } from 'files-sdk/versioning'
+import { memory } from '#files-sdk/memory'
+import { versioning } from '#files-sdk/versioning'
 import { defineFilesConfig } from 'nuxt-files-sdk/config'
 
 const custom = () => memory()

@@ -27,7 +27,7 @@ export const checkGeneratedTypes = async (directory: string): Promise<void> => {
     expect(imports).toContain("const defineFilesConfig: typeof import('nuxt-files-sdk/config').defineFilesConfig")
     expect(appImports).toContain('defineFilesConfig')
     expect(imports).not.toMatch(/node_modules\/nuxt-files-sdk\/runtime/u)
-    expect(plugin).toContain('from "files-sdk/fs"')
+    expect(plugin).toContain('from "#files-sdk/fs"')
     expect(plugin).not.toContain('files-sdk/loader')
 }
 

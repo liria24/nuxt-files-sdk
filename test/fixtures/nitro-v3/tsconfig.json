@@ -1,10 +1,8 @@
 {
+    "extends": ["nitro/tsconfig", "./node_modules/.nitro/nuxt-files-sdk/tsconfig.json"],
     "compilerOptions": {
         "module": "Preserve",
         "moduleResolution": "Bundler",
-        "paths": {
-            "files-sdk": ["./node_modules/files-sdk"]
-        },
         "skipLibCheck": true,
         "strict": true,
         "target": "ESNext"

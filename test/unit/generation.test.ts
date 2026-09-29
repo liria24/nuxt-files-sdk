@@ -83,9 +83,9 @@ describe('provider generation', () => {
         expect(runtimeConfig).not.toHaveBeenCalled()
 
         const generated = providerCode(['r2'])
-        expect(generated.imports).toBe('import { r2 as provider0 } from "files-sdk/r2"')
+        expect(generated.imports).toBe('import { r2 as provider0 } from "#files-sdk/r2"')
         expect(generated.factories).toBe('"r2": provider0')
-        expect(providerCode(['rustfs']).imports).toBe('import { rustfs as provider0 } from "files-sdk/rustfs"')
+        expect(providerCode(['rustfs']).imports).toBe('import { rustfs as provider0 } from "#files-sdk/rustfs"')
     })
 
     test('custom adapters and plugin resolvers generate no unrelated provider imports', () => {
@@ -277,9 +277,8 @@ describe('provider generation', () => {
                 },
             }
             await extendTypes(types)
-            expect(types.tsConfig.compilerOptions.paths['files-sdk']?.[0]).toMatch(/node_modules\/files-sdk$/u)
-            expect(types.tsConfig.compilerOptions.paths['files-sdk']?.[0]).not.toContain('/dist')
-            expect(types.tsConfig.compilerOptions.paths['files-sdk/*']).toBeUndefined()
+            expect(types.tsConfig.compilerOptions.paths['#files-sdk']?.[0]).toMatch(/files-sdk\/dist\/index\.d\.ts$/u)
+            expect(types.tsConfig.compilerOptions.paths['files-sdk']).toBeUndefined()
             return nitro.options.plugins[0]!
         }
 
@@ -290,11 +289,11 @@ describe('provider generation', () => {
 
         expect(productionPlugin).not.toBe(developmentPlugin)
         expect(await readFile(developmentPlugin, 'utf8')).toBe(developmentSource)
-        expect(developmentSource).toContain('from "files-sdk/fs"')
+        expect(developmentSource).toContain('from "#files-sdk/fs"')
         expect(developmentSource).toContain('configureFiles(config,')
         expect(developmentSource).toMatch(/import \{ configureFiles \} from "[^"\n]+\/runtime\/internal\.js"/u)
         expect(developmentSource).not.toContain("from 'nuxt-files-sdk/runtime'")
-        expect(productionSource).toContain('from "files-sdk/r2"')
+        expect(productionSource).toContain('from "#files-sdk/r2"')
         expect(productionSource).toContain('configureFiles(config,')
         const environment = JSON.parse(/environment: (.+),/u.exec(productionSource)![1]!) as Record<string, string[][]>
         expect(Object.keys(environment)).toEqual(['r2'])

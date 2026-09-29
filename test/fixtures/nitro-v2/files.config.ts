@@ -1,4 +1,4 @@
-import { versioning } from 'files-sdk/versioning'
+import { versioning } from '#files-sdk/versioning'
 import { defineFilesConfig } from 'nuxt-files-sdk/config'
 
 export default defineFilesConfig({

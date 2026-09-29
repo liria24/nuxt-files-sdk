@@ -40,7 +40,6 @@ export default defineNuxtModule<ModuleOptions>({
         ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
         const paths = ((nuxt.options.typescript.tsConfig.compilerOptions ??= {}).paths ??= {})
         Object.assign(paths, sdkTypePaths(sdk))
-        paths['files-sdk'] ??= [resolve(nuxt.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
         let active = false
         nuxt.hook('nitro:init', async (nitro) => {
             active = await setupNitroFilesIntegration(nitro, {
@@ -63,7 +62,7 @@ export default defineNuxtModule<ModuleOptions>({
         ])
         addImports({ name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' })
         for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {
-            addImports({ name, from: 'files-sdk/vue' })
+            addImports({ name, from: '#files-sdk/vue' })
         }
 
         if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
