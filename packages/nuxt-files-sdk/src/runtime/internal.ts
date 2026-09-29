@@ -27,6 +27,7 @@ export const configureFiles = <const C extends FilesConfig>(
 export const inspectFiles = (): ReturnType<FilesRegistry['inspect']> =>
     registry?.inspect() ?? {
         storages: [],
+        dependencies: [],
         diagnostics: [registryDiagnostic ?? { code: 'NUXT_FILES_NOT_CONFIGURED' }],
     }
 

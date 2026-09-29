@@ -1,3 +1,4 @@
+import type { DependencyDiagnostic } from '../integration/diagnostics'
 import { inspectFiles } from '../runtime/internal'
 import { authorizeFilesDevtoolsRequest } from './auth'
 import { createFilesDevtoolsDiagnostic, type FilesDevtoolsDiagnostic } from './diagnostics'
@@ -10,6 +11,7 @@ export interface FilesDevtoolsSnapshot {
         initialized: boolean
     }>
     diagnostics: FilesDevtoolsDiagnostic[]
+    dependencies: DependencyDiagnostic[]
 }
 
 export const FILES_DEVTOOLS_PATH = '/__nuxt-files-sdk/'

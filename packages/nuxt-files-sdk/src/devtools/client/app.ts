@@ -57,6 +57,14 @@ const isSnapshot = (value: unknown): value is Snapshot =>
             item.plugins.every((plugin) => typeof plugin === 'string') &&
             typeof item.initialized === 'boolean',
     ) &&
+    Array.isArray(value.dependencies) &&
+    value.dependencies.every(
+        (item) =>
+            isRecord(item) &&
+            typeof item.dependency === 'string' &&
+            typeof item.status === 'string' &&
+            typeof item.reason === 'string',
+    ) &&
     Array.isArray(value.diagnostics) &&
     value.diagnostics.every(isFilesDevtoolsDiagnostic)
 const isAccess = (value: unknown): value is Access =>
@@ -337,6 +345,13 @@ const uploadFile = async (file: File): Promise<void> => {
 }
 
 const renderSnapshot = (): void => {
+    element('#dependencies', HTMLElement).replaceChildren(
+        ...snapshot.dependencies.map((item) => {
+            const row = document.createElement('p')
+            row.textContent = `${item.storage ?? item.subpath}: ${item.dependency} — ${item.status}. ${item.reason}`
+            return row
+        }),
+    )
     summary.textContent = `${snapshot.storages.length} configured storage${snapshot.storages.length === 1 ? '' : 's'}`
     element('#storages', HTMLTableSectionElement).replaceChildren(
         ...snapshot.storages.map((item) => {

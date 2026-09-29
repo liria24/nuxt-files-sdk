@@ -11,6 +11,7 @@ import {
 
 import type { FilesConfig, FilesConfigInput, StorageConfig } from '../config'
 import type { FilesDevtoolsDiagnosticCode } from '../devtools/diagnostics'
+import type { DependencyDiagnostic } from '../integration/diagnostics'
 import { normalizeFilesConfig, type StorageEntry } from './normalize'
 import type { ProviderFactories } from './provider-types'
 
@@ -103,6 +104,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     readonly #environment: ProviderEnvironment
     readonly #factories: FilesProviderFactories
     readonly #hooks: FilesRuntimeHooks
+    readonly #dependencies: readonly DependencyDiagnostic[]
     readonly #adapters = new Map<string | undefined, Adapter>()
     readonly #adapterInitializing = new Set<string | undefined>()
     readonly #instances = new Map<string | undefined, Files>()
@@ -117,6 +119,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             environment?: ProviderEnvironment
             factories: FilesProviderFactories
             hooks?: FilesRuntimeHooks
+            dependencies?: readonly DependencyDiagnostic[]
         },
     ) {
         this.#entries = normalizeFilesConfig(config)
@@ -124,6 +127,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         this.#environment = options.environment ?? {}
         this.#factories = options.factories
         this.#hooks = options.hooks ?? {}
+        this.#dependencies = options.dependencies ?? []
     }
 
     /** Return the client from an unnamed single-storage configuration. */
@@ -167,6 +171,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
                 initialized: this.#instances.has(name),
             })),
             diagnostics: [...this.#diagnostics.values()],
+            dependencies: this.#dependencies,
         }
     }
 
