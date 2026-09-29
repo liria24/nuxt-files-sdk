@@ -51,6 +51,19 @@ describe('configuration types', () => {
         expectTypeOf<SingleStorage<typeof only>['adapter']>().toEqualTypeOf<MemoryAdapter>()
     })
 
+    test('[TYPE-013] does not promise plugins explicitly removed by an environment', () => {
+        const config = defineFilesConfig({
+            storage: { adapter: 'memory', plugins: [versioning()] },
+            $development: { storage: { adapter: 'memory', plugins: [] } },
+        })
+        const check = (files: SingleStorage<typeof config>) => {
+            // @ts-expect-error the development branch removes versioning
+            files.versions()
+        }
+        void check
+        expect(config.$development.storage.plugins).toEqual([])
+    })
+
     test('[CFG-005][GATEWAY-003] is a pure identity helper with lazy resolvers and routes', () => {
         const config = defineFilesConfig({
             storage: { adapter: 'fs', config: () => ({ root: '.data/files' }) },

@@ -9,7 +9,7 @@ import {
     type ProviderSlug,
 } from 'files-sdk'
 
-import type { FilesConfig, FilesConfigInput, StorageConfig } from '../config'
+import type { FilesConfig, FilesConfigInput, StorageBranches, StorageConfig, StorageNames } from '../config'
 import type { FilesDevtoolsDiagnosticCode } from '../devtools/diagnostics'
 import type { DependencyDiagnostic } from '../integration/diagnostics'
 import { normalizeFilesConfig, type StorageEntry } from './normalize'
@@ -30,22 +30,13 @@ type PluginsFor<T> = T extends { plugins: infer V }
           ? V
           : never
     : never
-export type FilesForStorage<T extends { adapter: ProviderSlug | ((...args: never[]) => Adapter) }> = Files<
-    AdapterFor<T['adapter']>
-> &
-    ExtensionsOf<PluginsFor<T>>
+export type FilesForStorage<T> = T extends { adapter: ProviderSlug | ((...args: never[]) => Adapter) }
+    ? Files<AdapterFor<T['adapter']>> & ExtensionsOf<PluginsFor<T>>
+    : never
 
-type StorageOf<C> = C extends { storage: infer S } ? S : never
-type StorageBranch<C> =
-    | StorageOf<C>
-    | StorageOf<C extends { $development: infer E } ? E : never>
-    | StorageOf<C extends { $production: infer E } ? E : never>
-    | StorageOf<C extends { $test: infer E } ? E : never>
-    | StorageOf<C extends { $prerender: infer E } ? E : never>
-    | StorageOf<C extends { $env: infer E } ? E[keyof E] : never>
-type SingleEntry<C> = Extract<StorageBranch<C>, { adapter: ProviderSlug | ((...args: never[]) => Adapter) }>
-type NamedSet<C> = Exclude<StorageBranch<C>, { adapter: unknown }>
-type StorageNames<C> = NamedSet<C> extends infer S ? (S extends object ? keyof S : never) : never
+type SingleEntry<C> = Extract<StorageBranches<C>, { adapter: ProviderSlug | ((...args: never[]) => Adapter) }>
+type NamedSet<C> = Exclude<StorageBranches<C>, { adapter: unknown }>
+
 type NamedEntry<C, Name extends PropertyKey> =
     NamedSet<C> extends infer S ? (S extends object ? (Name extends keyof S ? S[Name] : never) : never) : never
 /** Map each configured storage name to its native Files client and plugin extensions. */
@@ -98,19 +89,22 @@ export interface RegistryDiagnostic {
     adapter?: string
 }
 
+interface RegistryEntry extends StorageEntry {
+    adapter?: Adapter
+    files?: Files
+    adapterInitializing?: boolean
+    filesInitializing?: boolean
+    pluginNames?: string[]
+    diagnostic?: RegistryDiagnostic
+}
+
 /** Lazily construct and memoize native Files clients for a validated project configuration. */
 export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
-    readonly #entries: Map<string | undefined, StorageEntry>
+    readonly #entries: Map<string | undefined, RegistryEntry>
     readonly #environment: ProviderEnvironment
     readonly #factories: FilesProviderFactories
     readonly #hooks: FilesRuntimeHooks
     readonly #dependencies: readonly DependencyDiagnostic[]
-    readonly #adapters = new Map<string | undefined, Adapter>()
-    readonly #adapterInitializing = new Set<string | undefined>()
-    readonly #instances = new Map<string | undefined, Files>()
-    readonly #filesInitializing = new Set<string | undefined>()
-    readonly #pluginNames = new Map<string | undefined, string[]>()
-    readonly #diagnostics = new Map<string | undefined, RegistryDiagnostic>()
 
     /** Create a registry without constructing a provider. */
     constructor(
@@ -123,7 +117,6 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         },
     ) {
         this.#entries = normalizeFilesConfig(config)
-        if (!this.#entries.size) throw new Error('[nuxt-files-sdk:invalid-config] At least one storage is required.')
         this.#environment = options.environment ?? {}
         this.#factories = options.factories
         this.#hooks = options.hooks ?? {}
@@ -138,44 +131,44 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         const name = args[0]
         const entry = this.#entry(name)
         const key = entry.name
-        const cached = this.#instances.get(key)
+        const cached = entry.files
         if (cached) return cached
-        if (this.#filesInitializing.has(key)) throw this.#circular(key)
-        this.#filesInitializing.add(key)
+        if (entry.filesInitializing) throw this.#circular(key)
+        entry.filesInitializing = true
         try {
             const files = this.#create(entry)
-            this.#instances.set(key, files)
-            this.#diagnostics.delete(key)
+            entry.files = files
+            delete entry.diagnostic
             return files
         } catch (error) {
-            this.#diagnostics.set(key, {
+            entry.diagnostic = {
                 code: 'NUXT_FILES_ADAPTER_INIT_FAILED',
                 ...(entry.name === undefined ? {} : { name: entry.name }),
                 adapter: typeof entry.storage.adapter === 'string' ? entry.storage.adapter : 'custom',
-            })
+            }
             throw error
         } finally {
-            this.#filesInitializing.delete(key)
+            entry.filesInitializing = false
         }
     }
 
     /** Return secret-free storage metadata and initialization state for development diagnostics. */
     inspect() {
         return {
-            storages: [...this.#entries.values()].map(({ name, storage }) => ({
+            storages: [...this.#entries.values()].map(({ name, storage, files, pluginNames }) => ({
                 ...(name === undefined ? {} : { name }),
                 adapter: typeof storage.adapter === 'string' ? storage.adapter : 'custom',
                 plugins:
-                    this.#pluginNames.get(name) ??
+                    pluginNames ??
                     (Array.isArray(storage.plugins) ? storage.plugins.map((plugin) => plugin.name) : []),
-                initialized: this.#instances.has(name),
+                initialized: !!files,
             })),
-            diagnostics: [...this.#diagnostics.values()],
+            diagnostics: [...this.#entries.values()].flatMap(({ diagnostic }) => diagnostic ? [diagnostic] : []),
             dependencies: this.#dependencies,
         }
     }
 
-    #entry(name?: string): StorageEntry {
+    #entry(name?: string): RegistryEntry {
         if (name === undefined && !this.#entries.has(undefined)) {
             throw new Error('[nuxt-files-sdk:storage-name-required] A storage name is required.')
         }
@@ -188,16 +181,16 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     resolveAdapter(name?: string): Adapter {
         const entry = this.#entry(name)
         const key = entry.name
-        const cached = this.#adapters.get(key)
+        const cached = entry.adapter
         if (cached) return cached
-        if (this.#adapterInitializing.has(key)) throw this.#circular(key)
-        this.#adapterInitializing.add(key)
+        if (entry.adapterInitializing) throw this.#circular(key)
+        entry.adapterInitializing = true
         try {
             const adapter = this.#createAdapter(entry)
-            this.#adapters.set(key, adapter)
+            entry.adapter = adapter
             return adapter
         } finally {
-            this.#adapterInitializing.delete(key)
+            entry.adapterInitializing = false
         }
     }
 
@@ -232,7 +225,8 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
         })
     }
 
-    #create({ name, storage }: StorageEntry): Files {
+    #create(entry: RegistryEntry): Files {
+        const { name, storage } = entry
         const adapter = this.resolveAdapter(name)
         const plugins =
             typeof storage.plugins === 'function'
@@ -260,11 +254,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             },
             ...(plugins ? { plugins } : {}),
         })
-        if (plugins)
-            this.#pluginNames.set(
-                name,
-                plugins.map((plugin) => plugin.name),
-            )
+        if (plugins) entry.pluginNames = plugins.map((plugin) => plugin.name)
         return files
     }
 }
