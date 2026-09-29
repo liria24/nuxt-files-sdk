@@ -3,12 +3,16 @@ import type { StoredFile } from 'files-sdk'
 import { createFilesClient } from 'files-sdk/client'
 
 import { isFilesDevtoolsDiagnostic, type FilesDevtoolsFailure } from '../diagnostics'
-import type { FilesDevtoolsSnapshot as Snapshot } from '../snapshot'
+import type { FilesDevtoolsSnapshot } from '../snapshot'
 import { FilesBrowser } from './browser'
 
 interface Access {
     write: boolean
     maxUploadSize: number
+}
+
+type Snapshot = Omit<FilesDevtoolsSnapshot, 'dependencies'> & {
+    dependencies: { storage?: string; subpath: string; dependency: string; status: string; reason: string }[]
 }
 
 interface AccessToken {
@@ -61,6 +65,8 @@ const isSnapshot = (value: unknown): value is Snapshot =>
     value.dependencies.every(
         (item) =>
             isRecord(item) &&
+            (item.storage === undefined || typeof item.storage === 'string') &&
+            typeof item.subpath === 'string' &&
             typeof item.dependency === 'string' &&
             typeof item.status === 'string' &&
             typeof item.reason === 'string',

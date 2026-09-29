@@ -1,5 +1,6 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 import type { NavigationItem } from 'comark-content'
+import { flattenNavigation } from '../../shared/utils/navigation'
 
 export const toMenuItems = (items: NavigationItem[]): NavigationMenuItem[] =>
     items.map((item) => ({
@@ -9,19 +10,13 @@ export const toMenuItems = (items: NavigationItem[]): NavigationMenuItem[] =>
         children: item.children?.length ? toMenuItems(item.children) : undefined,
     }))
 
-export const flattenPages = (items: NavigationItem[]): NavigationItem[] =>
-    items.flatMap((item) => [
-        ...(item.page === false || item.path === '/' ? [] : [item]),
-        ...flattenPages(item.children ?? []),
-    ])
-
 export const firstPage = (items: NavigationItem[] | undefined, path: string): string | undefined => {
     const section = items?.find((item) => item.path === path)
-    return section && flattenPages([section])[0]?.path
+    return section && flattenNavigation([section])[0]?.path
 }
 
 export const surroundingPages = (items: NavigationItem[], path: string) => {
-    const pages = flattenPages(items)
+    const pages = flattenNavigation(items)
     const index = pages.findIndex((item) => item.path === path)
     return index < 0
         ? []

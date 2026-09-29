@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import * as locales from '@nuxt/ui/locale'
+import { en } from '@nuxt/ui/locale'
 
 const { locale } = useI18n()
 
@@ -12,7 +12,7 @@ useHead({
 </script>
 
 <template>
-    <UApp :locale="locales[locale]">
+    <UApp :locale="en">
         <NuxtLoadingIndicator color="var(--ui-primary)" />
         <NuxtRouteAnnouncer />
         <NuxtLayout>

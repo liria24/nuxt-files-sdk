@@ -25,7 +25,7 @@
         "test": "vitest run",
         "test:unit": "vitest run --project unit",
         "typecheck": "bun --filter nuxt-files-sdk typecheck && bun run docs:typecheck && tsc --noEmit -p test/tsconfig.json",
-        "unused": "knip && knip --production",
+        "unused": "bun run docs:prepare && knip && knip --production",
         "workspace:check": "sherif",
         "test:nuxt4": "vitest run --project nuxt4",
         "test:nuxt5": "vitest run --project nuxt5",
@@ -34,7 +34,8 @@
         "test:consumer": "vitest run --project consumer",
         "test:size": "vitest run --project bundle",
         "benchmark": "bun test/benchmark.ts",
-        "benchmark:integration": "bun test/benchmark-integration.ts"
+        "benchmark:integration": "bun test/benchmark-integration.ts",
+        "docs:prepare": "bun run build && bun run --cwd=docs prepare:types"
     },
     "devDependencies": {
         "@nuxt/schema": "^4.5.2",
@@ -48,7 +49,9 @@
         "sherif": "^1.13.0",
         "taze": "^21.2.0",
         "typescript": "^7.0.2",
-        "vitest": "^5.0.2"
+        "vitest": "^5.0.2",
+        "vscode-jsonrpc": "^9.0.3",
+        "yaml": "^2.9.1"
     },
     "engines": {
         "node": ">=24.0.0"

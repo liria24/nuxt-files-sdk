@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { SearchSection } from '../../shared/search'
 const open = defineModel<boolean>('open', { default: false })
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const query = ref('')

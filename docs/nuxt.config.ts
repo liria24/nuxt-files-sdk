@@ -12,7 +12,6 @@ export default defineNuxtConfig({
 
     modules: [
         '@nuxtjs/i18n',
-        '@nuxt/image',
         '@nuxt/fonts',
         '@nuxtjs/sitemap',
         '@nuxtjs/robots',
@@ -21,7 +20,6 @@ export default defineNuxtConfig({
         '@nuxt/ui',
         '@comark/nuxt',
         'nuxt-files-sdk',
-        '@vueuse/nuxt',
     ],
 
     css: ['~/assets/css/main.css'],

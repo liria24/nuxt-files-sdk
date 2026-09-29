@@ -1,4 +1,4 @@
-import { NUXT_DEVTOOLS_GROUP_ID, onDevtoolsReady } from '@nuxt/devtools-kit'
+import type {} from '@nuxt/devtools-kit'
 import type { Nuxt } from '@nuxt/schema'
 import { createEmbedded } from 'devframe/adapters/embedded'
 
@@ -9,7 +9,7 @@ export const setupNuxtV4Devtools = (
     nuxt: Nuxt,
     options: { write: boolean; maxUploadSize: number; tokenSecret: string },
 ): void => {
-    onDevtoolsReady(async (context) => {
+    nuxt.hook('devtools:ready', async (context) => {
         await createEmbedded(
             createFilesDevframe({
                 ...options,
@@ -23,7 +23,7 @@ export const setupNuxtV4Devtools = (
             icon: 'ph:files-duotone',
             type: 'iframe',
             url: FILES_DEVTOOLS_PATH,
-            groupId: NUXT_DEVTOOLS_GROUP_ID,
+            groupId: 'nuxt',
         })
 
         const broadcast = (method: 'refresh' | 'copy-diagnostics') =>
@@ -49,5 +49,5 @@ export const setupNuxtV4Devtools = (
             category: 'tools',
             handler: () => broadcast('copy-diagnostics'),
         })
-    }, nuxt)
+    })
 }

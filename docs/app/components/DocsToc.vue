@@ -1,10 +1,5 @@
 <script setup lang="ts">
-interface TocLink {
-    id: string
-    text: string
-    depth: number
-    children?: TocLink[]
-}
+import type { TocLink } from 'comark/plugins/toc'
 
 defineProps<{ links: TocLink[] }>()
 </script>
