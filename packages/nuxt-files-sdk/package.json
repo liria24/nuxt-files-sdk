@@ -36,7 +36,8 @@
             "import": "./dist/runtime.js",
             "default": "./dist/runtime.js"
         },
-        "./package.json": "./package.json"
+        "./package.json": "./package.json",
+        "./module.json": "./dist/module.json"
     },
     "publishConfig": {
         "access": "public",
@@ -259,6 +260,9 @@
         "zod": {
             "optional": true
         }
+    },
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
     },
     "filesSdkOptionalPeers": {
         "version": "2.6.2",

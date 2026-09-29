@@ -1,4 +1,10 @@
+import { readFile } from 'node:fs/promises'
+
 import { defineConfig } from 'tsdown'
+
+import { moduleMeta } from './src/meta.ts'
+
+const manifest: { version: string } = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'))
 
 export default defineConfig([
     {
@@ -53,6 +59,18 @@ export default defineConfig([
         publint: true,
         sourcemap: true,
         unbundle: true,
+        plugins: [
+            {
+                name: 'nuxt-module-metadata',
+                generateBundle() {
+                    this.emitFile({
+                        type: 'asset',
+                        fileName: 'module.json',
+                        source: JSON.stringify({ ...moduleMeta, version: manifest.version }, null, 2) + '\n',
+                    })
+                },
+            },
+        ],
     },
     {
         clean: false,
