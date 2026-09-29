@@ -111,7 +111,7 @@ export const outputPaths = async (directory: string): Promise<string[]> =>
 export const startFixtureServer = async (
     name: string,
     options: { development?: boolean; readyPath?: string } = {},
-): Promise<{ url: string; close: () => Promise<void> }> => {
+): Promise<{ url: string; close: () => Promise<void>; output: () => string }> => {
     const reservation = createServer()
     await new Promise<void>((ready, reject) => {
         reservation.once('error', reject)
@@ -146,7 +146,7 @@ export const startFixtureServer = async (
                 .then((response) => (options.readyPath ? response.ok : true))
                 .catch(() => false)
         ) {
-            return { url, close: () => closeProcess(child) }
+            return { url, close: () => closeProcess(child), output: () => output }
         }
         await new Promise((resolveWait) => setTimeout(resolveWait, 100))
     }

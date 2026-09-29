@@ -4,8 +4,7 @@ import type { ProviderSlug } from 'files-sdk'
 import { getProvider, listEnvVars } from 'files-sdk/providers'
 
 import { normalizeFilesConfig } from '../runtime/normalize'
-import { loadFilesConfig, type FilesConfigLoaderOptions } from './load'
-import { pruneFilesConfigSource } from './prune'
+import type { FilesConfigLoaderOptions } from './load'
 
 export const selectedAdapters = (
     config: unknown,
@@ -48,6 +47,9 @@ export const gatewayRoutes = (
         }
         if (paths.has(route.path)) throw new Error(`[nuxt-files-sdk:duplicate-route] Duplicate route "${route.path}".`)
         paths.add(route.path)
+        if ('authorize' in route && route.authorize !== undefined && typeof route.authorize !== 'function') {
+            throw new Error('[nuxt-files-sdk:invalid-route] authorize must be a function.')
+        }
         const name = 'storage' in route ? route.storage : undefined
         if (storages.has(undefined) ? name !== undefined : typeof name !== 'string' || !storages.has(name)) {
             throw new Error(`[nuxt-files-sdk:unknown-storage] Invalid storage for route "${route.path}".`)
@@ -73,6 +75,8 @@ export const providerCode = (adapters: ProviderSlug[]): { imports: string; facto
 })
 
 export const prepareFilesConfig = async (options: FilesConfigLoaderOptions) => {
+    const { loadFilesConfig } = await import('./load')
+    const { pruneFilesConfigSource } = await import('./prune')
     const original = await readFile(options.configPath, 'utf8')
     const source = options.injectImports ? (await options.injectImports(original, options.configPath)).code : original
     const config = await loadFilesConfig({ ...options, source, injectImports: undefined })

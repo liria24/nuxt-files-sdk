@@ -1,5 +1,18 @@
 export const contracts = [
     {
+        id: 'UPDATE-001',
+        guarantee:
+            'Referenced config and dependency changes invalidate development routes without rewriting unchanged output',
+        source: 'test/unit/updates.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'UPDATE-002',
+        guarantee: 'Real development gateway refuses stale authorization and recovers from invalid edits',
+        source: 'test/nuxt/nuxt4-updates.test.ts',
+        job: 'test-nuxt4',
+    },
+    {
         id: 'DEP-003',
         guarantee: 'Dependency inspection stays silent for uncertainty and reports only changed confirmed failures',
         source: 'test/unit/diagnostics.test.ts',
