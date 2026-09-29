@@ -6,6 +6,7 @@ import type { Nuxt } from '@nuxt/schema'
 
 import { filesDevtoolsWriteEnabled, shouldEnableFilesDevtools, type FilesDevtoolsOptions } from './devtools/enabled'
 import type { NitroIntegration } from './integration/nitro'
+import { moduleMeta } from './meta'
 
 declare module '@nuxt/schema' {
     interface NuxtHooks {
@@ -23,11 +24,7 @@ export interface ModuleOptions {
 
 /** Install Files SDK storage configuration, server utilities, Vue composables, and development diagnostics in Nuxt. */
 export default defineNuxtModule<ModuleOptions>({
-    meta: {
-        name: 'nuxt-files-sdk',
-        configKey: 'files',
-        compatibility: { nuxt: '^4.0.0 || ^5.0.0' },
-    },
+    meta: moduleMeta,
     defaults: {
         config: 'files.config.ts',
         devtools: true,
