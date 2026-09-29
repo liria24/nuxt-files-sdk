@@ -317,6 +317,18 @@ describe('FilesRegistry', () => {
         expect(() => circular.get()).toThrow('[nuxt-files-sdk:circular-initialization]')
     })
 
+    test('[RUNTIME-003] retries failed plugin resolution while retaining the successful adapter', () => {
+        const factory = vi.fn(() => memory())
+        const plugins = vi.fn().mockImplementationOnce(() => { throw new Error('plugin failed') }).mockReturnValue([])
+        const registry = new FilesRegistry({ storage: { adapter: factory, plugins } }, { factories: {} })
+        expect(() => registry.get()).toThrow('plugin failed')
+        expect(registry.inspect().storages[0]?.initialized).toBe(false)
+        expect(registry.get()).toBe(registry.get())
+        expect(factory).toHaveBeenCalledOnce()
+        expect(plugins).toHaveBeenCalledTimes(2)
+        expect(registry.inspect().diagnostics).toEqual([])
+    })
+
     test('[HOOK-001] runs user then bridge hooks without changing operation results', async () => {
         const order: string[] = []
         const bridgeCalled = Promise.withResolvers<void>()

@@ -1,66 +1,6 @@
-import type { ProviderSlug } from 'files-sdk'
-
 import type { StorageEntry } from '../runtime/normalize'
 
 const aws = ['@aws-sdk/client-s3', '@aws-sdk/s3-presigned-post', '@aws-sdk/s3-request-presigner']
-const graph = [
-    '@azure/identity',
-    '@microsoft/microsoft-graph-client',
-    '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials/index.js',
-]
-
-/** Runtime imports in the owned SDK, not provider metadata's broader type/authoring peers. */
-export const adapterImports = {
-    akamai: aws,
-    alibaba: aws,
-    appwrite: ['node-appwrite', 'node-appwrite/file'],
-    archil: aws,
-    azure: ['@azure/storage-blob'],
-    'backblaze-b2': aws,
-    box: ['box-typescript-sdk-gen'],
-    'bun-s3': [],
-    'bunny-storage': ['@bunny.net/storage-sdk'],
-    cloudinary: ['cloudinary'],
-    convex: [],
-    'digitalocean-spaces': aws,
-    dropbox: ['dropbox'],
-    exoscale: aws,
-    filebase: aws,
-    'firebase-storage': [],
-    fs: [],
-    ftp: ['basic-ftp'],
-    gcs: ['@google-cloud/storage'],
-    'google-drive': ['@googleapis/drive', 'google-auth-library'],
-    hetzner: aws,
-    'ibm-cos': aws,
-    'idrive-e2': aws,
-    memory: [],
-    minio: [],
-    neon: aws,
-    'netlify-blobs': ['@netlify/blobs'],
-    onedrive: graph,
-    'oracle-cloud': aws,
-    ovhcloud: aws,
-    pocketbase: ['pocketbase'],
-    r2: [],
-    rustfs: [],
-    s3: aws,
-    's3-fetch': [],
-    scaleway: aws,
-    sftp: ['ssh2-sftp-client'],
-    sharepoint: graph,
-    storj: aws,
-    supabase: ['@supabase/storage-js'],
-    tencent: aws,
-    tigris: aws,
-    uploadthing: ['uploadthing/server'],
-    'vercel-blob': ['@vercel/blob'],
-    vultr: aws,
-    wasabi: aws,
-    webdav: ['webdav'],
-    yandex: aws,
-} satisfies Record<ProviderSlug, readonly string[]>
-
 export interface DependencyRequirement {
     storage?: string
     subpath: string
@@ -84,11 +24,9 @@ const field = (object: unknown, key: string): unknown => {
 }
 
 /** Pure structural analysis: never calls config resolvers, clients, factories or credentials. */
-export const storageDependencies = (entry: StorageEntry, target: FilesTarget): DependencyRequirement[] => {
+export const storageDependencies = (entry: StorageEntry, target: FilesTarget, imports: readonly DependencyRequirement[]): DependencyRequirement[] => {
     const adapter = entry.storage.adapter
     if (typeof adapter !== 'string') return []
-    if (!Object.hasOwn(adapterImports, adapter))
-        throw new Error(`[nuxt-files-sdk:adapter-dependencies] Unreviewed adapter: ${adapter}`)
     const subpath = `files-sdk/${adapter}`
     const requirement = (
         dependency: string,
@@ -103,10 +41,8 @@ export const storageDependencies = (entry: StorageEntry, target: FilesTarget): D
         stage,
         reason,
     })
-    const result = adapterImports[adapter].map((dependency) =>
-        requirement(dependency, 'required', 'import', 'Static adapter import'),
-    )
-    let usesAws: boolean | undefined = adapterImports[adapter] === aws
+    const result = imports.map((entryImport) => ({ ...entryImport, ...(entry.name === undefined ? {} : { storage: entry.name }) }))
+    let usesAws: boolean | undefined = imports.some(({ dependency }) => dependency === '@aws-sdk/client-s3')
     if (adapter === 'r2' || adapter === 'minio' || adapter === 'rustfs') {
         const binding = adapter === 'r2' ? field(entry.storage.config, 'binding') : undefined
         const client = field(entry.storage.config, 'client')

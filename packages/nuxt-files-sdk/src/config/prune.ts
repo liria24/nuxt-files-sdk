@@ -1,32 +1,15 @@
 import { dirname, resolve } from 'node:path'
 
-import { parseSync } from 'oxc-parser'
+import { parseSync, type Node, type ObjectPropertyKind } from 'oxc-parser'
 
-interface SyntaxNode {
-    type: string
-    start: number
-    end: number
-    name?: string
-    value?: unknown
-    key?: SyntaxNode
-    source?: SyntaxNode
-    declaration?: SyntaxNode
-    declarations?: SyntaxNode[]
-    id?: SyntaxNode
-    init?: SyntaxNode
-    expression?: SyntaxNode
-    callee?: SyntaxNode
-    arguments?: SyntaxNode[]
-    properties?: SyntaxNode[]
-    body?: SyntaxNode[]
-}
-
-const unwrap = (node: SyntaxNode): SyntaxNode =>
+const unwrap = (node: Node): Node =>
     node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'ParenthesizedExpression'
-        ? unwrap(node.expression!)
+        ? unwrap(node.expression)
         : node
-const keyOf = (node: SyntaxNode): string | undefined =>
-    node.key?.type === 'Identifier' ? node.key.name : typeof node.key?.value === 'string' ? node.key.value : undefined
+const keyOf = (node: ObjectPropertyKind): string | undefined =>
+    node.type !== 'Property' || node.computed ? undefined
+        : node.key.type === 'Identifier' ? node.key.name
+        : node.key.type === 'Literal' && typeof node.key.value === 'string' ? node.key.value : undefined
 
 /** Remove inactive environment literals before bundling the user config. */
 export const pruneFilesConfigSource = (source: string, configPath: string, environments: readonly string[]): string => {
@@ -34,16 +17,14 @@ export const pruneFilesConfigSource = (source: string, configPath: string, envir
     if (parsed.errors.length > 0) {
         throw new Error(`[nuxt-files-sdk:invalid-config] ${parsed.errors[0]!.message}`)
     }
-    // Oxc's node union is wider than the fields inspected here.
-    // oxlint-disable typescript/no-unsafe-type-assertion
-    const body = (parsed.program as unknown as SyntaxNode).body!
-    // oxlint-enable typescript/no-unsafe-type-assertion
+    const body = parsed.program.body
     const exported = body.find((node) => node.type === 'ExportDefaultDeclaration')?.declaration
     if (!exported) throw new Error('[nuxt-files-sdk:invalid-config] files.config.ts needs a default export.')
     let root = unwrap(exported)
-    if (root.type === 'CallExpression') root = unwrap(root.arguments?.[0] ?? root)
+    if (root.type === 'CallExpression') root = unwrap(root.arguments[0] ?? root)
     if (root.type === 'Identifier') {
-        const declaration = body.flatMap((node) => node.declarations ?? []).find((node) => node.id?.name === root.name)
+        const name = root.name
+        const declaration = body.flatMap((node) => node.type === 'VariableDeclaration' ? node.declarations : []).find((node) => node.id.type === 'Identifier' && node.id.name === name)
         if (declaration?.init) root = unwrap(declaration.init)
     }
     if (root.type !== 'ObjectExpression') {
@@ -51,15 +32,14 @@ export const pruneFilesConfigSource = (source: string, configPath: string, envir
     }
     const edits: Array<{ start: number; end: number; text: string }> = []
     const active = new Set(environments)
-    for (const property of root.properties ?? []) {
+    for (const property of root.properties) {
         const key = keyOf(property)
         if (!key?.startsWith('$')) continue
-        if (key === '$env' && property.value) {
-            // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-            const env = unwrap(property.value as SyntaxNode)
+        if (key === '$env' && property.type === 'Property') {
+            const env = unwrap(property.value)
             if (env.type !== 'ObjectExpression')
                 throw new Error('[nuxt-files-sdk:invalid-config] $env must be an object.')
-            for (const entry of env.properties ?? []) {
+            for (const entry of env.properties) {
                 if (!active.has(keyOf(entry) ?? '')) edits.push({ start: entry.start, end: entry.end, text: '...{}' })
             }
         } else if (!active.has(key.slice(1))) {
@@ -68,7 +48,7 @@ export const pruneFilesConfigSource = (source: string, configPath: string, envir
     }
     // The selected module lives under the build directory; preserve relative import resolution.
     for (const node of body) {
-        if (!node.source || typeof node.source.value !== 'string' || !node.source.value.startsWith('.')) continue
+        if (!('source' in node) || !node.source || !node.source.value.startsWith('.')) continue
         edits.push({
             start: node.source.start,
             end: node.source.end,
