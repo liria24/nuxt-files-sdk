@@ -9,6 +9,7 @@ import { getProvider, listEnvVars } from 'files-sdk/providers'
 import { loadFilesConfig } from '../config/load'
 import { pruneFilesConfigSource } from '../config/prune'
 import { normalizeFilesConfig } from '../runtime/normalize'
+import { registerSdkAliases, resolveOwnedSdk, sdkTypePaths } from './resolve'
 
 export interface NitroIntegration {
     meta?: { majorVersion?: number }
@@ -163,6 +164,8 @@ export const setupNitroFilesIntegration = async (
     nitro: NitroIntegration,
     options: NitroFilesIntegrationOptions,
 ): Promise<boolean> => {
+    const sdk = resolveOwnedSdk()
+    nitro.options.alias = registerSdkAliases(nitro.options.alias ?? {}, sdk)
     const configPath = options.configPath.replaceAll('\\', '/')
     const config = await loadFilesConfig({
         configPath,
@@ -178,6 +181,17 @@ export const setupNitroFilesIntegration = async (
     const writeTypes = async (): Promise<void> => {
         await mkdir(directory, { recursive: true })
         await writeFile(typesPath, storageTypes(configPath, nitroMajorVersion(nitro)))
+        await writeFile(
+            resolve(directory, 'tsconfig.json'),
+            JSON.stringify(
+                {
+                    compilerOptions: { paths: sdkTypePaths(sdk) },
+                    include: [typesPath.replaceAll('\\', '/')],
+                },
+                null,
+                2,
+            ),
+        )
     }
     await writeTypes()
     nitro.hooks.hook('types:extend', async (types) => {
@@ -186,6 +200,7 @@ export const setupNitroFilesIntegration = async (
         const tsConfig = (types.tsConfig ??= {})
         ;(tsConfig.include ??= []).push(typesPath)
         const paths = ((tsConfig.compilerOptions ??= {}).paths ??= {})
+        Object.assign(paths, sdkTypePaths(sdk))
         paths['files-sdk'] ??= [resolve(nitro.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
     })
     const routes = gatewayRoutes(config)

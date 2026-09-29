@@ -5,7 +5,14 @@ import { pathToFileURL } from 'node:url'
 
 import { afterAll, expect, test, vi } from 'vitest'
 
-import { resolveOwnedSdk, resolvePackage, sdkEntry } from '../../packages/nuxt-files-sdk/src/integration/resolve'
+import {
+    registerSdkAliases,
+    resolveOwnedSdk,
+    resolvePackage,
+    sdkAliases,
+    sdkEntry,
+    sdkTypePaths,
+} from '../../packages/nuxt-files-sdk/src/integration/resolve'
 
 const directories: string[] = []
 const makePackage = async (root: string, name: string, version: string, exports: Record<string, unknown>) => {
@@ -32,6 +39,9 @@ test('[RESOLVE-001] resolves the owned SDK and respects public export conditions
     const sdk = resolveOwnedSdk(from.href)
     expect(sdk.root).toBe(owned)
     expect(sdk.manifest.version).toBe('2.6.2')
+    expect(Object.keys(sdkAliases(sdk))).toEqual(['#files-sdk/versioning', '#files-sdk'])
+    expect(sdkTypePaths(sdk)['#files-sdk']?.[0]).toContain('/index.d.ts')
+    expect(() => registerSdkAliases({ '#files-sdk': '/unrelated-sdk.js' }, sdk)).toThrow('reserved-alias')
     expect(sdkEntry(sdk, 'files-sdk', ['browser', 'import'])).toBe(resolve(owned, 'browser.js').replaceAll('\\', '/'))
     expect(sdkEntry(sdk, 'files-sdk', ['types', 'import'])).toContain('/index.d.ts')
     expect(sdkEntry(sdk, 'files-sdk', ['node', 'require'])).toContain('/index.cjs')

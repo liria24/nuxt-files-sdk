@@ -6,6 +6,7 @@ import { loadConfig } from 'c12'
 import { createJiti } from 'jiti'
 
 import type { FilesConfig } from '../config'
+import { registerSdkAliases, resolveOwnedSdk } from '../integration/resolve'
 import { normalizeFilesConfig } from '../runtime/normalize'
 import { mergeFilesConfig } from './merge'
 
@@ -41,7 +42,7 @@ export const loadFilesConfig = async ({
 }: FilesConfigLoaderOptions): Promise<FilesConfig | undefined> => {
     const jiti = createJiti(import.meta.url, {
         alias: {
-            ...alias,
+            ...registerSdkAliases(alias ?? {}, resolveOwnedSdk()),
             'nuxt-files-sdk/config': fileURLToPath(new URL('../config.js', import.meta.url)),
         },
         interopDefault: true,

@@ -6,6 +6,7 @@ import type { Nuxt } from '@nuxt/schema'
 
 import { filesDevtoolsWriteEnabled, shouldEnableFilesDevtools, type FilesDevtoolsOptions } from './devtools/enabled'
 import { setupNitroFilesIntegration, type NitroIntegration } from './integration/nitro'
+import { registerSdkAliases, resolveOwnedSdk, sdkTypePaths } from './integration/resolve'
 
 declare module '@nuxt/schema' {
     interface NuxtHooks {
@@ -34,8 +35,11 @@ export default defineNuxtModule<ModuleOptions>({
     },
     async setup(options, nuxt: Nuxt) {
         const configPath = resolve(nuxt.options.rootDir, options.config)
+        const sdk = resolveOwnedSdk()
+        nuxt.options.alias = registerSdkAliases(nuxt.options.alias, sdk, ['browser', 'import'])
         ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
         const paths = ((nuxt.options.typescript.tsConfig.compilerOptions ??= {}).paths ??= {})
+        Object.assign(paths, sdkTypePaths(sdk))
         paths['files-sdk'] ??= [resolve(nuxt.options.rootDir, 'node_modules/files-sdk').replaceAll('\\', '/')]
         let active = false
         nuxt.hook('nitro:init', async (nitro) => {

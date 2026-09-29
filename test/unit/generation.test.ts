@@ -169,7 +169,7 @@ describe('provider generation', () => {
         }
 
         await setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })
-        const aliases = Object.entries(nitro.options.alias ?? {})
+        const aliases = Object.entries(nitro.options.alias ?? {}).filter(([name]) => name.startsWith('@aws-sdk/'))
         expect(aliases).toHaveLength(4)
         for (const [dependency, path] of aliases) {
             expect(await readFile(path, 'utf8')).toContain(dependency)

@@ -78,3 +78,37 @@ export const sdkEntry = (sdk: PackageInfo, subpath: string, conditions = ['node'
         '\\',
         '/',
     )
+
+/** Enumerate public subpaths without evaluating providers. Root comes last for prefix alias engines. */
+export const sdkAliases = (sdk: PackageInfo, conditions = ['node', 'import']): Record<string, string> =>
+    Object.fromEntries(
+        Object.keys(sdk.manifest.exports ?? {})
+            .toSorted((a, b) => b.length - a.length)
+            .map((key) => {
+                if (key !== '.' && (!key.startsWith('./') || key.includes('*'))) {
+                    throw new Error(`[nuxt-files-sdk:sdk-exports] Unsupported public export pattern: ${key}`)
+                }
+                const suffix = key === '.' ? '' : key.slice(1)
+                return [`#files-sdk${suffix}`, sdkEntry(sdk, `files-sdk${suffix}`, conditions)]
+            }),
+    )
+
+export const registerSdkAliases = (
+    aliases: Record<string, string>,
+    sdk: PackageInfo,
+    conditions = ['node', 'import'],
+): Record<string, string> => {
+    const selected = sdkAliases(sdk, conditions)
+    const node = sdkAliases(sdk)
+    const browser = sdkAliases(sdk, ['browser', 'import'])
+    for (const [name, path] of Object.entries(aliases)) {
+        if (name !== '#files-sdk' && !name.startsWith('#files-sdk/')) continue
+        if (![selected[name], node[name], browser[name]].includes(path.replaceAll('\\', '/'))) {
+            throw new Error(`[nuxt-files-sdk:reserved-alias] ${name} must refer to the owned Files SDK.`)
+        }
+    }
+    return { ...selected, ...Object.fromEntries(Object.entries(aliases).filter(([name]) => !(name in selected))) }
+}
+
+export const sdkTypePaths = (sdk: PackageInfo): Record<string, string[]> =>
+    Object.fromEntries(Object.entries(sdkAliases(sdk, ['types', 'import'])).map(([name, entry]) => [name, [entry]]))
