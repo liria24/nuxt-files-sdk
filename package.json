@@ -10,6 +10,7 @@
         "build": "bun --filter nuxt-files-sdk build",
         "check": "bun run format:check && bun run lint && bun run workspace:check && bun run unused && bun run typecheck && bun run test && bun run build && bun run docs:build",
         "deps:update": "taze",
+        "peers:sync": "bun scripts/sync-optional-peers.ts",
         "dev": "bun run build && bun --cwd=docs dev",
         "dev:devtools-v4": "bun run build && bun --cwd=test/fixtures/nuxt5-nightly install --ignore-scripts && bun --cwd=test/fixtures/nuxt5-nightly run dev",
         "docs:build": "bun run --cwd=docs build && bun scripts/verify-docs-output.ts",

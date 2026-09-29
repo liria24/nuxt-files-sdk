@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'PEER-001',
+        guarantee: 'Optional peer synchronization detects conflicts and only manages upstream optional peers',
+        source: 'test/unit/optional-peers.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'RESOLVE-001',
         guarantee: 'Owned package resolution respects importer, public exports and conditions without logging or stale misses',
         source: 'test/unit/resolution.test.ts',
