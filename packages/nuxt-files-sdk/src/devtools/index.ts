@@ -3,9 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { addDevServerHandler, addServerHandler, addServerTemplate } from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
 
-import { setupNuxtV3Devtools } from './nuxt-v3'
-import uiHandler from './nuxt-v3-handler'
-import { setupNuxtV4Devtools } from './nuxt-v4'
 import {
     FILES_DEVTOOLS_MAX_UPLOAD_SIZE,
     FILES_DEVTOOLS_PATH,
@@ -13,7 +10,6 @@ import {
     FILES_SNAPSHOT_PATH,
     FILES_TOKEN_PATH,
 } from './snapshot'
-import tokenHandler from './token'
 
 const authenticatedHandler = (name: string, path: string, arguments_: string[]): string => {
     const filename = `#nuxt-files-sdk/${name}`
@@ -25,7 +21,12 @@ const authenticatedHandler = (name: string, path: string, arguments_: string[]):
     return filename
 }
 
-export const setupFilesDevtools = (nuxt: Nuxt, version: string, write: boolean, secrets: { token: string }): void => {
+export const setupFilesDevtools = async (
+    nuxt: Nuxt,
+    version: string,
+    write: boolean,
+    secrets: { token: string },
+): Promise<void> => {
     // Snapshot must run inside Nitro's worker, where the runtime registry lives.
     addServerHandler({
         route: FILES_SNAPSHOT_PATH,
@@ -42,12 +43,16 @@ export const setupFilesDevtools = (nuxt: Nuxt, version: string, write: boolean, 
         ),
     })
     if (Number.parseInt(version) >= 4) {
+        const { setupNuxtV4Devtools } = await import('./nuxt-v4')
         setupNuxtV4Devtools(nuxt, {
             write,
             maxUploadSize: FILES_DEVTOOLS_MAX_UPLOAD_SIZE,
             tokenSecret: secrets.token,
         })
     } else {
+        const { setupNuxtV3Devtools } = await import('./nuxt-v3')
+        const { default: uiHandler } = await import('./nuxt-v3-handler')
+        const { default: tokenHandler } = await import('./token')
         addDevServerHandler({
             route: FILES_TOKEN_PATH,
             handler: (event) =>

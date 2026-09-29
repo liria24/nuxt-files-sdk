@@ -2,9 +2,6 @@ import { readFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { loadConfig } from 'c12'
-import { createJiti } from 'jiti'
-
 import type { FilesConfig } from '../config'
 import { registerSdkAliases, resolveOwnedSdk } from '../integration/resolve'
 import { normalizeFilesConfig } from '../runtime/normalize'
@@ -42,6 +39,8 @@ export const loadFilesConfig = async ({
     injectImports,
     source,
 }: FilesConfigLoaderOptions): Promise<FilesConfig | undefined> => {
+    const { loadConfig } = await import('c12')
+    const { createJiti } = await import('jiti')
     const jiti = createJiti(import.meta.url, {
         alias: {
             ...registerSdkAliases(alias ?? {}, resolveOwnedSdk()),

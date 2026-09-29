@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 
-import { setupNitroFilesIntegration, type NitroIntegration } from './integration/nitro'
+import type { NitroIntegration } from './integration/nitro'
 
 /**
  * A structurally compatible Nitro v2/v3 module. Nitro loads this export
@@ -8,11 +8,13 @@ import { setupNitroFilesIntegration, type NitroIntegration } from './integration
  */
 export default {
     name: 'nuxt-files-sdk',
-    setup: (nitro: NitroIntegration) =>
-        setupNitroFilesIntegration(nitro, {
+    setup: async (nitro: NitroIntegration) => {
+        const { setupNitroFilesIntegration } = await import('./integration/nitro')
+        return setupNitroFilesIntegration(nitro, {
             configPath: resolve(nitro.options.rootDir, 'files.config.ts'),
             environments: nitro.options.static
                 ? ['production', 'prerender']
                 : [nitro.options.dev ? 'development' : 'production'],
-        }),
+        })
+    },
 }

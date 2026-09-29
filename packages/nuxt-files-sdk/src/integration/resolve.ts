@@ -127,11 +127,15 @@ export const registerSdkAliases = (
     conditions = ['node', 'import'],
 ): Record<string, string> => {
     const selected = sdkAliases(sdk, conditions)
-    const node = sdkAliases(sdk)
-    const browser = sdkAliases(sdk, ['browser', 'import'])
+    let node: Record<string, string> | undefined
+    let browser: Record<string, string> | undefined
     for (const [name, path] of Object.entries(aliases)) {
         if (name !== '#files-sdk' && !name.startsWith('#files-sdk/')) continue
-        if (![selected[name], node[name], browser[name]].includes(path.replaceAll('\\', '/'))) {
+        const normalized = path.replaceAll('\\', '/')
+        if (selected[name] === normalized) continue
+        node ??= sdkAliases(sdk)
+        browser ??= sdkAliases(sdk, ['browser', 'import'])
+        if (![node[name], browser[name]].includes(normalized)) {
             throw new Error(`[nuxt-files-sdk:reserved-alias] ${name} must refer to the owned Files SDK.`)
         }
     }
