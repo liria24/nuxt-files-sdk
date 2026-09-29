@@ -30,7 +30,6 @@ test('documentation pages and internal links stay complete', async () => {
     )
     expect(links.length).toBeGreaterThan(0)
     for (const link of links) expect(routes, link).toContain(link)
-
 })
 
 test('GitHub content revision checks are bounded and validated', async () => {

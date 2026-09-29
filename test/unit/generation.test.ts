@@ -74,11 +74,11 @@ describe('provider generation', () => {
             $development: { storage: { files: { adapter: 'fs', config: { root: '.data/files' } } } },
         })
 
-        expect(selectedAdapters(config)).toEqual({ adapters: ['memory', 'r2'], single: false })
-        expect(selectedAdapters({ storage: { ...config.storage, ...config.$development.storage } })).toEqual({
-            adapters: ['fs', 'memory'],
-            single: false,
-        })
+        expect(selectedAdapters(config)).toEqual(['memory', 'r2'])
+        expect(selectedAdapters({ storage: { ...config.storage, ...config.$development.storage } })).toEqual([
+            'fs',
+            'memory',
+        ])
         expect(runtimeConfig).not.toHaveBeenCalled()
 
         const generated = providerCode(['r2'])
@@ -91,7 +91,7 @@ describe('provider generation', () => {
         const adapter = vi.fn<() => ReturnType<typeof memory>>(() => memory())
         const plugins = vi.fn<() => []>(() => [])
         const config = defineFilesConfig({ storage: { adapter, plugins } })
-        expect(selectedAdapters(config)).toEqual({ adapters: [], single: true })
+        expect(selectedAdapters(config)).toEqual([])
         expect(providerCode([])).toEqual({ imports: '', factories: '' })
         expect(adapter).not.toHaveBeenCalled()
         expect(plugins).not.toHaveBeenCalled()
@@ -193,10 +193,7 @@ describe('provider generation', () => {
             },
         ]) {
             const configResolver = vi.fn<() => typeof config>(() => config)
-            expect(selectedAdapters({ storage: { adapter: 'r2', config: configResolver } })).toEqual({
-                adapters: ['r2'],
-                single: true,
-            })
+            expect(selectedAdapters({ storage: { adapter: 'r2', config: configResolver } })).toEqual(['r2'])
             expect(configResolver).not.toHaveBeenCalled()
             for (const nitroMajor of [2, 3]) {
                 for (const installed of [false, true]) {
@@ -213,7 +210,7 @@ describe('provider generation', () => {
 
     test('[CFG-011] skips an environment-only config outside its environment', async () => {
         const config = defineFilesConfig({ $test: { storage: { adapter: 'memory' } } })
-        expect(selectedAdapters(config.$test)).toEqual({ adapters: ['memory'], single: true })
+        expect(selectedAdapters(config.$test)).toEqual(['memory'])
         expect(() => selectedAdapters(config)).toThrow('At least one storage is required')
 
         const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-development-only-'))

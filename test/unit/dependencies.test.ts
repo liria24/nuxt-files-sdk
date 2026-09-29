@@ -1,10 +1,7 @@
 import { PROVIDER_NAMES } from 'files-sdk/providers'
 import { expect, test, vi } from 'vitest'
 
-import {
-    deploymentTarget,
-    storageDependencies,
-} from '../../packages/nuxt-files-sdk/src/integration/dependencies'
+import { deploymentTarget, storageDependencies } from '../../packages/nuxt-files-sdk/src/integration/dependencies'
 import { subpathDependencies } from '../../packages/nuxt-files-sdk/src/integration/imports'
 import { resolveOwnedSdk } from '../../packages/nuxt-files-sdk/src/integration/resolve'
 import { normalizeFilesConfig } from '../../packages/nuxt-files-sdk/src/runtime/normalize'
@@ -65,4 +62,3 @@ test('[DEP-001] covers every native adapter and preserves known imports alongsid
     expect(dependencies('fs', {})).toEqual([])
     expect(resolver).not.toHaveBeenCalled()
 })
-

@@ -26,7 +26,7 @@ describe('normalized configuration', () => {
             expect(() => new FilesRegistry(config as FilesConfig, { factories: { memory } })).toThrow(error)
         }
         const config = { storage: { adapter: 'memory' as const } }
-        expect(selectedAdapters(config)).toEqual({ single: true, adapters: ['memory'] })
+        expect(selectedAdapters(config)).toEqual(['memory'])
         expect(new FilesRegistry(config, { factories: { memory } }).get().adapter.name).toBe('memory')
     })
 

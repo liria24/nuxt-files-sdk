@@ -1,5 +1,6 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 import type { NavigationItem } from 'comark-content'
+
 import { flattenNavigation } from '../../shared/utils/navigation'
 
 export const toMenuItems = (items: NavigationItem[]): NavigationMenuItem[] =>

@@ -6,11 +6,7 @@ import { getProvider, listEnvVars } from 'files-sdk/providers'
 import { normalizeFilesConfig } from '../runtime/normalize'
 import type { FilesConfigLoaderOptions } from './load'
 
-export const selectedAdapters = (
-    config: unknown,
-    entries = normalizeFilesConfig(config),
-): { adapters: ProviderSlug[]; single: boolean } => {
-    const single = entries.has(undefined)
+export const selectedAdapters = (config: unknown, entries = normalizeFilesConfig(config)): ProviderSlug[] => {
     const adapters = [
         ...new Set(
             [...entries.values()]
@@ -23,7 +19,7 @@ export const selectedAdapters = (
             throw new Error(`[nuxt-files-sdk:unknown-adapter] Unknown adapter "${adapter}".`)
         }
     }
-    return { adapters, single }
+    return adapters
 }
 
 export const gatewayRoutes = (
@@ -82,12 +78,10 @@ export const prepareFilesConfig = async (options: FilesConfigLoaderOptions) => {
     const config = await loadFilesConfig({ ...options, source, injectImports: undefined })
     if (!config) return undefined
     const entries = normalizeFilesConfig(config)
-    const { adapters, single } = selectedAdapters(config, entries)
+    const adapters = selectedAdapters(config, entries)
     return {
-        config,
         entries,
         adapters,
-        single,
         routes: gatewayRoutes(config, entries),
         providers: providerCode(adapters),
         source: pruneFilesConfigSource(source, options.configPath, options.environments),

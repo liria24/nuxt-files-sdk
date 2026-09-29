@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useClipboard } from '@vueuse/core'
 import type { TreeItem, TabsItem } from '@nuxt/ui'
+import { useClipboard } from '@vueuse/core'
 import { highlightText } from 'rangi'
 
 const { docs } = useAppConfig()

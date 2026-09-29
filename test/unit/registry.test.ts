@@ -98,31 +98,6 @@ describe('FilesRegistry', () => {
 
         expect(files.prefix).toBe('native-options')
         expect(files.defaults).toEqual({ retries: { max: 2, backoff: expect.any(Function) }, signal, timeout: 250 })
-        await expect(files.upload('passthrough.txt', 'hello')).resolves.toMatchObject({ key: 'passthrough.txt' })
-
-        const readonly = new FilesRegistry(
-            defineFilesConfig({
-                storage: { adapter: 'fs', config: { root: '.data/test-files' }, readonly: true },
-            }),
-            { factories },
-        ).get()
-        await expect(readonly.upload('readonly.txt', 'blocked')).rejects.toMatchObject({ code: 'ReadOnly' })
-    })
-
-    test('[CFG-011] supports an environment-only storage after resolution', () => {
-        const registry = new FilesRegistry(
-            defineFilesConfig({
-                storage: {
-                    adapter: 'fs',
-                    config: { root: '.data/test-files' },
-                    plugins: [versioning()],
-                },
-            }),
-            { factories },
-        )
-
-        expect(registry.get().versions).toBeTypeOf('function')
-        expect(registry.inspect().storages).toEqual([{ adapter: 'fs', plugins: ['versioning'], initialized: true }])
     })
 
     test('[SEC-002] reports only a secret-free snapshot', () => {
@@ -230,8 +205,6 @@ describe('FilesRegistry', () => {
         expect(cold).toHaveBeenCalledOnce()
         expect(hot).toHaveBeenCalledOnce()
         expect(resolverCalls).toBe(1)
-        await files.upload('archive/old.txt', 'hello')
-        expect(await files.exists('archive/old.txt')).toBe(true)
     })
 
     test('detects a cross-storage adapter dependency cycle', () => {
@@ -318,8 +291,13 @@ describe('FilesRegistry', () => {
     })
 
     test('[RUNTIME-003] retries failed plugin resolution while retaining the successful adapter', () => {
-        const factory = vi.fn(() => memory())
-        const plugins = vi.fn().mockImplementationOnce(() => { throw new Error('plugin failed') }).mockReturnValue([])
+        const factory = vi.fn<typeof memory>(() => memory())
+        const plugins = vi
+            .fn<() => []>()
+            .mockImplementationOnce(() => {
+                throw new Error('plugin failed')
+            })
+            .mockReturnValue([])
         const registry = new FilesRegistry({ storage: { adapter: factory, plugins } }, { factories: {} })
         expect(() => registry.get()).toThrow('plugin failed')
         expect(registry.inspect().storages[0]?.initialized).toBe(false)

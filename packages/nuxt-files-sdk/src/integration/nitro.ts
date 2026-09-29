@@ -223,9 +223,15 @@ export const setupNitroFilesIntegration = async (
             return resolvePackage(dependency, pathToFileURL(sdk.manifestPath)).status === 'resolved'
         },
     })
-    const adapterDependencies = new Map(prepared.adapters.map((adapter) => [adapter, subpathDependencies(sdk, `files-sdk/${adapter}`)]))
+    const adapterDependencies = new Map(
+        prepared.adapters.map((adapter) => [adapter, subpathDependencies(sdk, `files-sdk/${adapter}`)]),
+    )
     const requirements = [...prepared.entries.values()].flatMap((entry) =>
-        storageDependencies(entry, deploymentTarget(nitro.options.preset), typeof entry.storage.adapter === 'string' ? adapterDependencies.get(entry.storage.adapter)! : []),
+        storageDependencies(
+            entry,
+            deploymentTarget(nitro.options.preset),
+            typeof entry.storage.adapter === 'string' ? adapterDependencies.get(entry.storage.adapter)! : [],
+        ),
     )
     for (const subpath of graph.sdkImports) requirements.push(...subpathDependencies(sdk, subpath))
     const dependencyDiagnostics = diagnoseDependencies(sdk, requirements, aliases, awsShims)

@@ -1,4 +1,3 @@
-
 import type { Nuxt } from '@nuxt/schema'
 import { describe, expect, test, vi } from 'vitest'
 
@@ -174,5 +173,4 @@ describe('Nuxt DevTools integration', () => {
             })
         expect(context.messages.add).not.toHaveBeenCalled()
     })
-
 })

@@ -5,6 +5,7 @@ const project = (name: string, include: string[]) => ({
         name,
         include,
         environment: 'node' as const,
+        ...(name === 'unit' || name === 'consumer' ? {} : { globalSetup: ['./test/utils/global-setup.ts'] }),
         fileParallelism: false,
         hookTimeout: 300_000,
         testTimeout: 300_000,

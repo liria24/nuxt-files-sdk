@@ -46,7 +46,10 @@ export const runCommand = (
 
 let packageBuild: Promise<string> | undefined
 
-export const buildPackage = (): Promise<string> => (packageBuild ??= runCommand('bun', ['run', 'build']))
+export const buildPackage = async (): Promise<string> => {
+    if (process.env.VITEST && (await import('vitest')).inject('filesPackageBuilt')) return ''
+    return (packageBuild ??= runCommand('bun', ['run', 'build']))
+}
 
 export const installFixture = async (name: string): Promise<string> => {
     await buildPackage()
@@ -166,7 +169,6 @@ export const packPackage = async (): Promise<{ directory: string; tarball: strin
     if (process.env.NUXT_FILES_TARBALL) {
         return { directory, tarball: resolve(process.env.NUXT_FILES_TARBALL) }
     }
-    await buildPackage()
     await runCommand('bun', ['pm', 'pack', '--destination', directory], {
         cwd: resolve(repositoryRoot, 'packages/nuxt-files-sdk'),
     })

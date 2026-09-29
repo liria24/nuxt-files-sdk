@@ -7,15 +7,9 @@ import { resolveModulePath } from 'exsolve'
 import { getPackageInfoSync, resolveModule } from 'local-pkg'
 import { exports as resolveExports } from 'resolve.exports'
 
-export interface PackageManifest {
+export type PackageManifest = NonNullable<ReturnType<typeof getPackageInfoSync>>['packageJson'] & {
     name: string
     version: string
-    exports?: Record<string, unknown>
-    main?: string
-    dependencies?: Record<string, string>
-    optionalDependencies?: Record<string, string>
-    peerDependencies?: Record<string, string>
-    peerDependenciesMeta?: Record<string, { optional?: boolean }>
 }
 
 export interface PackageInfo {
@@ -38,7 +32,8 @@ export const packageInfo = (specifier: string, from: URL): PackageInfo | undefin
         const info = getPackageInfoSync(entry)
         if (info?.packageJson.name === name) {
             const manifestPath = realpathSync(info.packageJsonPath)
-            return { manifest: info.packageJson as PackageManifest, manifestPath, root: dirname(manifestPath) }
+            const manifest = { ...info.packageJson, name, version: info.version ?? '' }
+            return { manifest, manifestPath, root: dirname(manifestPath) }
         }
     }
     // A package can expose only subpaths. Failed root resolution does not prove absence.

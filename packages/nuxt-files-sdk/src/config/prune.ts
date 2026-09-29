@@ -7,9 +7,13 @@ const unwrap = (node: Node): Node =>
         ? unwrap(node.expression)
         : node
 const keyOf = (node: ObjectPropertyKind): string | undefined =>
-    node.type !== 'Property' || node.computed ? undefined
-        : node.key.type === 'Identifier' ? node.key.name
-        : node.key.type === 'Literal' && typeof node.key.value === 'string' ? node.key.value : undefined
+    node.type !== 'Property'
+        ? undefined
+        : node.key.type === 'Identifier' && !node.computed
+          ? node.key.name
+          : node.key.type === 'Literal' && typeof node.key.value === 'string'
+            ? node.key.value
+            : undefined
 
 /** Remove inactive environment literals before bundling the user config. */
 export const pruneFilesConfigSource = (source: string, configPath: string, environments: readonly string[]): string => {
@@ -24,7 +28,9 @@ export const pruneFilesConfigSource = (source: string, configPath: string, envir
     if (root.type === 'CallExpression') root = unwrap(root.arguments[0] ?? root)
     if (root.type === 'Identifier') {
         const name = root.name
-        const declaration = body.flatMap((node) => node.type === 'VariableDeclaration' ? node.declarations : []).find((node) => node.id.type === 'Identifier' && node.id.name === name)
+        const declaration = body
+            .flatMap((node) => (node.type === 'VariableDeclaration' ? node.declarations : []))
+            .find((node) => node.id.type === 'Identifier' && node.id.name === name)
         if (declaration?.init) root = unwrap(declaration.init)
     }
     if (root.type !== 'ObjectExpression') {
