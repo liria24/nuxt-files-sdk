@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'RESOLVE-001',
+        guarantee: 'Owned package resolution respects importer, public exports and conditions without logging or stale misses',
+        source: 'test/unit/resolution.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'META-001',
         guarantee: 'Every registered contract has an executable test reference and a blocking job',
         source: 'test/unit/contracts.test.ts',

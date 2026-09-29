@@ -62,7 +62,9 @@
         "@nuxt/kit": "^4.5.2",
         "c12": "^3.3.4",
         "devframe": "^1.1.0",
+        "exsolve": "^1.1.1",
         "jiti": "^2.7.0",
+        "local-pkg": "^1.2.1",
         "oxc-parser": "^0.152.0",
       },
       "devDependencies": {
