@@ -31,6 +31,7 @@
         "nuxt-og-image": "^6.9.1",
         "rangi": "^2.2.0",
         "tailwindcss": "^4.3.3",
+        "ufo": "^1.6.4",
         "unstorage": "^1.17.5"
     },
     "devDependencies": {

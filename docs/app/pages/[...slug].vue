@@ -2,6 +2,8 @@
 import type { NavigationItem } from 'comark-content'
 import type { Toc } from 'comark/plugins/toc'
 
+import DocsPageHeaderLinks from '../components/docs/DocsPageHeaderLinks.vue'
+
 definePageMeta({
     layout: 'docs',
     path: '/:slug(.+)',
