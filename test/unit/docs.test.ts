@@ -34,7 +34,7 @@ test('documentation pages and internal links stay complete', async () => {
 
     const content = pages.join('\n')
     for (const example of [
-        "from 'files-sdk/versioning'",
+        "from '#files-sdk/versioning'",
         'useServerFiles()',
         "useServerFiles('archive')",
         '$development',

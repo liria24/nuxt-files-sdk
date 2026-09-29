@@ -1,4 +1,4 @@
-import type { FsAdapter } from 'files-sdk/fs'
+import type { FsAdapter } from '#files-sdk/fs'
 
 export default defineEventHandler(() => {
     const files = useServerFiles()

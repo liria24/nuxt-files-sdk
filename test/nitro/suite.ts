@@ -24,7 +24,7 @@ export const nitroSuite = (
 
             expect(plugin).toMatch(/import \{ configureFiles \} from "[^"\n]+\/runtime\/internal\.js"/u)
             expect(plugin).not.toContain("from 'nuxt-files-sdk'")
-            expect(plugin).toContain('from "files-sdk/fs"')
+            expect(plugin).toContain('from "#files-sdk/fs"')
             expect(plugin).not.toContain('files-sdk/loader')
             expect(types).toContain(`declare module "${hookModule}"`)
             expect(types).toContain("declare module 'nuxt-files-sdk/runtime'")
@@ -118,7 +118,7 @@ export const nitroSuite = (
             )
             const generated = await readOutput(generatedDirectory)
             for (const adapter of ['minio', 'r2', 'rustfs']) {
-                expect(generated).toContain(`from "files-sdk/${adapter}"`)
+                expect(generated).toContain(`from "#files-sdk/${adapter}"`)
             }
             const generatedFiles = await readdir(generatedDirectory)
             expect(generatedFiles.some((file) => file.includes('aws-sdk-client-s3'))).toBe(name === 'nitro-v2')

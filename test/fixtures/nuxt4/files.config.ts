@@ -1,4 +1,4 @@
-import { versioning } from 'files-sdk/versioning'
+import { versioning } from '#files-sdk/versioning'
 
 export default defineFilesConfig({
     storage: {
