@@ -1,14 +1,12 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { ProviderSlug } from 'files-sdk'
-import { getProvider, listEnvVars } from 'files-sdk/providers'
+import { getProvider } from 'files-sdk/providers'
 
-import { loadFilesConfig } from '../config/load'
-import { pruneFilesConfigSource } from '../config/prune'
-import { normalizeFilesConfig } from '../runtime/normalize'
+import { prepareFilesConfig } from '../config/prepare'
 import { registerSdkAliases, resolveOwnedSdk, sdkTypePaths } from './resolve'
 
 export interface NitroIntegration {
@@ -75,67 +73,6 @@ export const optionalAwsSdkDependencies = (
 
 const nitroMajorVersion = (nitro: NitroIntegration): number => nitro.meta?.majorVersion ?? ('routing' in nitro ? 3 : 2)
 
-export const selectedAdapters = (config: unknown): { adapters: ProviderSlug[]; single: boolean } => {
-    const entries = normalizeFilesConfig(config)
-    const single = entries.has(undefined)
-    const adapters = [
-        ...new Set(
-            [...entries.values()]
-                .map(({ storage }) => storage.adapter)
-                .filter((adapter): adapter is ProviderSlug => typeof adapter === 'string'),
-        ),
-    ].toSorted()
-    for (const adapter of adapters) {
-        if (!getProvider(adapter)) {
-            throw new Error(`[nuxt-files-sdk:unknown-adapter] Unknown adapter "${adapter}".`)
-        }
-    }
-    return { adapters, single }
-}
-
-export const gatewayRoutes = (config: unknown): { path: string; storage?: string }[] => {
-    const routes = config && typeof config === 'object' && 'routes' in config ? config.routes : undefined
-    if (routes === undefined) return []
-    if (!Array.isArray(routes)) throw new Error('[nuxt-files-sdk:invalid-route] routes must be an array.')
-    const storages = normalizeFilesConfig(config)
-    const paths = new Set<string>()
-    const selected: { path: string; storage?: string }[] = []
-    for (const route of routes as unknown[]) {
-        if (
-            !route ||
-            typeof route !== 'object' ||
-            !('path' in route) ||
-            typeof route.path !== 'string' ||
-            !/^\/(?:[\w.~-]+(?:\/[\w.~-]+)*)?$/u.test(route.path)
-        ) {
-            throw new Error('[nuxt-files-sdk:invalid-route] Each route needs a static absolute path.')
-        }
-        if (paths.has(route.path)) throw new Error(`[nuxt-files-sdk:duplicate-route] Duplicate route "${route.path}".`)
-        paths.add(route.path)
-        const name = 'storage' in route ? route.storage : undefined
-        if (storages.has(undefined) ? name !== undefined : typeof name !== 'string' || !storages.has(name)) {
-            throw new Error(`[nuxt-files-sdk:unknown-storage] Invalid storage for route "${route.path}".`)
-        }
-        selected.push(typeof name === 'string' ? { path: route.path, storage: name } : { path: route.path })
-    }
-    return selected
-}
-
-const factoryName = (adapter: ProviderSlug): string =>
-    adapter === 'cloudinary'
-        ? 'cloudinaryAdapter'
-        : adapter.replaceAll(/-([a-z0-9])/gu, (_, character: string) => character.toUpperCase())
-
-export const providerCode = (adapters: ProviderSlug[]): { imports: string; factories: string } => ({
-    imports: adapters
-        .map(
-            (adapter, index) =>
-                `import { ${factoryName(adapter)} as provider${index} } from ${JSON.stringify(`#files-sdk/${adapter}`)}`,
-        )
-        .join('\n'),
-    factories: adapters.map((adapter, index) => `${JSON.stringify(adapter)}: provider${index}`).join(', '),
-})
-
 const hookTypes = (moduleName: 'nitropack/types' | 'nitro/types'): string => `
 declare module ${JSON.stringify(moduleName)} {
   interface NitroRuntimeHooks {
@@ -167,14 +104,13 @@ export const setupNitroFilesIntegration = async (
     const sdk = resolveOwnedSdk()
     nitro.options.alias = registerSdkAliases(nitro.options.alias ?? {}, sdk)
     const configPath = options.configPath.replaceAll('\\', '/')
-    const config = await loadFilesConfig({
+    const prepared = await prepareFilesConfig({
         configPath,
         environments: options.environments,
         alias: nitro.options.alias,
         injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
     })
-    if (!config) return false
-    const selected = selectedAdapters(config)
+    if (!prepared) return false
     const directory = resolve(nitro.options.rootDir, nitro.options.buildDir, 'nuxt-files-sdk')
     const typesPath = resolve(directory, 'storage-registry.d.ts')
     let writeRuntime: (() => Promise<void>) | undefined
@@ -202,18 +138,8 @@ export const setupNitroFilesIntegration = async (
         const paths = ((tsConfig.compilerOptions ??= {}).paths ??= {})
         Object.assign(paths, sdkTypePaths(sdk))
     })
-    const routes = gatewayRoutes(config)
-    const { adapters } = selected
-    const providers = providerCode(adapters)
+    const { routes, adapters, providers, environment } = prepared
     const internalPath = fileURLToPath(new URL('../runtime/internal.js', import.meta.url)).replaceAll('\\', '/')
-    const environment = Object.fromEntries(
-        adapters.map((adapter) => [
-            adapter,
-            listEnvVars(adapter)
-                .filter((variable) => variable.readBy === 'files-sdk')
-                .map((variable) => [variable.key, ...(variable.aliases ?? [])]),
-        ]),
-    )
     const require = createRequire(resolve(nitro.options.rootDir, 'package.json'))
     const aliases = nitro.options.alias ?? {}
     const awsShims = optionalAwsSdkDependencies(adapters, {
@@ -278,11 +204,7 @@ export const setupNitroFilesIntegration = async (
                 ),
             ),
         )
-        const originalSource = await readFile(configPath, 'utf8')
-        const importedSource = nitro.unimport
-            ? (await nitro.unimport.injectImports(originalSource, configPath)).code
-            : originalSource
-        await writeFile(selectedPath, pruneFilesConfigSource(importedSource, configPath, options.environments))
+        await writeFile(selectedPath, prepared.source)
         const mergePath = fileURLToPath(new URL('../config/merge.js', import.meta.url)).replaceAll('\\', '/')
         const selectedBranches = options.environments
             .flatMap((name) => [`raw[${JSON.stringify(`$${name}`)}]`, `raw.$env?.[${JSON.stringify(name)}]`])
