@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NavigationItem } from 'comark-content'
+import type { Toc } from 'comark/plugins/toc'
 
 definePageMeta({
     layout: 'docs',
@@ -30,7 +31,7 @@ if (!page.value) {
 const frontmatter = computed<Record<string, unknown>>(() => (page.value?.data ?? {}) as Record<string, unknown>)
 const title = computed(() => String(frontmatter.value.title ?? 'Nuxt Files SDK'))
 const description = computed(() => String(frontmatter.value.description ?? ''))
-const toc = computed(() => (page.value?.meta as { toc?: { links?: [] } } | undefined)?.toc?.links ?? [])
+const toc = computed(() => (page.value?.meta as { toc?: Toc } | undefined)?.toc?.links ?? [])
 const surround = computed(() => surroundingPages(navigation?.value ?? [], path.value))
 const siteUrl = useRuntimeConfig().public.siteUrl.replace(/\/$/u, '')
 const canonical = computed(() => `${siteUrl}${path.value}`)

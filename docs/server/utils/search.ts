@@ -1,12 +1,6 @@
 import type { AnyComarkContent, ContentFile } from 'comark-content'
 
-export interface SearchSection {
-    id: string
-    title: string
-    titles: string[]
-    level: number
-    content: string
-}
+import type { SearchSection } from '../../shared/search'
 
 const searchCacheKey = 'search-sections'
 

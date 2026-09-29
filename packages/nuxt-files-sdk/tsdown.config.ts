@@ -57,7 +57,7 @@ export default defineConfig([
         format: ['esm'],
         platform: 'neutral',
         publint: true,
-        sourcemap: true,
+        sourcemap: false,
         unbundle: true,
         plugins: [
             {

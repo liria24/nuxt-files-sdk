@@ -1,3 +1,4 @@
+import { flattenNavigation } from '../../shared/utils/navigation'
 export default defineNitroPlugin((nitroApp) => {
     nitroApp.hooks.hook('llms:generate', async (event, options) => {
         const content = await getDocsContent(event)

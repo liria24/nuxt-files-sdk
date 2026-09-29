@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useClipboard } from '@vueuse/core'
 import { joinURL } from 'ufo'
 
 const route = useRoute()

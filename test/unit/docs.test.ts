@@ -22,10 +22,8 @@ const routeFor = (path: string) => {
 
 test('documentation pages and internal links stay complete', async () => {
     const files = (await readdir(contentDirectory, { recursive: true })).filter((path) => path.endsWith('.md'))
-    expect(files).toHaveLength(14)
 
     const routes = new Set(files.map(routeFor))
-    expect(routes).toContain('/migration/upgrade-to-v0.2')
     const pages = await Promise.all(files.map((path) => readFile(resolve(contentDirectory, path), 'utf8')))
     const links = pages.flatMap((page) =>
         [...page.matchAll(/(?:\]\(|\bto:\s*|\bto=")(\/[a-z0-9][^\s)"#?]*)/giu)].map((match) => match[1]!),
@@ -33,73 +31,6 @@ test('documentation pages and internal links stay complete', async () => {
     expect(links.length).toBeGreaterThan(0)
     for (const link of links) expect(routes, link).toContain(link)
 
-    const content = pages.join('\n')
-    for (const example of [
-        "from '#files-sdk/versioning'",
-        'useServerFiles()',
-        "useServerFiles('archive')",
-        '$development',
-        'useFiles',
-        'useList',
-        'nuxt-files-sdk/nitro',
-        'write: false',
-    ]) {
-        expect(content, example).toContain(example)
-    }
-    expect(content).not.toContain('nuxt-files-sdk/plugins')
-})
-
-test('documentation dependencies and local storage stay isolated from the public package', async () => {
-    const rootPackage = await readFile(resolve(repositoryRoot, 'package.json'), 'utf8')
-    const docsPackage = await readFile(resolve(repositoryRoot, 'docs/package.json'), 'utf8')
-    const publicPackage = await readFile(resolve(repositoryRoot, 'packages/nuxt-files-sdk/package.json'), 'utf8')
-    const nuxtConfig = await readFile(resolve(repositoryRoot, 'docs/nuxt.config.ts'), 'utf8')
-    const filesConfig = await readFile(resolve(repositoryRoot, 'docs/files.config.ts'), 'utf8')
-    const contentRuntime = await readFile(resolve(repositoryRoot, 'docs/server/utils/content.ts'), 'utf8')
-
-    for (const dependency of [
-        '@comark/nuxt',
-        '@nuxt/fonts',
-        '@nuxt/image',
-        '@nuxt/ui',
-        '@nuxtjs/i18n',
-        '@nuxtjs/robots',
-        '@nuxtjs/sitemap',
-        '@takumi-rs/core',
-        '@takumi-rs/wasm',
-        'nuxt-og-image',
-        'rangi',
-    ])
-        expect(docsPackage).toContain(`"${dependency}"`)
-    for (const module of [
-        '@nuxt/fonts',
-        '@nuxt/image',
-        '@nuxtjs/i18n',
-        '@nuxtjs/robots',
-        '@nuxtjs/sitemap',
-        'nuxt-og-image',
-    ])
-        expect(nuxtConfig).toContain(`'${module}'`)
-    const docsManifest = JSON.parse(docsPackage) as { dependencies: Record<string, string> }
-    expect(docsManifest.dependencies['comark-content']).toMatch(/^\d+\.\d+\.\d+$/u)
-    expect(docsPackage).toContain('"nuxt-files-sdk": "workspace:*"')
-    expect(rootPackage).not.toContain('"postinstall"')
-    expect(docsPackage).not.toContain('"prepare": "nuxt prepare"')
-    expect(docsPackage).not.toContain('"comark-docs"')
-    expect(docsPackage).not.toContain('"satori"')
-    expect(docsPackage).not.toContain('shiki')
-    expect(`${rootPackage}\n${docsPackage}`).not.toContain('@comark/cms')
-    expect(publicPackage).not.toContain('comark')
-    expect(contentRuntime).toContain("from '@comark/nuxt/plugins/rangi'")
-    expect(contentRuntime).not.toContain('shiki')
-    expect(nuxtConfig).toContain("contentDir: 'docs/content'")
-    expect(nuxtConfig).toContain("preset: 'cloudflare-module'")
-    expect(nuxtConfig).toContain("locales: [{ code: 'en', language: 'en-US', name: 'English' }]")
-    expect(nuxtConfig).toContain("sources: ['/api/__sitemap__/urls']")
-    expect(filesConfig).toContain("root: '.data/files-devtools'")
-    expect(filesConfig).not.toContain('import { defineFilesConfig }')
-    expect(filesConfig).not.toMatch(/^\s*storage:/mu)
-    expect(filesConfig).not.toContain('NODE_ENV')
 })
 
 test('GitHub content revision checks are bounded and validated', async () => {

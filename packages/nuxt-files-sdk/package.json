@@ -50,7 +50,6 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@nuxt/devtools-kit": "4.0.0-beta.2",
         "@nuxt/kit": "^4.5.2",
         "@nuxt/schema": "^4.5.2",
         "c12": "4.0.0-rc.2",
@@ -71,7 +70,8 @@
         "publint": "^0.3.24",
         "tsdown": "^0.23.0",
         "typescript": "^7.0.2",
-        "vue": "^3.5.43"
+        "vue": "^3.5.43",
+        "@nuxt/devtools-kit": "4.0.0-beta.2"
     },
     "peerDependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",

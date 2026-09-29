@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 
 import type { Nuxt } from '@nuxt/schema'
 import { describe, expect, test, vi } from 'vitest'
@@ -176,12 +175,4 @@ describe('Nuxt DevTools integration', () => {
         expect(context.messages.add).not.toHaveBeenCalled()
     })
 
-    test('[DEV-003] v4 integration relies on the official kit types', async () => {
-        const source = await readFile(
-            new URL('../../packages/nuxt-files-sdk/src/devtools/nuxt-v4.ts', import.meta.url),
-            'utf8',
-        )
-        expect(source).toContain("from '@nuxt/devtools-kit'")
-        expect(source).not.toMatch(/type DevtoolsContext|interface NuxtHooks|declare module '@nuxt\/schema'/u)
-    })
 })

@@ -1,12 +1,6 @@
 import { defineContentClientPlugin } from 'comark-content/client'
 
-export interface SearchSection {
-    id: string
-    title: string
-    titles: string[]
-    level: number
-    content: string
-}
+import type { SearchSection } from '../../shared/search'
 
 interface SearchMethods {
     searchSections(): Promise<SearchSection[]>

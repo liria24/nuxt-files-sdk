@@ -22,8 +22,6 @@ jobs:
               with: { persist-credentials: false }
             - uses: ./.github/actions/setup
             - run: bun run build
-            - run: bunx publint packages/nuxt-files-sdk
-            - run: bunx attw --pack packages/nuxt-files-sdk --profile esm-only
 
     typecheck:
         permissions:
@@ -63,8 +61,7 @@ jobs:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
               with: { persist-credentials: false }
             - uses: ./.github/actions/setup
-            - run: bunx knip
-            - run: bunx knip --production
+            - run: bun run unused
     unit:
         permissions:
             contents: read

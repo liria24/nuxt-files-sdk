@@ -1,29 +1,56 @@
 {
     "$schema": "https://unpkg.com/knip@6/schema.json",
     "ignoreExportsUsedInFile": true,
-    "ignore": ["test/fixtures/**"],
+    "ignore": [
+        "test/fixtures/**"
+    ],
     "workspaces": {
         ".": {
-            "entry": ["*.config.ts", "test/**/*.test.ts"],
-            "project": ["*.{ts,vue}", "test/**/*.ts"]
+            "entry": [
+                "*.config.ts",
+                "test/**/*.test.ts"
+            ],
+            "project": [
+                "*.ts",
+                "test/**/*.ts"
+            ]
         },
         "packages/nuxt-files-sdk": {
-            "entry": ["src/{module,config,nitro,runtime}.ts"],
-            "ignoreDependencies": ["@arethetypeswrong/cli", "@vitejs/devtools-kit"],
+            "entry": [
+                "src/{module,config,nitro,runtime}.ts"
+            ],
+            "ignoreDependencies": [
+                "@arethetypeswrong/cli",
+                "@vitejs/devtools-kit"
+            ],
             "ignoreIssues": {
-                "package.json": ["optionalPeerDependencies"]
+                "package.json": [
+                    "optionalPeerDependencies"
+                ]
             },
-            "project": ["src/**/*.{ts,vue}!", "*.config.ts"]
+            "project": [
+                "src/**/*.ts!",
+                "*.config.ts"
+            ]
         },
         "docs": {
-            "entry": ["files.config.ts!", "app/**/*.{ts,vue}!", "server/**/*.ts!"],
+            "entry": [
+                "files.config.ts!",
+                "app/{app,error}.vue!",
+                "app/pages/**/*.vue!",
+                "app/layouts/**/*.vue!",
+                "app/plugins/**/*.ts!",
+                "server/{api,routes,plugins,middleware}/**/*.ts!",
+                "server/error.ts!"
+            ],
             "ignoreDependencies": [
                 "@iconify-json/lucide",
                 "@iconify-json/simple-icons",
-                "@vueuse/core",
                 "nuxtseo-layer-devtools"
             ],
-            "project": ["**/*.{ts,vue,css}"]
+            "project": [
+                "**/*.{ts,vue,css}"
+            ]
         }
     }
 }
