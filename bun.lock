@@ -56,7 +56,7 @@
     },
     "packages/nuxt-files-sdk": {
       "name": "nuxt-files-sdk",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "dependencies": {
         "@nuxt/kit": "^4.5.2",
         "@nuxt/schema": "^4.5.2",
