@@ -162,7 +162,10 @@ describe('Packed consumer', () => {
                 // Strict non-hoisting also exposes Nuxt's undeclared c12/unplugin imports.
                 // Keep these framework dependencies explicit, including for workspace Layers.
                 frameworkDependencies = Object.fromEntries(
-                    ['c12', 'unplugin', '@types/node'].map((name) => [name, consumerPackage.devDependencies[name]!]),
+                    ['c12', 'unplugin', '@types/node'].map((dependency) => [
+                        dependency,
+                        consumerPackage.devDependencies[dependency]!,
+                    ]),
                 )
             }
             if (layout === 'workspace') {
