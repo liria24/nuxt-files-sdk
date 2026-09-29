@@ -57,13 +57,19 @@ test('[REL-002] mandatory jobs and the release artifact fail closed', async () =
     expect(release.slice(release.indexOf('    publish:'))).toContain('needs: pack')
 })
 
-test('[REL-003] package and workspace lockfile versions agree', async () => {
+test('[REL-003] package, workspace and fixture lockfiles agree', async () => {
     const manifest = JSON.parse(
         await readFile(resolve(repositoryRoot, 'packages/nuxt-files-sdk/package.json'), 'utf8'),
-    ) as { version: string }
+    ) as { version: string; dependencies: Record<string, string>; peerDependencies: Record<string, string> }
     const lock = await readFile(resolve(repositoryRoot, 'bun.lock'), 'utf8')
     const lockedVersion = lock.match(
         /"packages\/nuxt-files-sdk": \{\s*"name": "nuxt-files-sdk",\s*"version": "([^"]+)"/u,
     )?.[1]
     expect(lockedVersion).toBe(manifest.version)
+    for (const fixture of ['nuxt4', 'nuxt4-vue', 'nuxt5-nightly', 'nitro-v2', 'nitro-v3']) {
+        const fixtureLock = await readFile(resolve(repositoryRoot, 'test/fixtures', fixture, 'bun.lock'), 'utf8')
+        const [, dependency] = JSON.parse(fixtureLock.match(/"nuxt-files-sdk": (\[.*\]),/u)?.[1] ?? '[]')
+        expect(dependency?.dependencies, fixture).toEqual(manifest.dependencies)
+        expect(dependency?.peerDependencies, fixture).toEqual(manifest.peerDependencies)
+    }
 })

@@ -153,14 +153,26 @@ describe('Packed consumer', () => {
             const consumer = await copyPackedConsumer(name, parent, packed.tarball)
             const consumerPackage = JSON.parse(await readFile(resolve(consumer, 'package.json'), 'utf8')) as {
                 dependencies: Record<string, string>
+                devDependencies: Record<string, string>
             }
             expect(consumerPackage.dependencies['files-sdk']).toBeUndefined()
-            if (packageManager === 'pnpm')
+            let frameworkDependencies: Record<string, string> | undefined
+            if (packageManager === 'pnpm') {
                 await writeFile(resolve(consumer, '.npmrc'), 'hoist=false\nshamefully-hoist=false\n')
+                // Strict non-hoisting also exposes Nuxt's undeclared c12/unplugin imports.
+                // Keep these framework dependencies explicit, including for workspace Layers.
+                frameworkDependencies = Object.fromEntries(
+                    ['c12', 'unplugin', '@types/node'].map((name) => [name, consumerPackage.devDependencies[name]!]),
+                )
+            }
             if (layout === 'workspace') {
                 await writeFile(
                     resolve(parent, 'package.json'),
-                    JSON.stringify({ private: true, name: 'files-workspace' }),
+                    JSON.stringify({
+                        private: true,
+                        name: 'files-workspace',
+                        devDependencies: frameworkDependencies,
+                    }),
                 )
                 await writeFile(resolve(parent, 'pnpm-workspace.yaml'), 'packages:\n  - nuxt4\n  - layer\n')
                 await writeFile(resolve(parent, '.npmrc'), 'hoist=false\nshamefully-hoist=false\n')
