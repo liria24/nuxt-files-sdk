@@ -1,5 +1,17 @@
 export const contracts = [
     {
+        id: 'DEP-002',
+        guarantee: 'Dependency assumptions match public SDK import graphs without retesting native operations',
+        source: 'test/unit/dependencies.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'DEP-001',
+        guarantee: 'Every standard adapter has structural dependency conditions without invoking runtime code',
+        source: 'test/unit/dependencies.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'PEER-001',
         guarantee: 'Optional peer synchronization detects conflicts and only manages upstream optional peers',
         source: 'test/unit/optional-peers.test.ts',
