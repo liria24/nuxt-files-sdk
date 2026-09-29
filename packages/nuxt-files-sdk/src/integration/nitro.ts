@@ -230,8 +230,8 @@ export const setupNitroFilesIntegration = async (
     const dependencyDiagnostics = diagnoseDependencies(sdk, requirements, aliases, awsShims)
     watcher?.add(
         requirements.flatMap(({ dependency, conditions }) => {
-            const info = resolvePackage(dependency, pathToFileURL(sdk.manifestPath), conditions).package
-            return info ? [info.manifestPath] : []
+            const result = resolvePackage(dependency, pathToFileURL(sdk.manifestPath), conditions)
+            return result.status === 'missing' ? [] : [result.package.manifestPath]
         }),
     )
     reportDependencyIssues(dependencyDiagnostics, dependencySession(nitro.options.rootDir), (message) =>

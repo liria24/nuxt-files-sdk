@@ -17,10 +17,6 @@ export interface FilesConfigLoaderOptions {
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
     value !== null && typeof value === 'object' && !Array.isArray(value)
-const isResolvedFilesConfig = (value: unknown): value is FilesConfig => {
-    normalizeFilesConfig(value)
-    return true
-}
 
 const hasEnvironmentStorage = (config: Record<string, unknown>): boolean =>
     [
@@ -31,7 +27,6 @@ const hasEnvironmentStorage = (config: Record<string, unknown>): boolean =>
         ...(isObject(config.$env) ? Object.values(config.$env) : []),
     ].some((branch) => isObject(branch) && branch.storage !== undefined)
 
-/** c12 selects the first environment; a later prerender override is applied with the same merger. */
 export const loadFilesConfig = async ({
     configPath,
     environments,
@@ -49,36 +44,27 @@ export const loadFilesConfig = async ({
         interopDefault: true,
         moduleCache: false,
     })
-    const importer = Object.assign(jiti, {
-        import: async (id: string) => {
-            const input = source ?? (await readFile(id, 'utf8'))
-            const code = injectImports ? (await injectImports(input, id)).code : input
-            const loaded: unknown = await jiti.evalModule(code, { filename: id, async: true })
-            return loaded && typeof loaded === 'object' && 'default' in loaded ? loaded.default : loaded
-        },
-    })
-    const { config } = await loadConfig<Record<string, unknown>>({
+    const { config, layers } = await loadConfig<Record<string, unknown>>({
         cwd: dirname(configPath),
         configFile: basename(configPath),
         configFileRequired: true,
         rcFile: false,
         extend: false,
-        envName: environments[0] ?? false,
-        jiti: importer,
+        dotenv: false,
+        envName: [...environments],
+        omit$Keys: true,
         merger: mergeFilesConfig,
+        envMerger: mergeFilesConfig,
+        import: async (id) => {
+            const input = source ?? (await readFile(id, 'utf8'))
+            const code = injectImports ? (await injectImports(input, id)).code : input
+            return jiti.evalModule(code, { filename: id, async: true })
+        },
     })
-    let resolved: Record<string, unknown> = config
-    for (const environment of environments.slice(1)) {
-        const direct = resolved[`$${environment}`]
-        const named = isObject(resolved.$env) ? resolved.$env[environment] : undefined
-        resolved = mergeFilesConfig(
-            { ...(isObject(direct) ? direct : {}), ...(isObject(named) ? named : {}) },
-            resolved,
-        )
-    }
-    const result: unknown = Object.fromEntries(Object.entries(resolved).filter(([key]) => !key.startsWith('$')))
-    if (isObject(result) && result.storage === undefined && hasEnvironmentStorage(resolved)) return undefined
-    if (!isResolvedFilesConfig(result))
-        throw new Error('[nuxt-files-sdk:invalid-config] Invalid resolved configuration.')
-    return result
+    if (config.storage === undefined && layers?.some(({ config }) => config && hasEnvironmentStorage(config)))
+        return undefined
+    normalizeFilesConfig(config)
+    // Storage is validated above; route validation follows during preparation.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    return config as unknown as FilesConfig
 }
