@@ -1,9 +1,10 @@
 import { fileURLToPath } from 'node:url'
 
-import { $fetch, setup } from '@nuxt/test-utils/e2e'
+import { $fetch, setup, url } from '@nuxt/test-utils/e2e'
 import { describe, expect, test } from 'vitest'
 
 import { cleanFixture, installFixture } from '../utils/fixture'
+import { assertGatewayListing } from '../utils/gateway'
 
 export const nuxtRuntimeSuite = async (name: string, expected: Record<string, unknown>): Promise<void> => {
     await cleanFixture(name)
@@ -20,11 +21,7 @@ export const nuxtRuntimeSuite = async (name: string, expected: Record<string, un
         })
 
         test('[GATEWAY-004] serves the configured application gateway route', async () => {
-            const result = await $fetch<{ items: unknown[] }>('/api/gateway', {
-                method: 'POST',
-                body: { op: 'list' },
-            })
-            expect(result.items).toEqual([])
+            await assertGatewayListing(url('/api/gateway'), [])
         })
     })
 }

@@ -4,21 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 
 import { fixtureDirectory, readOutput, runCommand, runFixture, startFixtureServer } from '../utils/fixture'
-
-const postGateway = (url: string, body: object, user?: string) =>
-    fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...(user && { 'x-files-user': user }) },
-        body: JSON.stringify(body),
-    })
-
-const assertArchiveGateway = async (url: string): Promise<void> => {
-    const response = await postGateway(url, { op: 'list' })
-    expect(response.status).toBe(200)
-    expect(((await response.json()) as { items: { key: string }[] }).items.map((item) => item.key)).toEqual([
-        'archive.txt',
-    ])
-}
+import { assertGatewayListing, postGateway } from '../utils/gateway'
 
 export const nitroSuite = (
     name: 'nitro-v2' | 'nitro-v3',
@@ -69,12 +55,10 @@ export const nitroSuite = (
                 const endpoint = `${server.url}${name === 'nitro-v2' ? '/gateway' : '/gateway/blob'}`
                 const denied = await postGateway(endpoint, { op: 'list' })
                 expect(denied.ok).toBe(false)
-                const [alice, bob] = (await Promise.all([
-                    postGateway(endpoint, { op: 'list' }, 'alice').then((response) => response.json()),
-                    postGateway(endpoint, { op: 'list' }, 'bob').then((response) => response.json()),
-                ])) as [{ items: { key: string }[] }, { items: { key: string }[] }]
-                expect(alice.items.map((item) => item.key)).toEqual(['alice.txt'])
-                expect(bob.items.map((item) => item.key)).toEqual(['bob.txt'])
+                await Promise.all([
+                    assertGatewayListing(endpoint, ['alice.txt'], 'alice'),
+                    assertGatewayListing(endpoint, ['bob.txt'], 'bob'),
+                ])
                 expect((await postGateway(endpoint, { op: 'delete', key: 'alice.txt' }, 'alice')).status).toBe(403)
 
                 const presigned = (await postGateway(
@@ -112,7 +96,7 @@ export const nitroSuite = (
                 ).then((response) => response.json())) as { files: { key: string }[] }
                 expect(completed.files.map((file) => file.key)).toEqual([upload.key])
                 if (name === 'nitro-v3') {
-                    await assertArchiveGateway(`${server.url}/gateway/archive`)
+                    await assertGatewayListing(`${server.url}/gateway/archive`, ['archive.txt'])
                 }
             } finally {
                 await server.close()

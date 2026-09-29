@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
 import { invalidTypeCases } from '../types/invalid/cases'
+import { assertGatewayListing } from '../utils/gateway'
 import {
     copyPackedConsumer,
     outputPaths,
@@ -193,6 +194,7 @@ describe('Packed consumer', () => {
             const response = await fetch(`${server.url}/${name === 'nuxt4' ? 'api/' : ''}files`)
             expect(response.status).toBe(200)
             expect(await response.json()).toMatchObject({ adapter: 'fs' })
+            if (name === 'nuxt4') await assertGatewayListing(`${server.url}/api/gateway`, [])
         } finally {
             await server.close()
         }
