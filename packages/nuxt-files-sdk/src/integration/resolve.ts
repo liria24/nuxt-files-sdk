@@ -46,7 +46,7 @@ export const packageInfo = (specifier: string, from: URL): PackageInfo | undefin
     }
     for (const path of candidates) {
         if (!existsSync(path)) continue
-        const manifest = JSON.parse(readFileSync(path, 'utf8')) as PackageManifest
+        const manifest: PackageManifest = JSON.parse(readFileSync(path, 'utf8'))
         if (manifest.name !== name) continue
         const manifestPath = realpathSync(path)
         return { manifest, manifestPath, root: dirname(manifestPath) }

@@ -18,6 +18,7 @@ export interface NitroIntegration {
     meta?: { majorVersion?: number }
     options: {
         rootDir: string
+        workspaceDir?: string
         buildDir: string
         dev?: boolean
         static?: boolean
@@ -133,12 +134,16 @@ export const setupNitroFilesIntegration = async (
         })
     } catch (error) {
         // Supplement a real import failure while preserving the original native exception.
-        const requirements = graph.sdkImports.flatMap((subpath) => subpathDependencies(sdk, subpath))
-        reportDependencyIssues(
-            diagnoseDependencies(sdk, requirements, nitro.options.alias),
-            dependencySession(nitro.options.rootDir),
-            (message) => nitro.logger?.warn(message),
-        )
+        try {
+            const requirements = graph.sdkImports.flatMap((subpath) => subpathDependencies(sdk, subpath))
+            reportDependencyIssues(
+                diagnoseDependencies(sdk, requirements, nitro.options.alias),
+                dependencySession(nitro.options.rootDir),
+                (message) => nitro.logger?.warn(message),
+            )
+        } catch {
+            /* Supplementary inspection must never replace the configuration error. */
+        }
         throw error
     }
     if (Object.entries(inputHashes).some(([path, hash]) => fileHash(path) !== hash)) {
@@ -146,9 +151,13 @@ export const setupNitroFilesIntegration = async (
             '[nuxt-files-sdk:config-changed] Files configuration changed during preparation. Retry preparation.',
         )
     }
-    if (!prepared) return false
+    let watcher: ReturnType<typeof watchFiles> | undefined
     if (nitro.options.dev) {
-        const roots = new Set([nitro.options.rootDir, ...graph.files.map((path) => resolve(path, '..'))])
+        const roots = new Set([
+            nitro.options.rootDir,
+            nitro.options.workspaceDir ?? nitro.options.rootDir,
+            ...graph.files.map((path) => resolve(path, '..')),
+        ])
         const watched = [
             ...graph.files,
             sdk.manifestPath,
@@ -158,10 +167,10 @@ export const setupNitroFilesIntegration = async (
                 ),
             ),
         ]
-        const watcher = watchFiles(
+        watcher = watchFiles(
             watched,
             async () => {
-                watcher.add(configSources(configPath, nitro.options.alias).files)
+                watcher?.add(configSources(configPath, nitro.options.alias).files)
                 // Keep the current watcher alive while invalid config is being repaired.
                 await prepareFilesConfig({
                     configPath,
@@ -173,8 +182,9 @@ export const setupNitroFilesIntegration = async (
             },
             (error) => nitro.logger?.warn(error instanceof Error ? error.message : String(error)),
         )
-        nitro.hooks.hook('close', () => watcher.close())
+        nitro.hooks.hook('close', () => watcher?.close())
     }
+    if (!prepared) return false
     const directory = resolve(nitro.options.rootDir, nitro.options.buildDir, 'nuxt-files-sdk')
     const typesPath = resolve(directory, 'storage-registry.d.ts')
     let writeRuntime: (() => Promise<void>) | undefined
@@ -218,6 +228,12 @@ export const setupNitroFilesIntegration = async (
     )
     for (const subpath of graph.sdkImports) requirements.push(...subpathDependencies(sdk, subpath))
     const dependencyDiagnostics = diagnoseDependencies(sdk, requirements, aliases, awsShims)
+    watcher?.add(
+        requirements.flatMap(({ dependency, conditions }) => {
+            const info = resolvePackage(dependency, pathToFileURL(sdk.manifestPath), conditions).package
+            return info ? [info.manifestPath] : []
+        }),
+    )
     reportDependencyIssues(dependencyDiagnostics, dependencySession(nitro.options.rootDir), (message) =>
         nitro.logger?.warn(message),
     )

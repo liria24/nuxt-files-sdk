@@ -55,7 +55,7 @@ test('[DEP-003] diagnoses from the SDK importer silently and only reports change
             stdout.mockRestore()
             stderr.mockRestore()
         }
-        const warn = vi.fn()
+        const warn = vi.fn<(message: string) => void>()
         const state = new Set<string>()
         reportDependencyIssues(missing, state, warn)
         reportDependencyIssues(missing, state, warn)

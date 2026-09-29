@@ -22,9 +22,10 @@ const routeFor = (path: string) => {
 
 test('documentation pages and internal links stay complete', async () => {
     const files = (await readdir(contentDirectory, { recursive: true })).filter((path) => path.endsWith('.md'))
-    expect(files).toHaveLength(13)
+    expect(files).toHaveLength(14)
 
     const routes = new Set(files.map(routeFor))
+    expect(routes).toContain('/migration/upgrade-to-v0.2')
     const pages = await Promise.all(files.map((path) => readFile(resolve(contentDirectory, path), 'utf8')))
     const links = pages.flatMap((page) =>
         [...page.matchAll(/(?:\]\(|\bto:\s*|\bto=")(\/[a-z0-9][^\s)"#?]*)/giu)].map((match) => match[1]!),

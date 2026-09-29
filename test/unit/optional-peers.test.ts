@@ -30,4 +30,5 @@ test('[PEER-001] synchronizes upstream optional peers without rewriting independ
         synchronizeOptionalPeers({ ...manifest, filesSdkOptionalPeers: { version: '', keys: [] } }, sdk),
     ).toThrow('changed')
     expect(() => synchronizeOptionalPeers({ ...manifest, dependencies: { added: '^3' } }, sdk)).toThrow('added')
+    expect(() => synchronizeOptionalPeers({ ...manifest, dependencies: { changed: '^2' } }, sdk)).toThrow('changed')
 })
