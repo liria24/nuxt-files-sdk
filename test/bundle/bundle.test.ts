@@ -7,6 +7,7 @@ import { directorySize, fixtureDirectory, outputPaths, readOutput, runFixture, u
 let nuxtOutput = ''
 let nitroOutput = ''
 let generatedOutput = ''
+let generatedRuntime = ''
 let paths: string[] = []
 let nuxtServerBytes = 0
 let nuxtClientBytes = 0
@@ -27,6 +28,7 @@ describe('Bundle contract', () => {
         nuxtOutput = await readOutput(resolve(nuxt, '.output'))
         nitroOutput = await readOutput(resolve(nitro, '.output'))
         generatedOutput = await readOutput(resolve(nuxt, '.nuxt/nuxt-files-sdk'))
+        generatedRuntime = await readOutput(resolve(nuxt, '.nuxt/nuxt-files-sdk'), true)
         paths = [...(await outputPaths(resolve(nuxt, '.output'))), ...(await outputPaths(resolve(nitro, '.output')))]
         ;[nuxtServerBytes, nuxtClientBytes, nitroServerBytes] = await Promise.all([
             directorySize(resolve(nuxt, '.output/server')),
@@ -50,9 +52,9 @@ describe('Bundle contract', () => {
 
     test('[BUNDLE-003] fs-only output excludes unrelated native SDKs', () => {
         expect(paths.filter((path) => /node_modules\/(?:@aws-sdk|@azure|@google-cloud)\//u.test(path))).toEqual([])
-        expect(generatedOutput).toContain('from "#files-sdk/fs"')
+        expect(generatedRuntime).toContain('from "#files-sdk/fs"')
         for (const provider of ['appwrite', 'azure', 'gcs', 'google-drive', 'r2', 's3']) {
-            expect(generatedOutput).not.toContain(`files-sdk/${provider}`)
+            expect(generatedRuntime).not.toContain(`files-sdk/${provider}`)
         }
         expect(nuxtOutput).not.toContain('files-sdk/loader')
         expect(nitroOutput).not.toContain('files-sdk/loader')
