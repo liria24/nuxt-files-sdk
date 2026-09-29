@@ -1,13 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import type { ProviderSlug } from 'files-sdk'
 import { getProvider } from 'files-sdk/providers'
 
 import { prepareFilesConfig } from '../config/prepare'
-import { registerSdkAliases, resolveOwnedSdk, sdkTypePaths } from './resolve'
+import { registerSdkAliases, resolveOwnedSdk, resolvePackage, sdkTypePaths } from './resolve'
 
 export interface NitroIntegration {
     meta?: { majorVersion?: number }
@@ -140,19 +139,13 @@ export const setupNitroFilesIntegration = async (
     })
     const { routes, adapters, providers, environment } = prepared
     const internalPath = fileURLToPath(new URL('../runtime/internal.js', import.meta.url)).replaceAll('\\', '/')
-    const require = createRequire(resolve(nitro.options.rootDir, 'package.json'))
     const aliases = nitro.options.alias ?? {}
     const awsShims = optionalAwsSdkDependencies(adapters, {
         nitroMajor: nitroMajorVersion(nitro),
         preset: nitro.options.preset,
         resolvable: (dependency) => {
             if (Object.hasOwn(aliases, dependency)) return true
-            try {
-                require.resolve(dependency)
-                return true
-            } catch {
-                return false
-            }
+            return resolvePackage(dependency, pathToFileURL(sdk.manifestPath)).status === 'resolved'
         },
     })
     const shimFiles = awsShims.map((dependency) => ({
@@ -172,7 +165,7 @@ export const setupNitroFilesIntegration = async (
                     `${name === 'useServerFiles' ? `${indent}/** Return the project's Files client, including its configured plugin extensions. */\n` : ''}${indent}const ${name}: typeof import('nuxt-files-sdk/${name === 'defineFilesConfig' ? 'config' : 'runtime'}').${name}`,
             ),
     })
-    // Inline both packages so installed consumers also tree-shake the plugin barrel.
+    // Bundle the integration and selected native SDK entries, including installed consumers.
     const externals = (nitro.options.externals ??= {})
     ;(externals.inline ??= []).push('nuxt-files-sdk')
     // Nitro's single-file dev build would eagerly import every native provider SDK.
