@@ -5,11 +5,13 @@ import { pathToFileURL } from 'node:url'
 
 import { resolveModulePath } from 'exsolve'
 import { resolveModule } from 'local-pkg'
+import { exports as resolveExports } from 'resolve.exports'
 
 export interface PackageManifest {
     name: string
     version: string
     exports?: Record<string, unknown>
+    main?: string
     dependencies?: Record<string, string>
     optionalDependencies?: Record<string, string>
     peerDependencies?: Record<string, string>
@@ -59,7 +61,7 @@ export const resolvePackage = (
 ): { status: 'resolved' | 'missing' | 'unresolved'; entry?: string; package?: PackageInfo } => {
     const info = packageInfo(specifier, from)
     if (!info) return { status: 'missing' }
-    const entry = resolveModulePath(specifier, { from, conditions, cache: false, try: true })
+    const entry = publicEntry(info, specifier, conditions)
     return entry
         ? { status: 'resolved', entry: entry.replaceAll('\\', '/'), package: info }
         : { status: 'unresolved', package: info }
@@ -73,11 +75,37 @@ export const resolveOwnedSdk = (from = import.meta.url): PackageInfo => {
     return result.package
 }
 
-export const sdkEntry = (sdk: PackageInfo, subpath: string, conditions = ['node', 'import']): string =>
-    resolveModulePath(subpath, { from: pathToFileURL(sdk.manifestPath), conditions, cache: false }).replaceAll(
-        '\\',
-        '/',
-    )
+const publicEntry = (info: PackageInfo, specifier: string, conditions: string[]): string | undefined => {
+    // exsolve caches package.json internally even with cache:false. Resolve fresh exports first
+    // so installing/replacing a dependency during development cannot retain a stale result.
+    try {
+        const suffix = specifier.slice(info.manifest.name.length)
+        const target = info.manifest.exports
+            ? resolveExports(info.manifest as Parameters<typeof resolveExports>[0], `.${suffix}`, {
+                  conditions,
+                  unsafe: true,
+              })?.[0]
+            : suffix
+              ? `.${suffix}`
+              : info.manifest.main || './index.js'
+        if (!target) return undefined
+        return resolveModulePath(new URL(target, pathToFileURL(info.manifestPath)).href, {
+            conditions,
+            cache: false,
+            try: true,
+            extensions: ['.js', '.json', '.node'],
+            suffixes: ['', '/index'],
+        })
+    } catch {
+        return undefined
+    }
+}
+
+export const sdkEntry = (sdk: PackageInfo, subpath: string, conditions = ['node', 'import']): string => {
+    const entry = publicEntry(sdk, subpath, conditions)
+    if (!entry) throw new Error(`[nuxt-files-sdk:sdk-exports] Cannot resolve public entry ${subpath}.`)
+    return entry.replaceAll('\\', '/')
+}
 
 /** Enumerate public subpaths without evaluating providers. Root comes last for prefix alias engines. */
 export const sdkAliases = (sdk: PackageInfo, conditions = ['node', 'import']): Record<string, string> =>

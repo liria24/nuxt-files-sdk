@@ -6,9 +6,9 @@ import {
     deploymentTarget,
     storageDependencies,
 } from '../../packages/nuxt-files-sdk/src/integration/dependencies'
-import { normalizeFilesConfig } from '../../packages/nuxt-files-sdk/src/runtime/normalize'
 import { subpathDependencies } from '../../packages/nuxt-files-sdk/src/integration/imports'
 import { resolveOwnedSdk } from '../../packages/nuxt-files-sdk/src/integration/resolve'
+import { normalizeFilesConfig } from '../../packages/nuxt-files-sdk/src/runtime/normalize'
 
 const dependencies = (adapter: string, config: unknown, preset = 'node-server') =>
     storageDependencies(
@@ -19,10 +19,16 @@ const dependencies = (adapter: string, config: unknown, preset = 'node-server') 
 test('[DEP-002] adapter import assumptions match the owned SDK, including injected-client paths', () => {
     const sdk = resolveOwnedSdk()
     for (const adapter of PROVIDER_NAMES) {
-        expect(subpathDependencies(sdk, `files-sdk/${adapter}`).map((entry) => entry.dependency).sort(), adapter)
-            .toEqual([...adapterImports[adapter]].sort())
+        expect(
+            subpathDependencies(sdk, `files-sdk/${adapter}`)
+                .map((entry) => entry.dependency)
+                .sort(),
+            adapter,
+        ).toEqual([...adapterImports[adapter]].sort())
     }
-    expect(subpathDependencies(sdk, 'files-sdk/tracing').map((entry) => entry.dependency)).toContain('@opentelemetry/api')
+    expect(subpathDependencies(sdk, 'files-sdk/tracing').map((entry) => entry.dependency)).toContain(
+        '@opentelemetry/api',
+    )
     expect(subpathDependencies(sdk, 'files-sdk/vue').map((entry) => entry.dependency)).toEqual(['vue'])
 })
 

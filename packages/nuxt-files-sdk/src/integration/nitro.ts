@@ -6,9 +6,13 @@ import type { ProviderSlug } from 'files-sdk'
 import { getProvider } from 'files-sdk/providers'
 
 import { prepareFilesConfig } from '../config/prepare'
+import { deploymentTarget, storageDependencies } from './dependencies'
+import { dependencySession, diagnoseDependencies, reportDependencyIssues } from './diagnostics'
+import { sourceImports, subpathDependencies } from './imports'
 import { registerSdkAliases, resolveOwnedSdk, resolvePackage, sdkTypePaths } from './resolve'
 
 export interface NitroIntegration {
+    logger?: { warn(message: string): void }
     meta?: { majorVersion?: number }
     options: {
         rootDir: string
@@ -148,6 +152,17 @@ export const setupNitroFilesIntegration = async (
             return resolvePackage(dependency, pathToFileURL(sdk.manifestPath)).status === 'resolved'
         },
     })
+    const requirements = [...prepared.entries.values()].flatMap((entry) =>
+        storageDependencies(entry, deploymentTarget(nitro.options.preset)),
+    )
+    for (const specifier of sourceImports(configPath, prepared.source)) {
+        if (specifier === '#files-sdk' || specifier.startsWith('#files-sdk/'))
+            requirements.push(...subpathDependencies(sdk, specifier.slice(1)))
+    }
+    const dependencyDiagnostics = diagnoseDependencies(sdk, requirements, aliases, awsShims)
+    reportDependencyIssues(dependencyDiagnostics, dependencySession(nitro.options.rootDir), (message) =>
+        nitro.logger?.warn(message),
+    )
     const shimFiles = awsShims.map((dependency) => ({
         dependency,
         path: resolve(directory, `${dependency.replaceAll(/[^a-z0-9]+/giu, '-')}.mjs`),
@@ -213,6 +228,7 @@ ${providers.imports}
 import { configureFiles } from ${JSON.stringify(internalPath)}
 
 export default (nitroApp) => configureFiles(config, {
+  ${nitro.options.dev ? `dependencies: ${JSON.stringify(dependencyDiagnostics)},` : ''}
   factories: { ${providers.factories} },
   environment: ${JSON.stringify(environment)},
   hooks: {

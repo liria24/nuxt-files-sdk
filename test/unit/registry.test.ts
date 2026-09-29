@@ -148,6 +148,7 @@ describe('FilesRegistry', () => {
                 },
             ],
             diagnostics: [],
+            dependencies: [],
         })
         expect(JSON.stringify(registry.inspect())).not.toMatch(/secret-bucket|NUXT_FILES_TEST_SECRET_123456/)
     })

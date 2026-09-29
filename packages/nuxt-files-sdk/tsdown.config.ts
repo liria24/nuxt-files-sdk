@@ -22,6 +22,8 @@ export default defineConfig([
                 'jiti',
                 'local-pkg',
                 'oxc-parser',
+                'resolve.exports',
+                'verkit',
                 'node:crypto',
                 'node:fs',
                 'node:fs/promises',

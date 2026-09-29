@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'DEP-003',
+        guarantee: 'Dependency inspection stays silent for uncertainty and reports only changed confirmed failures',
+        source: 'test/unit/diagnostics.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'DEP-002',
         guarantee: 'Dependency assumptions match public SDK import graphs without retesting native operations',
         source: 'test/unit/dependencies.test.ts',
@@ -19,7 +25,8 @@ export const contracts = [
     },
     {
         id: 'RESOLVE-001',
-        guarantee: 'Owned package resolution respects importer, public exports and conditions without logging or stale misses',
+        guarantee:
+            'Owned package resolution respects importer, public exports and conditions without logging or stale misses',
         source: 'test/unit/resolution.test.ts',
         job: 'unit',
     },
