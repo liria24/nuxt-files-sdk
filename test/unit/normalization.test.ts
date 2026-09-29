@@ -2,7 +2,7 @@ import { memory } from 'files-sdk/memory'
 import { describe, expect, test, vi } from 'vitest'
 
 import type { FilesConfig, StorageConfig } from '../../packages/nuxt-files-sdk/src/config'
-import { selectedAdapters } from '../../packages/nuxt-files-sdk/src/integration/nitro'
+import { selectedAdapters } from '../../packages/nuxt-files-sdk/src/config/prepare'
 import * as runtime from '../../packages/nuxt-files-sdk/src/runtime'
 import { FilesRegistry } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 

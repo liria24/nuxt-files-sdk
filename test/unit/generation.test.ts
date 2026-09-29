@@ -6,11 +6,9 @@ import { memory } from 'files-sdk/memory'
 import { afterAll, describe, expect, test, vi } from 'vitest'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
+import { gatewayRoutes, providerCode, selectedAdapters } from '../../packages/nuxt-files-sdk/src/config/prepare'
 import {
-    gatewayRoutes,
     optionalAwsSdkDependencies,
-    providerCode,
-    selectedAdapters,
     setupNitroFilesIntegration,
     type NitroIntegration,
 } from '../../packages/nuxt-files-sdk/src/integration/nitro'

@@ -15,6 +15,7 @@ export interface FilesConfigLoaderOptions {
     environments: readonly string[]
     alias?: Record<string, string> | undefined
     injectImports?: ((code: string, id?: string) => Promise<{ code: string }>) | undefined
+    source?: string
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -39,6 +40,7 @@ export const loadFilesConfig = async ({
     environments,
     alias,
     injectImports,
+    source,
 }: FilesConfigLoaderOptions): Promise<FilesConfig | undefined> => {
     const jiti = createJiti(import.meta.url, {
         alias: {
@@ -50,8 +52,8 @@ export const loadFilesConfig = async ({
     })
     const importer = Object.assign(jiti, {
         import: async (id: string) => {
-            const source = await readFile(id, 'utf8')
-            const code = injectImports ? (await injectImports(source, id)).code : source
+            const input = source ?? (await readFile(id, 'utf8'))
+            const code = injectImports ? (await injectImports(input, id)).code : input
             const loaded: unknown = await jiti.evalModule(code, { filename: id, async: true })
             return loaded && typeof loaded === 'object' && 'default' in loaded ? loaded.default : loaded
         },
