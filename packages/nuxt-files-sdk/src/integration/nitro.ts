@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -6,10 +6,12 @@ import type { ProviderSlug } from 'files-sdk'
 import { getProvider } from 'files-sdk/providers'
 
 import { prepareFilesConfig } from '../config/prepare'
+import { fileHash } from '../runtime/development'
 import { deploymentTarget, storageDependencies } from './dependencies'
 import { dependencySession, diagnoseDependencies, reportDependencyIssues } from './diagnostics'
-import { sourceImports, subpathDependencies } from './imports'
+import { configSources, subpathDependencies } from './imports'
 import { registerSdkAliases, resolveOwnedSdk, resolvePackage, sdkTypePaths } from './resolve'
+import { watchFiles, writeChanged as writeFile } from './update'
 
 export interface NitroIntegration {
     logger?: { warn(message: string): void }
@@ -35,6 +37,8 @@ export interface NitroIntegration {
         }
     }
     hooks: {
+        callHook?(name: 'restart'): Promise<void>
+        hook(name: 'close', callback: () => void): void
         hook(
             name: 'types:extend',
             callback: (types: {
@@ -50,6 +54,7 @@ export interface NitroIntegration {
 export interface NitroFilesIntegrationOptions {
     configPath: string
     environments: readonly string[]
+    restart?: () => void | Promise<void>
 }
 
 const AWS_CORE_DEPENDENCIES = [
@@ -105,15 +110,71 @@ export const setupNitroFilesIntegration = async (
     options: NitroFilesIntegrationOptions,
 ): Promise<boolean> => {
     const sdk = resolveOwnedSdk()
+    for (const dependency of [...AWS_CORE_DEPENDENCIES, AWS_MULTIPART_DEPENDENCY]) {
+        const shim = resolve(
+            nitro.options.rootDir,
+            nitro.options.buildDir,
+            'nuxt-files-sdk',
+            `${dependency.replaceAll(/[^a-z0-9]+/giu, '-')}.mjs`,
+        ).replaceAll('\\', '/')
+        if (nitro.options.alias?.[dependency]?.replaceAll('\\', '/') === shim) delete nitro.options.alias[dependency]
+    }
     nitro.options.alias = registerSdkAliases(nitro.options.alias ?? {}, sdk)
     const configPath = options.configPath.replaceAll('\\', '/')
-    const prepared = await prepareFilesConfig({
-        configPath,
-        environments: options.environments,
-        alias: nitro.options.alias,
-        injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
-    })
+    const graph = configSources(configPath, nitro.options.alias)
+    const inputHashes = Object.fromEntries(graph.files.map((path) => [path, fileHash(path)]))
+    let prepared
+    try {
+        prepared = await prepareFilesConfig({
+            configPath,
+            environments: options.environments,
+            alias: nitro.options.alias,
+            injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
+        })
+    } catch (error) {
+        // Supplement a real import failure while preserving the original native exception.
+        const requirements = graph.sdkImports.flatMap((subpath) => subpathDependencies(sdk, subpath))
+        reportDependencyIssues(
+            diagnoseDependencies(sdk, requirements, nitro.options.alias),
+            dependencySession(nitro.options.rootDir),
+            (message) => nitro.logger?.warn(message),
+        )
+        throw error
+    }
+    if (Object.entries(inputHashes).some(([path, hash]) => fileHash(path) !== hash)) {
+        throw new Error(
+            '[nuxt-files-sdk:config-changed] Files configuration changed during preparation. Retry preparation.',
+        )
+    }
     if (!prepared) return false
+    if (nitro.options.dev) {
+        const roots = new Set([nitro.options.rootDir, ...graph.files.map((path) => resolve(path, '..'))])
+        const watched = [
+            ...graph.files,
+            sdk.manifestPath,
+            ...[...roots].flatMap((root) =>
+                ['package.json', 'bun.lock', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'].map((name) =>
+                    resolve(root, name),
+                ),
+            ),
+        ]
+        const watcher = watchFiles(
+            watched,
+            async () => {
+                watcher.add(configSources(configPath, nitro.options.alias).files)
+                // Keep the current watcher alive while invalid config is being repaired.
+                await prepareFilesConfig({
+                    configPath,
+                    environments: options.environments,
+                    alias: nitro.options.alias,
+                    injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
+                })
+                await (options.restart ? options.restart() : nitro.hooks.callHook?.('restart'))
+            },
+            (error) => nitro.logger?.warn(error instanceof Error ? error.message : String(error)),
+        )
+        nitro.hooks.hook('close', () => watcher.close())
+    }
     const directory = resolve(nitro.options.rootDir, nitro.options.buildDir, 'nuxt-files-sdk')
     const typesPath = resolve(directory, 'storage-registry.d.ts')
     let writeRuntime: (() => Promise<void>) | undefined
@@ -155,10 +216,7 @@ export const setupNitroFilesIntegration = async (
     const requirements = [...prepared.entries.values()].flatMap((entry) =>
         storageDependencies(entry, deploymentTarget(nitro.options.preset)),
     )
-    for (const specifier of sourceImports(configPath, prepared.source)) {
-        if (specifier === '#files-sdk' || specifier.startsWith('#files-sdk/'))
-            requirements.push(...subpathDependencies(sdk, specifier.slice(1)))
-    }
+    for (const subpath of graph.sdkImports) requirements.push(...subpathDependencies(sdk, subpath))
     const dependencyDiagnostics = diagnoseDependencies(sdk, requirements, aliases, awsShims)
     reportDependencyIssues(dependencyDiagnostics, dependencySession(nitro.options.rootDir), (message) =>
         nitro.logger?.warn(message),
@@ -250,6 +308,7 @@ export default (nitroApp) => configureFiles(config, {
 import { createFilesRouter } from '#files-sdk/api'
 ${nitroMajorVersion(nitro) >= 3 ? '' : "import { createRouteHandler } from '#files-sdk/nitro'"}
 import { getFiles } from ${JSON.stringify(internalPath)}
+${nitro.options.dev ? `import { developmentConfigCurrent } from ${JSON.stringify(fileURLToPath(new URL('../runtime/development.js', import.meta.url)).replaceAll('\\', '/'))}\nconst inputHashes = ${JSON.stringify(inputHashes)}` : ''}
 
 const route = config.routes[${index}]
 const environmentSecret = typeof process === 'undefined' ? undefined : process.env?.FILES_API_SECRET
@@ -267,6 +326,7 @@ const makeRouter = (event) => createFilesRouter({
   authorize: route.authorize && ((context) => route.authorize({ ...context, event })),
 })
 export default (event) => {
+  ${nitro.options.dev ? `if (!developmentConfigCurrent(inputHashes)) return new Response('Files configuration is being updated.', { status: 503 })` : ''}
   const router = route.authorize ? makeRouter(event) : (sharedRouter ??= makeRouter(event))
   return ${handler}
 }

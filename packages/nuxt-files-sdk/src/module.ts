@@ -5,8 +5,7 @@ import { addImports, addServerImports, defineNuxtModule, getNuxtModuleVersion } 
 import type { Nuxt } from '@nuxt/schema'
 
 import { filesDevtoolsWriteEnabled, shouldEnableFilesDevtools, type FilesDevtoolsOptions } from './devtools/enabled'
-import { setupNitroFilesIntegration, type NitroIntegration } from './integration/nitro'
-import { registerSdkAliases, resolveOwnedSdk, sdkTypePaths } from './integration/resolve'
+import type { NitroIntegration } from './integration/nitro'
 
 declare module '@nuxt/schema' {
     interface NuxtHooks {
@@ -34,6 +33,7 @@ export default defineNuxtModule<ModuleOptions>({
         devtools: true,
     },
     async setup(options, nuxt: Nuxt) {
+        const { registerSdkAliases, resolveOwnedSdk, sdkTypePaths } = await import('./integration/resolve')
         const configPath = resolve(nuxt.options.rootDir, options.config)
         const sdk = resolveOwnedSdk()
         nuxt.options.alias = registerSdkAliases(nuxt.options.alias, sdk, ['browser', 'import'])
@@ -42,8 +42,10 @@ export default defineNuxtModule<ModuleOptions>({
         Object.assign(paths, sdkTypePaths(sdk))
         let active = false
         nuxt.hook('nitro:init', async (nitro) => {
+            const { setupNitroFilesIntegration } = await import('./integration/nitro')
             active = await setupNitroFilesIntegration(nitro, {
                 configPath,
+                restart: () => nuxt.callHook('restart'),
                 environments: nitro.options.static
                     ? ['production', 'prerender']
                     : [nuxt.options.envName || (nuxt.options.dev ? 'development' : 'production')],
@@ -69,7 +71,7 @@ export default defineNuxtModule<ModuleOptions>({
             const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
             const { setupFilesDevtools } = await import('./devtools')
             const secrets = { token: randomUUID() }
-            setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools), secrets)
+            await setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools), secrets)
         }
     },
 })

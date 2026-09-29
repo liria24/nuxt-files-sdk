@@ -3,6 +3,7 @@ import { expect } from 'vitest'
 export const postGateway = (url: string, body: object, user?: string) =>
     fetch(url, {
         method: 'POST',
+        signal: AbortSignal.timeout(10_000),
         headers: { 'content-type': 'application/json', ...(user && { 'x-files-user': user }) },
         body: JSON.stringify(body),
     })

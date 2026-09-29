@@ -39,6 +39,7 @@ export default defineConfig([
             nitro: 'src/nitro.ts',
             runtime: 'src/runtime.ts',
             'runtime/internal': 'src/runtime/internal.ts',
+            'runtime/development': 'src/runtime/development.ts',
             'config/merge': 'src/config/merge.ts',
             'devtools/files-read': 'src/devtools/files-read.ts',
             'devtools/files-write': 'src/devtools/files-write.ts',

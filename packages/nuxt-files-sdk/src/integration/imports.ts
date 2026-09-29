@@ -1,10 +1,51 @@
 import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, isAbsolute, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
+import { resolveModulePath } from 'exsolve'
 import { parseSync } from 'oxc-parser'
 
 import type { DependencyRequirement } from './dependencies'
 import { sdkEntry, type PackageInfo } from './resolve'
+
+/** Follow local and Layer imports from their actual importer, without discovering/merging configs. */
+export const configSources = (filename: string, aliases: Record<string, string> = {}) => {
+    const files = new Set<string>()
+    const sdkImports = new Set<string>()
+    const visit = (path: string) => {
+        path = resolve(path)
+        if (files.has(path)) return
+        files.add(path)
+        let source: string
+        try {
+            source = readFileSync(path, 'utf8')
+        } catch {
+            return
+        }
+        for (const specifier of sourceImports(path, source)) {
+            if (specifier === '#files-sdk' || specifier.startsWith('#files-sdk/')) {
+                sdkImports.add(specifier.slice(1))
+                continue
+            }
+            const alias = Object.keys(aliases)
+                .toSorted((a, b) => b.length - a.length)
+                .find((key) => specifier === key || specifier.startsWith(`${key}/`))
+            const target = alias ? aliases[alias]! + specifier.slice(alias.length) : specifier
+            if (!target.startsWith('.') && !isAbsolute(target)) continue
+            const entry = resolveModulePath(target, {
+                from: pathToFileURL(path),
+                cache: false,
+                try: true,
+                extensions: ['.ts', '.mts', '.js', '.mjs', '.cts', '.cjs', '.json'],
+                suffixes: ['', '/index'],
+            })
+            if (entry) visit(entry)
+            else files.add(resolve(dirname(path), target))
+        }
+    }
+    visit(filename)
+    return { files: [...files], sdkImports: [...sdkImports] }
+}
 
 /** Runtime imports only; type-only references never require optional SDK installation. */
 export const sourceImports = (filename: string, source: string): string[] => {
