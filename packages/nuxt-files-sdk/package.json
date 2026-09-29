@@ -54,14 +54,14 @@
         "c12": "^3.3.4",
         "devframe": "^1.1.0",
         "jiti": "^2.7.0",
-        "oxc-parser": "^0.150.0"
+        "oxc-parser": "^0.152.0"
     },
     "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.5",
         "@nuxt/schema": "^4.5.2",
         "@types/node": "^26.6.3",
         "@vitejs/devtools-kit": "^0.7.6",
-        "files-sdk": "^2.6.0",
+        "files-sdk": "^2.6.2",
         "h3": "^1.15.11",
         "publint": "^0.3.24",
         "tsdown": "^0.23.0",
