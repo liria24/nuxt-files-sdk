@@ -110,7 +110,7 @@ describe('Packed consumer', () => {
         }
         expect(Object.keys(packageJson.exports)).toEqual(['.', './config', './nitro', './runtime', './package.json'])
         expect(packageJson.dependencies['files-sdk']).toBeUndefined()
-        expect(packageJson.devDependencies['files-sdk']).toBe('^2.6.0')
+        expect(packageJson.devDependencies['files-sdk']).toBe('^2.6.2')
         expect(packageJson.peerDependencies['files-sdk']).toBe('^2.6.0')
         expect(packageJson.peerDependenciesMeta['files-sdk']).toBeUndefined()
         expect(JSON.stringify(packageJson.dependencies)).not.toMatch(/@aws-sdk|@azure|@google-cloud/u)
