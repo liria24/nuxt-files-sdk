@@ -14,6 +14,7 @@ import {
 } from '../../packages/nuxt-files-sdk/src/integration/nitro'
 
 const temporaryDirectories: string[] = []
+type TestHook = (name: 'types:extend' | 'close', callback: Parameters<NitroIntegration['hooks']['hook']>[1]) => void
 const missingDependency = () => false
 afterAll(() => Promise.all(temporaryDirectories.map((directory) => rm(directory, { recursive: true, force: true }))))
 
@@ -46,7 +47,7 @@ describe('provider generation', () => {
             const nitro: NitroIntegration = {
                 meta: { majorVersion },
                 options: { rootDir: directory, buildDir: resolve(directory, String(majorVersion)), plugins: [] },
-                hooks: { hook: vi.fn<NitroIntegration['hooks']['hook']>() },
+                hooks: { hook: vi.fn<TestHook>() },
             }
             await setupNitroFilesIntegration(nitro, { configPath, environments: ['production'] })
             expect(nitro.options.handlers).toHaveLength(1)
@@ -154,7 +155,7 @@ describe('provider generation', () => {
         temporaryDirectories.push(directory)
         const configPath = resolve(directory, 'files.config.mjs')
         await writeFile(configPath, `export default { storage: { adapter: 'r2' } }`)
-        const hook = vi.fn<NitroIntegration['hooks']['hook']>()
+        const hook = vi.fn<TestHook>()
         const nitro: NitroIntegration = {
             meta: { majorVersion: 2 },
             options: {
@@ -219,7 +220,7 @@ describe('provider generation', () => {
         temporaryDirectories.push(directory)
         const configPath = resolve(directory, 'files.config.mjs')
         await writeFile(configPath, `export default { $test: { storage: { adapter: 'memory' } } }`)
-        const hook = vi.fn<NitroIntegration['hooks']['hook']>()
+        const hook = vi.fn<TestHook>()
         const nitro: NitroIntegration = {
             options: { rootDir: directory, buildDir: directory, dev: false, plugins: [] },
             hooks: { hook },

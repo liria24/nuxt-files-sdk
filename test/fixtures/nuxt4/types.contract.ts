@@ -1,3 +1,7 @@
+import { defineFilesConfig, type FilesPluginContext } from 'nuxt-files-sdk/config'
+import type { SingleStorage, StorageRegistry } from 'nuxt-files-sdk/runtime'
+import { syncFiles as importedSyncFiles, transferFiles as importedTransferFiles } from 'nuxt-files-sdk/runtime'
+
 import { FilesError, sync, transfer } from '#files-sdk'
 import type { FileHandle, Files, FilesPlugin, StoredFile, SyncResult, TransferResult } from '#files-sdk'
 import type { FsAdapter } from '#files-sdk/fs'
@@ -5,9 +9,6 @@ import type { MemoryAdapter } from '#files-sdk/memory'
 import { memory } from '#files-sdk/memory'
 import { tiering } from '#files-sdk/tiering'
 import { versioning } from '#files-sdk/versioning'
-import { defineFilesConfig, type FilesPluginContext } from 'nuxt-files-sdk/config'
-import type { SingleStorage, StorageRegistry } from 'nuxt-files-sdk/runtime'
-import { syncFiles as importedSyncFiles, transferFiles as importedTransferFiles } from 'nuxt-files-sdk/runtime'
 
 const switchedConfig = defineFilesConfig({
     storage: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },

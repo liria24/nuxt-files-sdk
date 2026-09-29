@@ -29,7 +29,7 @@ test('[UPDATE-001] tracks Layer aliases and referenced config, suppresses unchan
         const before = (await stat(config)).mtimeMs
         await writeChanged(config, original)
         expect((await stat(config)).mtimeMs).toBe(before)
-        const changed = vi.fn(async () => {})
+        const changed = vi.fn<() => Promise<void>>(async () => {})
         watcher = watchFiles([...graph.files, lock], changed, (error) => {
             throw error
         })

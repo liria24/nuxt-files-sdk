@@ -21,6 +21,7 @@ export const nuxtRuntimeSuite = async (name: string, expected: Record<string, un
         })
 
         test('[GATEWAY-004] serves the configured application gateway route', async () => {
+            expect.hasAssertions()
             await assertGatewayListing(url('/api/gateway'), [])
         })
     })

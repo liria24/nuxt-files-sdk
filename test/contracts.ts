@@ -1,5 +1,12 @@
 export const contracts = [
     {
+        id: 'RESOLVE-002',
+        guarantee:
+            'Packed consumers retain owned SDK identity without a direct SDK dependency and with isolated workspace/Layer competing SDKs',
+        source: 'test/consumer/packed.test.ts',
+        job: 'test-consumer',
+    },
+    {
         id: 'UPDATE-001',
         guarantee:
             'Referenced config and dependency changes invalidate development routes without rewriting unchanged output',

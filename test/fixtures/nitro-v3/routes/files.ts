@@ -1,6 +1,7 @@
-import type { MemoryAdapter } from '#files-sdk/memory'
 import { defineEventHandler } from 'nitro/h3'
 import { useServerFiles } from 'nuxt-files-sdk/runtime'
+
+import type { MemoryAdapter } from '#files-sdk/memory'
 
 const assertCustomAdapterType = () => {
     useServerFiles('custom').adapter satisfies MemoryAdapter
