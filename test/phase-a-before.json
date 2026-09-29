@@ -1,0 +1,31 @@
+{
+    "node": "v24.21.0",
+    "bun": "1.4.2",
+    "platform": "win32",
+    "sdk": "2.6.2",
+    "commit": "ae41af01d3b3fe1c11cf08cbe772f22c53ccad72",
+    "moduleImportMedianMs": 85.5026,
+    "distBytes": 284505,
+    "tarballBytes": 78106,
+    "fixtures": {
+        "nuxt4": {
+            "prepareMs": 12712,
+            "typecheckMs": 9165,
+            "buildMs": 21963,
+            "devReadyMs": 5247,
+            "outputBytes": 2271496,
+            "generatedBytes": 3648,
+            "installedBytes": 318258558,
+            "packageManifests": 921
+        },
+        "nitro-v2": {
+            "prepareMs": 7781,
+            "typecheckMs": 3728,
+            "buildMs": 3779,
+            "outputBytes": 299573,
+            "generatedBytes": 3613,
+            "installedBytes": 273362790,
+            "packageManifests": 693
+        }
+    }
+}

@@ -108,7 +108,10 @@ export const directorySize = async (directory: string): Promise<number> => {
 export const outputPaths = async (directory: string): Promise<string[]> =>
     (await readdir(directory, { recursive: true })).map((path) => path.replaceAll('\\', '/'))
 
-export const startFixtureServer = async (name: string): Promise<{ url: string; close: () => Promise<void> }> => {
+export const startFixtureServer = async (
+    name: string,
+    options: { development?: boolean; readyPath?: string } = {},
+): Promise<{ url: string; close: () => Promise<void> }> => {
     const reservation = createServer()
     await new Promise<void>((ready, reject) => {
         reservation.once('error', reject)
@@ -118,23 +121,29 @@ export const startFixtureServer = async (name: string): Promise<{ url: string; c
     if (!address || typeof address === 'string') throw new Error('No fixture port allocated')
     const port = address.port
     await new Promise<void>((closed) => reservation.close(() => closed()))
-    const child = spawn('node', ['.output/server/index.mjs'], {
-        cwd: fixtureDirectory(name),
-        env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' },
-        stdio: ['ignore', 'pipe', 'pipe'],
-    })
+    const child = spawn(
+        'node',
+        options.development
+            ? ['node_modules/nuxt/bin/nuxt.mjs', 'dev', '--no-fork', '--port', String(port), '--host', '127.0.0.1']
+            : ['.output/server/index.mjs'],
+        {
+            cwd: fixtureDirectory(name),
+            env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' },
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
+    )
     let output = ''
     let spawnError: Error | undefined
     child.on('error', (error) => (spawnError = error))
     child.stdout.on('data', (chunk) => (output += chunk))
     child.stderr.on('data', (chunk) => (output += chunk))
     const url = `http://127.0.0.1:${port}`
-    for (let attempt = 0; attempt < 100; attempt += 1) {
+    for (let attempt = 0; attempt < (options.development ? 300 : 100); attempt += 1) {
         if (spawnError) throw spawnError
         if (child.exitCode !== null) throw new Error(`Fixture server exited early.\n${output}`)
         if (
-            await fetch(url, { signal: AbortSignal.timeout(500) })
-                .then(() => true)
+            await fetch(`${url}${options.readyPath ?? ''}`, { signal: AbortSignal.timeout(500) })
+                .then((response) => (options.readyPath ? response.ok : true))
                 .catch(() => false)
         ) {
             return { url, close: () => closeProcess(child) }
