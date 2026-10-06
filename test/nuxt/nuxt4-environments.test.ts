@@ -13,7 +13,7 @@ test('Nuxt --envName staging selects $env.staging before provider generation', a
     await cleanFixture('nuxt4')
     await installFixture('nuxt4')
     await runCommand('bunx', ['nuxt', 'build', '--envName', 'staging'], { cwd: directory })
-    const plugin = await readFile(resolve(generated, 'plugin.mjs'), 'utf8')
+    const plugin = await readFile(resolve(generated, 'registry.mjs'), 'utf8')
     const selected = await readFile(resolve(generated, 'selected.ts'), 'utf8')
     expect(plugin).toContain('files-sdk/memory')
     expect(selected).toContain('staging')

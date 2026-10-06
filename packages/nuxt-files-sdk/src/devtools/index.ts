@@ -16,7 +16,7 @@ const authenticatedHandler = (name: string, path: string, arguments_: string[]):
     addServerTemplate({
         filename,
         getContents: () =>
-            `import handler from ${JSON.stringify(path.replaceAll('\\', '/'))}\nexport default event => handler(event, ${arguments_.map((value) => JSON.stringify(value)).join(', ')})\n`,
+            `import '#nuxt-files-sdk/registry'\nimport handler from ${JSON.stringify(path.replaceAll('\\', '/'))}\nexport default event => handler(event, ${arguments_.map((value) => JSON.stringify(value)).join(', ')})\n`,
     })
     return filename
 }

@@ -5,14 +5,7 @@ import { addImports, addServerImports, defineNuxtModule, getNuxtModuleVersion } 
 import type { Nuxt } from '@nuxt/schema'
 
 import { filesDevtoolsWriteEnabled, shouldEnableFilesDevtools, type FilesDevtoolsOptions } from './devtools/enabled'
-import type { NitroIntegration } from './integration/nitro'
 import { moduleMeta } from './meta'
-
-declare module '@nuxt/schema' {
-    interface NuxtHooks {
-        'nitro:init': (nitro: NitroIntegration) => void | Promise<void>
-    }
-}
 
 /** Options for the Nuxt Files SDK module. */
 export interface ModuleOptions {
@@ -30,28 +23,10 @@ export default defineNuxtModule<ModuleOptions>({
         devtools: true,
     },
     async setup(options, nuxt: Nuxt) {
-        const { registerSdkAliases, resolveOwnedSdk, sdkTypePaths } = await import('./integration/resolve')
+        const { setupNuxtFilesIntegration } = await import('./integration/nuxt')
         const configPath = resolve(nuxt.options.rootDir, options.config)
-        const sdk = resolveOwnedSdk()
-        nuxt.options.alias = registerSdkAliases(nuxt.options.alias, sdk, ['browser', 'import'])
-        ;(nuxt.options.typescript.tsConfig.include ??= []).push(configPath)
-        const paths = ((nuxt.options.typescript.tsConfig.compilerOptions ??= {}).paths ??= {})
-        Object.assign(paths, sdkTypePaths(sdk))
-        let active = false
-        nuxt.hook('nitro:init', async (nitro) => {
-            const { setupNitroFilesIntegration } = await import('./integration/nitro')
-            active = await setupNitroFilesIntegration(nitro, {
-                configPath,
-                restart: () => nuxt.callHook('restart'),
-                environments: nitro.options.static
-                    ? ['production', 'prerender']
-                    : [nuxt.options.envName || (nuxt.options.dev ? 'development' : 'production')],
-            })
-        })
-        nuxt.hook('prepare:types', ({ references }) => {
-            if (active)
-                references.push({ path: resolve(nuxt.options.buildDir, 'nuxt-files-sdk/storage-registry.d.ts') })
-        })
+        const active = await setupNuxtFilesIntegration(nuxt, { configPath })
+        if (!active) return
 
         addServerImports([
             { name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' },
