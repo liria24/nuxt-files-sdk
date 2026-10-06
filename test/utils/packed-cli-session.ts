@@ -403,7 +403,19 @@ export const runPackedNuxtCliSession = async ({
         // A file bootstrap keeps --input-type eval flags out of Nitro's worker execArgv.
         await writeFile(
             bootstrap,
-            `import { pathToFileURL } from 'node:url'\nconst [bin, ...args] = process.argv.slice(2)\nprocess.argv = [process.execPath, bin, ...args]\nprocess.on('message', message => { if (message === 'files-cli-stop') process.emit('SIGTERM') })\nawait import(pathToFileURL(bin).href)\n`,
+            `import { pathToFileURL } from 'node:url'
+const [bin, ...args] = process.argv.slice(2)
+process.argv = [process.execPath, bin, ...args]
+const observe = data => console.info('[Files CLI bootstrap] ' + JSON.stringify({ pid: process.pid, ...data }))
+process.on('exit', code => observe({ phase: 'exit', code }))
+process.on('message', message => {
+  if (message !== 'files-cli-stop') return
+  observe({ phase: 'stop-received', signal: 'SIGTERM', listeners: process.listenerCount('SIGTERM') })
+  const handled = process.emit('SIGTERM')
+  observe({ phase: 'signal-emitted', handled })
+})
+await import(pathToFileURL(bin).href)
+`,
         )
         // Own the current Node runtime directly so IPC and exit events refer to the bootstrap process.
         child = spawn(
