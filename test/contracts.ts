@@ -1,5 +1,18 @@
 export const contracts = [
     {
+        id: 'CLI-002',
+        guarantee:
+            'An isolated exact archive survives real CLI startup, repair, dependency addition, restart and termination',
+        source: 'test/consumer/packed.test.ts',
+        job: 'test-consumer',
+    },
+    {
+        id: 'GATEWAY-006',
+        guarantee: 'Native RequestEvent, auth and SDK endpoint binding stay intact across HTTP and CLI transport',
+        source: 'test/consumer/packed.test.ts',
+        job: 'test-consumer',
+    },
+    {
         id: 'SECRET-001',
         guarantee:
             'Runtime secret precedence and derivation preserve standalone Nitro boundaries without cached failures',

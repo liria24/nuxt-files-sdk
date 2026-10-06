@@ -22,6 +22,7 @@ import {
     checkPublicExamples,
     cleanTypeContracts,
 } from '../utils/generated-types'
+import { runPackedNuxtCliSession } from '../utils/packed-cli-session'
 
 let packed: Awaited<ReturnType<typeof packPackage>>
 let contents: string[]
@@ -144,6 +145,23 @@ describe('Packed consumer', () => {
             'string',
         )
     })
+
+    test('[CLI-002][GATEWAY-006] exact archive runs the real CLI and portable gateway boundaries', async () => {
+        const consumer = await copyPackedConsumer('nuxt4', resolve(packed.directory, 'cli-input'), packed.tarball)
+        if (packageManager === 'pnpm') {
+            await writeFile(resolve(consumer, '.npmrc'), 'hoist=false\nshamefully-hoist=false\n')
+        }
+        const report = await runPackedNuxtCliSession({
+            consumer,
+            install: installConsumer,
+            runScript: runConsumerScript,
+        })
+        if (report.disconnectAbort.status === 'upstream-limitation') {
+            // The real probe ran; preserve the actual native-adapter limitation in CI output.
+            // oxlint-disable-next-line no-console
+            console.info(`[Packed Nuxt CLI] ${report.disconnectAbort.detail}`)
+        }
+    }, 600_000)
 
     test.each(consumerFixtures)(
         '[PKG-004][RESOLVE-002] %s installs the exact tarball and passes public contracts',
