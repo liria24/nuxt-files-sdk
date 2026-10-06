@@ -281,6 +281,18 @@ export const contracts = [
         job: 'typecheck',
     },
     {
+        id: 'TYPE-017',
+        guarantee: 'Native Nitro configuration auto-import declarations resolve exported helper types without any',
+        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        job: 'test-nuxt4',
+    },
+    {
+        id: 'TYPE-018',
+        guarantee: 'Unnamed storage retains inferred client types and rejects named access with Nitro auto-imports',
+        source: 'test/nuxt/vue.test.ts',
+        job: 'test-nuxt4',
+    },
+    {
         id: 'ENV-001',
         guarantee: 'Native environment keys and aliases take precedence over NUXT aliases',
         source: 'test/unit/environment.test.ts',
@@ -442,6 +454,12 @@ export const contracts = [
         guarantee: 'Nitro v2 and v3 workerd builds support R2, MinIO, and RustFS without bundled AWS SDK engines',
         source: 'test/nitro/suite.ts',
         job: 'test-nitro2',
+    },
+    {
+        id: 'BUNDLE-009',
+        guarantee: 'Nuxt workerd builds lazy unnamed R2 bindings without optional AWS packages',
+        source: 'test/nuxt/nuxt4-cloudflare.test.ts',
+        job: 'test-nuxt4',
     },
     {
         id: 'SEC-001',

@@ -11,7 +11,7 @@ import { filesBuilderCapabilities, requireFilesGateway } from './capabilities'
 import { deploymentTarget, storageDependencies } from './dependencies'
 import { dependencySession, diagnoseDependencies } from './diagnostics'
 import { configSources, subpathDependencies } from './imports'
-import { storageTypes, wireNuxtNitroOptions } from './nitro'
+import { optionalAwsSdkDependencies, storageTypes, wireNuxtNitroAwsOptions, wireNuxtNitroOptions } from './nitro'
 import { stopNitroDevReloadOnClose } from './nitro-dev-close'
 import { reportNuxtDependencyIssues } from './nuxt-diagnostics'
 import { registerSdkAliases, resolveOwnedSdk, resolvePackage, sdkTypePaths } from './resolve'
@@ -53,7 +53,22 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     const configPath = normalized(options.configPath)
     const sdk = resolveOwnedSdk()
     nuxt.options.alias = registerSdkAliases(nuxt.options.alias, sdk, ['browser', 'import'])
-    const graph = configSources(configPath, nuxt.options.alias)
+    // Nitro gives its server-only aliases precedence over general Nuxt aliases.
+    const preparationAliases = () => {
+        const native = nuxt.options.nitro
+        const aliases = 'alias' in native && native.alias && typeof native.alias === 'object' ? native.alias : {}
+        return registerSdkAliases(
+            {
+                ...nuxt.options.alias,
+                ...Object.fromEntries(
+                    Object.entries(aliases).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+                ),
+            },
+            sdk,
+            ['node', 'import'],
+        )
+    }
+    const graph = configSources(configPath, preparationAliases())
     const inputHashes = Object.fromEntries(graph.files.map((path) => [path, fileHash(path)]))
     const environments = nuxt.options.nitro.static
         ? ['production', 'prerender']
@@ -62,7 +77,7 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
         prepareFilesConfig({
             configPath,
             environments,
-            alias: nuxt.options.alias,
+            alias: preparationAliases(),
             injectImports: injectConfigImports,
         })
     let prepared
@@ -74,7 +89,7 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
                 diagnoseDependencies(
                     sdk,
                     graph.sdkImports.flatMap((subpath) => subpathDependencies(sdk, subpath)),
-                    nuxt.options.alias,
+                    preparationAliases(),
                 ),
                 dependencySession(nuxt.options.rootDir),
                 logger,
@@ -110,7 +125,7 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
                 ),
             ],
             async () => {
-                watcher?.add(configSources(configPath, nuxt.options.alias).files)
+                watcher?.add(configSources(configPath, preparationAliases()).files)
                 await withFilesTask(terminal, 'Updating Files configuration', prepare)
                 await nuxt.callHook('restart')
             },
@@ -123,6 +138,19 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     const major = resolveServerVariant({ nitro2: 2, nitro3: 3, nuxt: 0 }) ?? 0
     // This observes native development shutdown; Registry initialization stays in generated runtime imports.
     if (nuxt.options.dev && major === 2) nuxt.hook('nitro:init', stopNitroDevReloadOnClose)
+    let awsShims: string[] = []
+    if (
+        major === 2 &&
+        optionalAwsSdkDependencies(prepared.adapters, {
+            nitroMajor: major,
+            preset: 'cloudflare-module',
+            resolvable: () => false,
+        }).length
+    ) {
+        nuxt.hook('nitro:init', (nitro) => {
+            awsShims = wireNuxtNitroAwsOptions(nitro, { sdk, adapters: prepared.adapters, nitroMajor: major })
+        })
+    }
     const capabilities = filesBuilderCapabilities(major === 2 ? 'nitro2' : major === 3 ? 'nitro3' : 'nuxt')
     requireFilesGateway(prepared.routes.length > 0, capabilities.gateway)
     const mode = nuxt.options.dev ? '.dev' : ''
@@ -152,20 +180,39 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     const adapterDependencies = new Map(
         prepared.adapters.map((adapter) => [adapter, subpathDependencies(sdk, `files-sdk/${adapter}`)]),
     )
-    const requirements = [...prepared.entries.values()].flatMap((entry) =>
-        storageDependencies(
-            entry,
-            deploymentTarget(
-                'preset' in nuxt.options.nitro && typeof nuxt.options.nitro.preset === 'string'
-                    ? nuxt.options.nitro.preset
-                    : undefined,
+    const requirementsFor = (preset?: string) =>
+        [...prepared.entries.values()].flatMap((entry) =>
+            storageDependencies(
+                entry,
+                deploymentTarget(preset),
+                typeof entry.storage.adapter === 'string' ? adapterDependencies.get(entry.storage.adapter)! : [],
             ),
-            typeof entry.storage.adapter === 'string' ? adapterDependencies.get(entry.storage.adapter)! : [],
-        ),
+        )
+    const requirements = requirementsFor(
+        'preset' in nuxt.options.nitro && typeof nuxt.options.nitro.preset === 'string'
+            ? nuxt.options.nitro.preset
+            : undefined,
     )
     for (const subpath of graph.sdkImports) requirements.push(...subpathDependencies(sdk, subpath))
-    const diagnostics = diagnoseDependencies(sdk, requirements, nuxt.options.alias)
-    await reportNuxtDependencyIssues(diagnostics, dependencySession(nuxt.options.rootDir), logger, nuxt.options.rootDir)
+    const diagnostics = diagnoseDependencies(sdk, requirements, preparationAliases())
+    const previous = dependencySession(nuxt.options.rootDir)
+    // Native Nitro resolves environment presets and server aliases after module setup.
+    // Report its requirements only after that resolution and compatibility alias registration.
+    if (!major) await reportNuxtDependencyIssues(diagnostics, previous, logger, nuxt.options.rootDir)
+    if (major && requirements.length) {
+        nuxt.hook('nitro:init', async (value) => {
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+            const native = value as { options: { preset: string; alias: Record<string, string> } }
+            const resolvedRequirements = requirementsFor(native.options.preset)
+            for (const subpath of graph.sdkImports) resolvedRequirements.push(...subpathDependencies(sdk, subpath))
+            await reportNuxtDependencyIssues(
+                diagnoseDependencies(sdk, resolvedRequirements, native.options.alias, awsShims),
+                previous,
+                logger,
+                nuxt.options.rootDir,
+            )
+        })
+    }
     watcher?.add(
         requirements.flatMap(({ dependency, conditions }) => {
             const result = resolvePackage(dependency, pathToFileURL(sdk.manifestPath), conditions)

@@ -11,7 +11,7 @@ import { closeOwnedProcess, repositoryRoot, runCommand } from './fixture'
 
 export const cleanTypeContracts = async (directory: string): Promise<void> => {
     invalidTypeRuns.delete(directory)
-    for (const name of ['.contract-docs', '.contract-invalid', '.contract-examples']) {
+    for (const name of ['.contract-docs', '.contract-invalid', '.contract-examples', '.contract-config-autoimport']) {
         await rm(resolve(directory, name), { recursive: true, force: true })
     }
 }
@@ -23,6 +23,45 @@ export const checkGeneratedTypes = async (directory: string): Promise<void> => {
     )
     expect(imports).not.toMatch(/node_modules\/nuxt-files-sdk\/runtime/u)
     expect(registry).not.toContain('files-sdk/loader')
+    const helper = imports.match(/const defineFilesConfig: typeof import\('([^']+)'\)\.defineFilesConfig/u)?.[1]
+    expect(helper, 'Nitro must retain the public configuration auto-import declaration').toBeDefined()
+    const referencedConfig = helper!.startsWith('.')
+        ? resolve(directory, '.nuxt/types', helper!).replaceAll('\\', '/')
+        : helper!
+    // Compile Nitro's generated globals directly: shared declarations can otherwise hide a broken export path.
+    const contract = resolve(directory, '.contract-config-autoimport')
+    await mkdir(contract, { recursive: true })
+    await Promise.all([
+        writeFile(
+            resolve(contract, 'types.ts'),
+            `import type config from '../files.config'
+import { defineFilesConfig as nativeDefinition } from ${JSON.stringify(referencedConfig)}
+type IsAny<T> = 0 extends 1 & T ? true : false
+const helperIsAny: IsAny<typeof defineFilesConfig> = false
+const configIsAny: IsAny<typeof config> = false
+const inferred = nativeDefinition({ storage: { adapter: 'memory' } })
+inferred.storage.adapter satisfies 'memory'
+void [helperIsAny, configIsAny]
+`,
+        ),
+        writeFile(
+            resolve(contract, 'tsconfig.json'),
+            JSON.stringify({
+                extends: '../.nuxt/tsconfig.server.json',
+                compilerOptions: { types: ['node'] },
+                include: [
+                    '../.nuxt/types/nitro-imports.d.ts',
+                    '../.nuxt/nuxt-files-sdk/storage-registry.d.ts',
+                    '../node_modules/.cache/nuxt/.nuxt/nuxt-files-sdk/storage-registry.d.ts',
+                    '../files.config.ts',
+                    './types.ts',
+                ],
+            }),
+        ),
+    ])
+    await runCommand('bun', ['x', 'vue-tsc', '--noEmit', '-p', '.contract-config-autoimport/tsconfig.json'], {
+        cwd: directory,
+    })
 }
 
 const invalidTypeRuns = new Map<string, Promise<string>>()

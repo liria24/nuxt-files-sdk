@@ -46,7 +46,7 @@ afterEach(async () => {
     kit.startTask.mockClear()
 })
 
-const setup = async (source: string, major = 2, development = false) => {
+const setup = async (source: string, major = 2, development = false, nitroAlias: Record<string, string> = {}) => {
     const root = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-nuxt-generation-'))
     directories.push(root)
     kit.directory = resolve(root, '.nuxt')
@@ -62,9 +62,20 @@ const setup = async (source: string, major = 2, development = false) => {
             alias: {},
             dev: development,
             envName: development ? 'development' : 'production',
-            nitro: {},
+            nitro: { alias: nitroAlias },
         },
-        hook: (name: string, callback: (...args: any[]) => unknown) => hooks.set(name, callback),
+        hook: (name: string, callback: (...args: any[]) => unknown) => {
+            const previous = hooks.get(name)
+            hooks.set(
+                name,
+                previous
+                    ? async (...args) => {
+                          await previous(...args)
+                          return callback(...args)
+                      }
+                    : callback,
+            )
+        },
     } as unknown as Nuxt
     const active = await setupNuxtFilesIntegration(nuxt, { configPath })
     const close = hooks.get('close')
@@ -114,6 +125,105 @@ test.each([0, 2, 3])('development server %s wires only the native Nitro 2 shutdo
     expect(kit.templates.has('nuxt-files-sdk/plugin.dev.mjs')).toBe(false)
     const registry = await kit.templates.get('nuxt-files-sdk/registry.dev.mjs')!.getContents()
     expect(registry).toContain('configureFiles(config,')
+})
+
+test('Nuxt restores only missing workerd AWS compatibility after native preset resolution', async () => {
+    const { hooks } = await setup(`export default {
+        storage: { adapter: 'r2', config: () => { throw new Error('eager config'); } },
+        $development: { storage: { adapter: 'fs', config: { root: '.' } } },
+    }`)
+    const configure = hooks.get('nitro:init')!
+    const native = {
+        options: {
+            preset: 'cloudflare-module',
+            alias: { '@aws-sdk/client-s3': '/consumer/custom-client.mjs' } as Record<string, string>,
+            virtual: {} as Record<string, string>,
+        },
+    }
+    await configure(native)
+    expect(native.options.alias['@aws-sdk/client-s3']).toBe('/consumer/custom-client.mjs')
+    expect(Object.keys(native.options.virtual)).toHaveLength(3)
+    for (const [name, value] of Object.entries(native.options.virtual)) {
+        expect(name).toContain('virtual:nuxt-files-sdk/optional/')
+        expect(value).toContain('missing-optional-dependency')
+    }
+    const node = { options: { preset: 'node-server', alias: {}, virtual: {} } }
+    await configure(node)
+    expect(node.options.virtual).toEqual({})
+    const nitro3 = await setup("export default { storage: { adapter: 'r2' } }", 3)
+    const native3 = { options: { preset: 'cloudflare-module', alias: {}, virtual: {} } }
+    await nitro3.hooks.get('nitro:init')!(native3)
+    expect(native3.options.virtual).toEqual({})
+    native.options.preset = 'node-server'
+    await configure(native)
+    expect(native.options.alias['@aws-sdk/client-s3']).toBe('/consumer/custom-client.mjs')
+    expect(native.options.virtual).toEqual({})
+})
+
+test('Nuxt preparation retains Nitro-only source aliases without promoting them to client aliases', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'files-nitro-alias-'))
+    directories.push(directory)
+    const helper = resolve(directory, 'storage.ts')
+    await writeFile(helper, "export const storage = { adapter: 'memory' }")
+    const { active, nuxt } = await setup(
+        "import { storage } from '#server-storage'; export default { storage }",
+        2,
+        false,
+        { '#server-storage': helper },
+    )
+    expect(active).toBe(true)
+    expect(nuxt.options.alias['#server-storage']).toBeUndefined()
+})
+
+test('Nuxt rejects Nitro-only reserved aliases before evaluating Files configuration', async () => {
+    await expect(
+        setup("throw new Error('configuration evaluated before alias validation')", 2, false, {
+            '#files-sdk': '/consumer/unowned-sdk.mjs',
+        }),
+    ).rejects.toThrow('[nuxt-files-sdk:reserved-alias]')
+})
+
+test.each([
+    "export default { storage: { adapter: 'r2', config: {} } }",
+    "export default { storage: { adapter: 'r2', config: () => { throw new Error('eager resolver'); } } }",
+])('Nuxt defers AWS advice until the workerd preset and compatibility aliases are resolved', async (source) => {
+    const { hooks } = await setup(source)
+    expect(kit.warn).not.toHaveBeenCalled()
+    await hooks.get('nitro:init')!({
+        options: { preset: 'cloudflare-module', alias: {}, virtual: {} },
+    })
+    expect(kit.warn).not.toHaveBeenCalled()
+})
+
+test('Nuxt peer advice uses the native resolved preset and preserves Nitro-only peer aliases', async () => {
+    const { hooks } = await setup("export default { storage: { adapter: 'r2', config: {} } }")
+    expect(kit.warn).not.toHaveBeenCalled()
+    await hooks.get('nitro:init')!({
+        options: { preset: 'node-server', alias: { '@aws-sdk/client-s3': '/consumer/custom-client.mjs' } },
+    })
+    expect(kit.warn).toHaveBeenCalledOnce()
+    const message = String(kit.warn.mock.calls[0]![0])
+    expect(message).toContain('@aws-sdk/s3-presigned-post')
+    expect(message).not.toContain('@aws-sdk/client-s3')
+})
+
+test('Nuxt workerd throw shims do not hide confirmed AWS requirements or repeat unchanged advice', async () => {
+    const { hooks } = await setup("export default { storage: { adapter: 'r2', config: { client: 'aws-sdk' } } }")
+    expect(kit.warn).not.toHaveBeenCalled()
+    const native = {
+        options: {
+            preset: 'cloudflare-module',
+            alias: { '@aws-sdk/client-s3': '/consumer/custom-client.mjs' },
+            virtual: {},
+        },
+    }
+    await hooks.get('nitro:init')!(native)
+    expect(kit.warn).toHaveBeenCalledOnce()
+    const message = String(kit.warn.mock.calls[0]![0])
+    expect(message).toContain('@aws-sdk/s3-presigned-post')
+    expect(message).not.toContain('@aws-sdk/client-s3')
+    await hooks.get('nitro:init')!(native)
+    expect(kit.warn).toHaveBeenCalledOnce()
 })
 
 test('Nuxt public type generation contributes to server, app, shared and node programs', async () => {
