@@ -1,5 +1,12 @@
 export const contracts = [
     {
+        id: 'SECRET-001',
+        guarantee:
+            'Runtime secret precedence and derivation preserve standalone Nitro boundaries without cached failures',
+        source: 'test/unit/gateway-secret.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'IMPORT-001',
         guarantee: 'Aliased configuration and referenced files re-evaluate without duplicate fallback side effects',
         source: 'test/unit/import-strategy.test.ts',

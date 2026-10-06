@@ -5,6 +5,10 @@ const project = (name: string, include: string[]) => ({
         name,
         include,
         environment: 'node' as const,
+        env: {
+            NUXT_APP_SECRET: 'fixture-only-root-secret-for-files-gateway-2026',
+            FILES_API_SECRET: 'fixture-only-explicit-nitro-gateway-secret',
+        },
         ...(name === 'unit' || name === 'consumer' ? {} : { globalSetup: ['./test/utils/global-setup.ts'] }),
         fileParallelism: false,
         hookTimeout: 300_000,

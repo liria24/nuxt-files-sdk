@@ -331,16 +331,12 @@ import { createFilesRouter } from '#files-sdk/api'
 ${nitroMajorVersion(nitro) >= 3 ? '' : "import { toWebRequest } from 'h3'"}
 import { nitroRequestEvent, nitroResponse } from ${JSON.stringify(fileURLToPath(new URL('./nitro-event.js', import.meta.url)).replaceAll('\\', '/'))}
 import { getFiles } from ${JSON.stringify(internalPath)}
+import { resolveGatewaySecret } from ${JSON.stringify(fileURLToPath(new URL('../runtime/gateway-secret.js', import.meta.url)).replaceAll('\\', '/'))}
 ${nitro.options.dev ? `import { developmentConfigCurrent } from ${JSON.stringify(fileURLToPath(new URL('../runtime/development.js', import.meta.url)).replaceAll('\\', '/'))}\nconst inputHashes = ${JSON.stringify(inputHashes)}` : ''}
 
 const route = config.routes[${index}]
 const environmentSecret = typeof process === 'undefined' ? undefined : process.env?.FILES_API_SECRET
-const secret = route.authorize
-  ? route.secret || environmentSecret || crypto.randomUUID() + crypto.randomUUID()
-  : route.secret
-if (route.authorize && !route.secret && !environmentSecret) {
-  console.warn('[nuxt-files-sdk:gateway-secret] Set FILES_API_SECRET for upload tokens shared across processes.')
-}
+const secret = await resolveGatewaySecret(route.secret, environmentSecret)
 let sharedRouter
 const makeRouter = (event) => createFilesRouter({
   ...route,

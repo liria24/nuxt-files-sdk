@@ -86,7 +86,7 @@ test('Nuxt generates one shared lazy registry graph without Nitro startup initia
     expect(registry).not.toContain('files-sdk/loader')
     expect(runtime).toContain("import { registry } from '#nuxt-files-sdk/registry'")
     expect(runtime).toContain('void registry')
-    expect(handler).toContain("import { defineEventHandler } from 'nuxt/server'")
+    expect(handler).toContain("import { defineEventHandler, deriveSecret } from 'nuxt/server'")
     expect(handler).toContain("from 'nuxt-files-sdk/runtime'")
     expect(handler).toContain('router.handle(event.req)')
     expect(kit.handlers).toEqual([
@@ -126,4 +126,26 @@ test('non-Nitro builders retain basic runtime and reject an explicitly configure
     await expect(
         setup(`export default { storage: { adapter: 'memory' }, routes: [{ path: '/files' }] }`, 0),
     ).rejects.toThrow('[nuxt-files-sdk:gateway-unavailable]')
+})
+
+test('Gateway secret resolution stays in runtime source and failed derivation can retry', async () => {
+    const old = process.env.FILES_API_SECRET
+    process.env.FILES_API_SECRET = 'generation-must-not-serialize-this-value'
+    try {
+        await setup(
+            `export default { storage: { adapter: 'memory' }, routes: [{ path: '/files', authorize: () => true }] }`,
+        )
+        const handler = await kit.templates.get('nuxt-files-sdk/gateway-0.mjs')!.getContents()
+        expect(handler).toContain('process.env?.FILES_API_SECRET')
+        expect(handler).toContain('deriveSecret("nuxt-files-sdk:gateway:/files")')
+        expect(handler).toContain('secretPromise = undefined')
+        expect(handler).toContain('const secret = await gatewaySecret()')
+        expect(handler).toContain('sharedRouter ??= makeRouter(event, secret)')
+        expect(handler).not.toContain(process.env.FILES_API_SECRET)
+        expect(handler).not.toContain('randomUUID')
+        expect(handler).not.toContain('config.appSecret')
+    } finally {
+        if (old === undefined) delete process.env.FILES_API_SECRET
+        else process.env.FILES_API_SECRET = old
+    }
 })

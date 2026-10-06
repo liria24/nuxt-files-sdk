@@ -1,3 +1,5 @@
+import type { RequestEvent } from '@nuxt/schema'
+
 import type { DependencyDiagnostic } from '../integration/diagnostics'
 import { inspectFiles } from '../runtime/internal'
 import { authorizeFilesDevtoolsRequest } from './auth'
@@ -15,13 +17,13 @@ export interface FilesDevtoolsSnapshot {
 }
 
 export const FILES_DEVTOOLS_PATH = '/__nuxt-files-sdk/'
-export const FILES_SNAPSHOT_PATH = `${FILES_DEVTOOLS_PATH}snapshot`
-export const FILES_GATEWAY_PATH = `${FILES_DEVTOOLS_PATH}files`
-export const FILES_TOKEN_PATH = `${FILES_DEVTOOLS_PATH}token`
+export const FILES_SNAPSHOT_PATH = '/__nuxt-files-sdk-api/snapshot'
+export const FILES_GATEWAY_PATH = '/__nuxt-files-sdk-api/files'
+export const FILES_TOKEN_PATH = '/__nuxt-files-sdk-api/token'
 export const FILES_DEVTOOLS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 
-export default async (event: { node: { req: { headers: Headers } } }, secret: string) => {
-    if (!(await authorizeFilesDevtoolsRequest(event.node.req, secret))) {
+export default async (event: RequestEvent, secret: string) => {
+    if (!(await authorizeFilesDevtoolsRequest(event.req, secret))) {
         return new Response(null, { status: 401 })
     }
     const snapshot = inspectFiles()

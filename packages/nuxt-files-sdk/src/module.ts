@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 
 import {
@@ -6,8 +6,8 @@ import {
     addServerImports,
     defineNuxtModule,
     getNuxtModuleVersion,
-    logger,
     resolveServerVariant,
+    useLogger,
 } from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
 
@@ -56,15 +56,29 @@ export default defineNuxtModule<ModuleOptions>({
 
         if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
             if (!capabilities.devtools) {
-                logger.warn(
+                useLogger('nuxt-files-sdk').warn(
                     '[nuxt-files-sdk:devtools-unavailable] Files DevTools is unavailable with this server builder. Basic Files runtime remains enabled.',
                 )
                 return
             }
             const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
             const { setupFilesDevtools } = await import('./devtools')
-            const secrets = { token: randomUUID() }
-            await setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools), secrets)
+            const environmentKey = `NUXT_FILES_DEVTOOLS_${createHash('sha256').update(nuxt.options.rootDir).digest('hex').slice(0, 24).toUpperCase()}`
+            const previous = process.env[environmentKey]
+            const secrets = { token: randomUUID(), environmentKey }
+            process.env[environmentKey] = secrets.token
+            const restore = () => {
+                if (process.env[environmentKey] !== secrets.token) return
+                if (previous === undefined) delete process.env[environmentKey]
+                else process.env[environmentKey] = previous
+            }
+            nuxt.hook('close', restore)
+            try {
+                await setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools), secrets)
+            } catch (error) {
+                restore()
+                throw error
+            }
         }
     },
 })

@@ -233,7 +233,38 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     for (const [index, route] of prepared.routes.entries()) {
         const handler = template(
             `gateway-${index}`,
-            `import { defineEventHandler } from 'nuxt/server'\nimport config from ${JSON.stringify(resolved)}\nimport { createFilesRouter } from '#files-sdk/api'\nimport { useServerFiles } from 'nuxt-files-sdk/runtime'\n${nuxt.options.dev ? `import { developmentConfigCurrent } from ${JSON.stringify(runtimeFile('../runtime/development.js'))}\nconst inputHashes = ${JSON.stringify(inputHashes)}` : ''}\nconst route = config.routes[${index}]\nconst environmentSecret = typeof process === 'undefined' ? undefined : process.env?.FILES_API_SECRET\nconst secret = route.secret || environmentSecret\nlet sharedRouter\nconst makeRouter = (event) => createFilesRouter({\n  ...route,\n  files: () => useServerFiles(${route.storage === undefined ? '' : JSON.stringify(route.storage)}),\n  secret,\n  authorize: route.authorize && ((context) => route.authorize({ ...context, event })),\n})\nexport default defineEventHandler(event => {\n  ${nuxt.options.dev ? "if (!developmentConfigCurrent(inputHashes)) return new Response('Files configuration is being updated.', { status: 503 })" : ''}\n  const router = route.authorize ? makeRouter(event) : (sharedRouter ??= makeRouter(event))\n  return router.handle(event.req)\n})\n`,
+            `import { defineEventHandler, deriveSecret } from 'nuxt/server'
+import config from ${JSON.stringify(resolved)}
+import { createFilesRouter } from '#files-sdk/api'
+import { useServerFiles } from 'nuxt-files-sdk/runtime'
+import { resolveGatewaySecret } from ${JSON.stringify(runtimeFile('../runtime/gateway-secret.js'))}
+${nuxt.options.dev ? `import { developmentConfigCurrent } from ${JSON.stringify(runtimeFile('../runtime/development.js'))}\nconst inputHashes = ${JSON.stringify(inputHashes)}` : ''}
+const route = config.routes[${index}]
+let secretPromise
+const gatewaySecret = () => secretPromise ??= resolveGatewaySecret(
+  route.secret,
+  typeof process === 'undefined' ? undefined : process.env?.FILES_API_SECRET,
+  () => deriveSecret(${JSON.stringify(`nuxt-files-sdk:gateway:${route.path}`)}),
+).catch(error => {
+  secretPromise = undefined
+  throw error
+})
+let sharedRouter
+const makeRouter = (event, secret) => createFilesRouter({
+  ...route,
+  files: () => useServerFiles(${route.storage === undefined ? '' : JSON.stringify(route.storage)}),
+  secret,
+  authorize: route.authorize && ((context) => route.authorize({ ...context, event })),
+})
+export default defineEventHandler(async event => {
+  ${nuxt.options.dev ? "if (!developmentConfigCurrent(inputHashes)) return new Response('Files configuration is being updated.', { status: 503 })" : ''}
+  const secret = await gatewaySecret()
+  const router = route.authorize
+    ? makeRouter(event, secret)
+    : (sharedRouter ??= makeRouter(event, secret))
+  return router.handle(event.req)
+})
+`,
         )
         addServerHandler({ route: route.path, handler: { nuxt: handler } })
     }
