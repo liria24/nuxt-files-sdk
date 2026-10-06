@@ -125,7 +125,7 @@ describe('Packed consumer', () => {
         expect(metadata).toMatchObject({
             name: 'nuxt-files-sdk',
             configKey: 'files',
-            compatibility: { nuxt: '^4.0.0 || ^5.0.0' },
+            compatibility: { nuxt: '^4.6.0 || ^5.0.0' },
         })
         expect(packageJson.dependencies['files-sdk']).toBe('2.6.2')
         expect(packageJson.devDependencies['files-sdk']).toBeUndefined()

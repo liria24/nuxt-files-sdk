@@ -25,7 +25,7 @@
         "comark": "^0.7.0",
         "comark-content": "0.4.1",
         "h3": "^1.15.11",
-        "nuxt": "^4.5.2",
+        "nuxt": "^4.6.0",
         "nuxt-files-sdk": "workspace:*",
         "nuxt-llms": "https://pkg.pr.new/nuxt-content/nuxt-llms/nuxt-llms@f6a9730",
         "nuxt-og-image": "^6.9.1",

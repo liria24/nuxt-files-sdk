@@ -50,8 +50,8 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@nuxt/kit": "^4.5.2",
-        "@nuxt/schema": "^4.5.2",
+        "@nuxt/kit": "^4.6.0",
+        "@nuxt/schema": "^4.6.0",
         "c12": "4.0.0-rc.2",
         "devframe": "^1.1.0",
         "exsolve": "^1.1.1",

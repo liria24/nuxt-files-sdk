@@ -19,6 +19,7 @@ export default defineConfig([
             neverBundle: true,
             onlyImport: [
                 '@nuxt/kit',
+                '@nuxt/schema',
                 '@nuxt/devtools-kit',
                 'c12',
                 'devframe',
@@ -44,6 +45,7 @@ export default defineConfig([
             module: 'src/module.ts',
             nitro: 'src/nitro.ts',
             runtime: 'src/runtime.ts',
+            'integration/nitro-event': 'src/integration/nitro-event.ts',
             'runtime/internal': 'src/runtime/internal.ts',
             'runtime/development': 'src/runtime/development.ts',
             'config/merge': 'src/config/merge.ts',

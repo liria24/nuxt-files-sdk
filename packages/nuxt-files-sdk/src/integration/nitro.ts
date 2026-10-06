@@ -102,7 +102,7 @@ declare module 'nuxt-files-sdk/runtime' {
   interface NuxtFilesSingleStorage { value: SingleStorage<typeof config> }
   interface NuxtFilesStorageRegistry extends StorageRegistry<typeof config> {}
 }
-${hookTypes(nitroMajor >= 3 ? 'nitro/types' : 'nitropack/types')}
+${nitroMajor === 0 ? '' : hookTypes(nitroMajor >= 3 ? 'nitro/types' : 'nitropack/types')}
 export {}
 `
 
@@ -323,13 +323,13 @@ export default (nitroApp) => configureFiles(config, {
         await Promise.all(
             routePaths.map((path, index) => {
                 const route = routes[index]!
-                const handler =
-                    nitroMajorVersion(nitro) >= 3 ? 'router.handle(event.req)' : 'createRouteHandler(router)(event)'
+                const request = nitroMajorVersion(nitro) >= 3 ? 'event.req' : 'toWebRequest(event)'
                 return writeFile(
                     path,
                     `import config from ${JSON.stringify(resolvedPath.replaceAll('\\', '/'))}
 import { createFilesRouter } from '#files-sdk/api'
-${nitroMajorVersion(nitro) >= 3 ? '' : "import { createRouteHandler } from '#files-sdk/nitro'"}
+${nitroMajorVersion(nitro) >= 3 ? '' : "import { toWebRequest } from 'h3'"}
+import { nitroRequestEvent, nitroResponse } from ${JSON.stringify(fileURLToPath(new URL('./nitro-event.js', import.meta.url)).replaceAll('\\', '/'))}
 import { getFiles } from ${JSON.stringify(internalPath)}
 ${nitro.options.dev ? `import { developmentConfigCurrent } from ${JSON.stringify(fileURLToPath(new URL('../runtime/development.js', import.meta.url)).replaceAll('\\', '/'))}\nconst inputHashes = ${JSON.stringify(inputHashes)}` : ''}
 
@@ -348,10 +348,11 @@ const makeRouter = (event) => createFilesRouter({
   secret,
   authorize: route.authorize && ((context) => route.authorize({ ...context, event })),
 })
-export default (event) => {
+export default async (event) => {
   ${nitro.options.dev ? `if (!developmentConfigCurrent(inputHashes)) return new Response('Files configuration is being updated.', { status: 503 })` : ''}
-  const router = route.authorize ? makeRouter(event) : (sharedRouter ??= makeRouter(event))
-  return ${handler}
+  const portable = nitroRequestEvent(${request}, event.context)
+  const router = route.authorize ? makeRouter(portable) : (sharedRouter ??= makeRouter(portable))
+  return nitroResponse(await router.handle(portable.req), portable)
 }
 `,
                 )
@@ -360,4 +361,28 @@ export default (event) => {
     }
     await writeRuntime()
     return true
+}
+
+/** Native bundle settings stay in the Nitro adapter, including Nuxt's Nitro-backed path. */
+export const wireNuxtNitroOptions = (
+    value: unknown,
+    options: {
+        sdk: ReturnType<typeof resolveOwnedSdk>
+        runtime: string
+        registry: string
+        resolved: string
+        selected: string
+        development: boolean
+    },
+): void => {
+    // The public schema deliberately does not embed Nitro's native option types.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const config = value as Pick<NitroIntegration['options'], 'alias' | 'externals'>
+    config.alias = registerSdkAliases(
+        { ...config.alias, 'nuxt-files-sdk/runtime': options.runtime, '#nuxt-files-sdk/registry': options.registry },
+        options.sdk,
+    )
+    const inline = ((config.externals ??= {}).inline ??= [])
+    inline.push('nuxt-files-sdk', options.runtime, options.registry, options.resolved, options.selected)
+    if (!options.development) inline.push('files-sdk')
 }

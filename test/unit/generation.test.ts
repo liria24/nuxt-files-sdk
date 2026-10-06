@@ -56,7 +56,9 @@ describe('provider generation', () => {
             expect(handler).toContain('createFilesRouter({')
             expect(handler).toContain('files: () => getFiles()')
             expect(handler).toContain(
-                majorVersion === 2 ? 'createRouteHandler(router)(event)' : 'router.handle(event.req)',
+                majorVersion === 2
+                    ? 'nitroRequestEvent(toWebRequest(event), event.context)'
+                    : 'nitroRequestEvent(event.req, event.context)',
             )
         }
     })
