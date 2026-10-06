@@ -12,7 +12,7 @@ test('experimental Vite server builds and serves basic Files SSR without Nitro s
         const response = await fetch(server.url)
         expect(response.status).toBe(200)
         expect(await response.text()).toContain('Files SSR: memory')
-        expect((await fetch(`${server.url}/__nuxt-files-sdk/snapshot`)).headers.get('content-type')).toContain(
+        expect((await fetch(`${server.url}/__nuxt-files-api/snapshot`)).headers.get('content-type')).toContain(
             'text/html',
         )
     } finally {

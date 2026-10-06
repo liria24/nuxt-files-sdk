@@ -1,3 +1,5 @@
+import { defineEventHandler } from 'nuxt/server'
+
 export default defineEventHandler(async () => {
     const files = useServerFiles('blob')
     const archive = useServerFiles('archive')

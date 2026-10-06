@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import type { ProviderSlug } from 'files-sdk'
@@ -162,9 +162,14 @@ export const setupNitroFilesIntegration = async (
             ...graph.files,
             sdk.manifestPath,
             ...[...roots].flatMap((root) =>
-                ['package.json', 'bun.lock', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'].map((name) =>
-                    resolve(root, name),
-                ),
+                [
+                    'package.json',
+                    'bun.lock',
+                    'package-lock.json',
+                    'pnpm-lock.yaml',
+                    'yarn.lock',
+                    'node_modules/.package-lock.json',
+                ].map((name) => resolve(root, name)),
             ),
         ]
         watcher = watchFiles(
@@ -359,6 +364,29 @@ export default async (event) => {
     return true
 }
 
+/** Preserve TypeScript compilation when Nuxt places its build directory inside node_modules. */
+export const selectedSourcePlugin = (options: { selected: string; source: string; configPath: string }) => {
+    const selected = options.selected.replaceAll('\\', '/')
+    const id = `nuxt-files-sdk:${basename(selected)}`
+    return {
+        name: 'nuxt-files-sdk-selected-source',
+        resolveId(
+            this: {
+                resolve(source: string, importer: string, options: { skipSelf: true }): Promise<{ id: string } | null>
+            },
+            source: string,
+            importer?: string,
+        ) {
+            if (source.replaceAll('\\', '/') === selected) return id
+            if (importer === id) return this.resolve(source, options.configPath, { skipSelf: true })
+            return null
+        },
+        load(source: string) {
+            return source === id ? options.source : null
+        },
+    }
+}
+
 /** Native bundle settings stay in the Nitro adapter, including Nuxt's Nitro-backed path. */
 export const wireNuxtNitroOptions = (
     value: unknown,
@@ -368,12 +396,16 @@ export const wireNuxtNitroOptions = (
         registry: string
         resolved: string
         selected: string
+        selectedSource: string
+        configPath: string
         development: boolean
     },
 ): void => {
     // The public schema deliberately does not embed Nitro's native option types.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const config = value as Pick<NitroIntegration['options'], 'alias' | 'externals'>
+    const config = value as Pick<NitroIntegration['options'], 'alias' | 'externals'> & {
+        rollupConfig?: { plugins?: unknown[] }
+    }
     config.alias = registerSdkAliases(
         { ...config.alias, 'nuxt-files-sdk/runtime': options.runtime, '#nuxt-files-sdk/registry': options.registry },
         options.sdk,
@@ -381,4 +413,12 @@ export const wireNuxtNitroOptions = (
     const inline = ((config.externals ??= {}).inline ??= [])
     inline.push('nuxt-files-sdk', options.runtime, options.registry, options.resolved, options.selected)
     if (!options.development) inline.push('files-sdk')
+    const plugins = ((config.rollupConfig ??= {}).plugins ??= [])
+    plugins.push(
+        selectedSourcePlugin({
+            selected: options.selected,
+            source: options.selectedSource,
+            configPath: options.configPath,
+        }),
+    )
 }

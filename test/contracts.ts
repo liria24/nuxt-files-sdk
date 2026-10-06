@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'ARCHIVE-001',
+        guarantee: 'All stable platform and package-manager consumers verify the same immutable packed archive',
+        source: 'test/unit/packed-artifact.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'CLI-002',
         guarantee:
             'An isolated exact archive survives real CLI startup, repair, dependency addition, restart and termination',

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -14,6 +14,7 @@ test('[UPDATE-001] tracks Layer aliases and referenced config, suppresses unchan
     const config = resolve(root, 'files.config.ts')
     const authorization = resolve(root, 'authorize.ts')
     const lock = resolve(root, 'bun.lock')
+    const npmMetadata = resolve(root, 'node_modules/.package-lock.json')
     let watcher: ReturnType<typeof watchFiles> | undefined
     try {
         await writeFile(
@@ -30,7 +31,7 @@ test('[UPDATE-001] tracks Layer aliases and referenced config, suppresses unchan
         await writeChanged(config, original)
         expect((await stat(config)).mtimeMs).toBe(before)
         const changed = vi.fn<() => Promise<void>>(async () => {})
-        watcher = watchFiles([...graph.files, lock], changed, (error) => {
+        watcher = watchFiles([...graph.files, lock, npmMetadata], changed, (error) => {
             throw error
         })
         await writeFile(authorization, 'export const authorize = false')
@@ -41,6 +42,17 @@ test('[UPDATE-001] tracks Layer aliases and referenced config, suppresses unchan
         await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(1))
         await writeFile(lock, 'new dependencies')
         await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(2))
+        // npm --package-lock=false can install a dependency without changing a root lockfile.
+        // Its hidden installation metadata is still an observable development-session input.
+        await mkdir(resolve(root, 'node_modules'), { recursive: true })
+        const installed = JSON.stringify({ packages: { 'node_modules/files-late-dependency': { version: '1.0.0' } } })
+        await writeFile(npmMetadata, installed)
+        await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(3))
+        await writeChanged(npmMetadata, installed)
+        await new Promise((done) => setTimeout(done, 600))
+        expect(changed).toHaveBeenCalledTimes(3)
+        await writeFile(npmMetadata, installed.replace('1.0.0', '1.0.1'))
+        await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(4))
         watcher.close()
         await writeFile(authorization, 'export const authorize = () => ({})')
         expect(developmentConfigCurrent(hashes)).toBe(true)

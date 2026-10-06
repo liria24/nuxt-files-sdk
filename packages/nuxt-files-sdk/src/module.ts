@@ -45,9 +45,9 @@ export default defineNuxtModule<ModuleOptions>({
 
         addServerImports([
             { name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' },
-            { name: 'useServerFiles', from: 'nuxt-files-sdk/runtime' },
-            { name: 'syncFiles', from: 'nuxt-files-sdk/runtime' },
-            { name: 'transferFiles', from: 'nuxt-files-sdk/runtime' },
+            { name: 'useServerFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: true },
+            { name: 'syncFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: true },
+            { name: 'transferFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: true },
         ])
         addImports({ name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' })
         for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {
@@ -61,24 +61,35 @@ export default defineNuxtModule<ModuleOptions>({
                 )
                 return
             }
-            const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
-            const { setupFilesDevtools } = await import('./devtools')
-            const environmentKey = `NUXT_FILES_DEVTOOLS_${createHash('sha256').update(nuxt.options.rootDir).digest('hex').slice(0, 24).toUpperCase()}`
-            const previous = process.env[environmentKey]
-            const secrets = { token: randomUUID(), environmentKey }
-            process.env[environmentKey] = secrets.token
-            const restore = () => {
-                if (process.env[environmentKey] !== secrets.token) return
-                if (previous === undefined) delete process.env[environmentKey]
-                else process.env[environmentKey] = previous
-            }
-            nuxt.hook('close', restore)
-            try {
-                await setupFilesDevtools(nuxt, version || '3', filesDevtoolsWriteEnabled(options.devtools), secrets)
-            } catch (error) {
-                restore()
-                throw error
-            }
+            // Nuxt may install its native DevTools module after user modules.
+            nuxt.hook('modules:done', () =>
+                nuxt.runWithContext(async () => {
+                    if (!shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) return
+                    const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
+                    const { setupFilesDevtools } = await import('./devtools')
+                    const environmentKey = `NUXT_FILES_DEVTOOLS_${createHash('sha256').update(nuxt.options.rootDir).digest('hex').slice(0, 24).toUpperCase()}`
+                    const previous = process.env[environmentKey]
+                    const secrets = { token: randomUUID(), environmentKey }
+                    process.env[environmentKey] = secrets.token
+                    const restore = () => {
+                        if (process.env[environmentKey] !== secrets.token) return
+                        if (previous === undefined) delete process.env[environmentKey]
+                        else process.env[environmentKey] = previous
+                    }
+                    nuxt.hook('close', restore)
+                    try {
+                        await setupFilesDevtools(
+                            nuxt,
+                            version || '3',
+                            filesDevtoolsWriteEnabled(options.devtools),
+                            secrets,
+                        )
+                    } catch (error) {
+                        restore()
+                        throw error
+                    }
+                }),
+            )
         }
     },
 })

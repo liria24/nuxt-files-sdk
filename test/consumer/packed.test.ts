@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { invalidTypeCases } from '../types/invalid/cases'
 import {
     copyPackedConsumer,
+    nuxtBuildDirectory,
     outputPaths,
     packPackage,
     readOutput,
@@ -37,23 +38,33 @@ const packageManager = requestedPackageManager as 'bun' | 'npm' | 'pnpm'
 const packageManagerShell = process.platform === 'win32' && packageManager !== 'bun'
 const consumerFixtures = packageManager === 'bun' ? ['nuxt4', 'nitro-v2', 'nitro-v3'] : ['nuxt4']
 if (packageManager === 'pnpm') consumerFixtures.push('workspace')
-const installConsumer = (directory: string): Promise<string> =>
+const installConsumer = (
+    directory: string,
+    options: { signal?: AbortSignal; timeout?: number } = {},
+): Promise<string> =>
     packageManager === 'bun'
-        ? runCommand('bun', ['install', '--ignore-scripts'], { cwd: directory })
+        ? runCommand('bun', ['install', '--ignore-scripts'], { cwd: directory, ...options })
         : packageManager === 'npm'
           ? runCommand(packageManager, ['install', '--ignore-scripts', '--package-lock=false'], {
                 cwd: directory,
                 shell: packageManagerShell,
+                ...options,
             })
           : runCommand(packageManager, ['install', '--ignore-scripts', '--no-frozen-lockfile'], {
                 cwd: directory,
                 shell: packageManagerShell,
+                ...options,
             })
-const runConsumerScript = (directory: string, script: string): Promise<string> =>
+const runConsumerScript = (
+    directory: string,
+    script: string,
+    options: { signal?: AbortSignal; timeout?: number } = {},
+): Promise<string> =>
     runCommand(packageManager, ['run', script], {
         cwd: directory,
         env: { NUXT_AWS_SECRET_ACCESS_KEY: secret },
         shell: packageManagerShell,
+        ...options,
     })
 
 describe('Packed consumer', () => {
@@ -126,7 +137,7 @@ describe('Packed consumer', () => {
         expect(metadata).toMatchObject({
             name: 'nuxt-files-sdk',
             configKey: 'files',
-            compatibility: { nuxt: '^4.6.0 || ^5.0.0' },
+            compatibility: { nuxt: '^4.6.0 || ^5.0.0-0' },
         })
         expect(packageJson.dependencies['files-sdk']).toBe('2.6.2')
         expect(packageJson.devDependencies['files-sdk']).toBeUndefined()
@@ -146,7 +157,7 @@ describe('Packed consumer', () => {
         )
     })
 
-    test('[CLI-002][GATEWAY-006] exact archive runs the real CLI and portable gateway boundaries', async () => {
+    test('[CLI-002][GATEWAY-006] exact archive runs the real CLI lifecycle and portable gateway boundaries', async () => {
         const consumer = await copyPackedConsumer('nuxt4', resolve(packed.directory, 'cli-input'), packed.tarball)
         if (packageManager === 'pnpm') {
             await writeFile(resolve(consumer, '.npmrc'), 'hoist=false\nshamefully-hoist=false\n')
@@ -156,6 +167,10 @@ describe('Packed consumer', () => {
             install: installConsumer,
             runScript: runConsumerScript,
         })
+        expect(report.cli).toMatch(/^4\./u)
+        expect(report.localReferenceUpdated).toBe(true)
+        expect(report.aliasLayerRelativeUpdated).toBe(true)
+        expect(report.installOnlyRecovery).toBe(true)
         if (report.disconnectAbort.status === 'upstream-limitation') {
             // The real probe ran; preserve the actual native-adapter limitation in CI output.
             // oxlint-disable-next-line no-console
@@ -277,7 +292,7 @@ describe('Packed consumer', () => {
                 resolve(
                     consumer,
                     name === 'nuxt4'
-                        ? '.nuxt/nuxt-files-sdk'
+                        ? resolve(await nuxtBuildDirectory(consumer), 'nuxt-files-sdk')
                         : name === 'nitro-v3'
                           ? 'node_modules/.nitro/nuxt-files-sdk'
                           : '.nitro/nuxt-files-sdk',

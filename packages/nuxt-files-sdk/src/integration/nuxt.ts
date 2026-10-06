@@ -183,7 +183,20 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     )
     const runtime = template(
         'runtime',
-        `import { registry } from '#nuxt-files-sdk/registry'\nvoid registry\nexport * from ${JSON.stringify(runtimeFile('../runtime.js'))}\n`,
+        `import { registry } from '#nuxt-files-sdk/registry'
+import { sync, transfer } from '#files-sdk'
+export const useServerFiles = name => name === undefined ? registry.get() : registry.get(name)
+const files = value => typeof value === 'string' ? registry.get(value) : value
+export const syncFiles = (source, destination, options) => sync(files(source), files(destination), options)
+export const transferFiles = (source, destination, options) => transfer(files(source), files(destination), options)
+`,
+    )
+    addTypeTemplate(
+        {
+            filename: `nuxt-files-sdk/runtime${mode}.d.ts`,
+            getContents: () => `export * from ${JSON.stringify(runtimeFile('../runtime.js'))}\n`,
+        },
+        { nuxt: false },
     )
     nuxt.options.alias['nuxt-files-sdk/runtime'] = runtime
     nuxt.options.alias['#nuxt-files-sdk/registry'] = registry
@@ -194,6 +207,8 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
             registry,
             resolved,
             selected,
+            selectedSource: prepared.source,
+            configPath,
             development: nuxt.options.dev,
         }),
     )
@@ -201,7 +216,18 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     const declarations = addTypeTemplate(
         {
             filename: 'nuxt-files-sdk/storage-registry.d.ts',
-            getContents: () => storageTypes(configPath, major),
+            getContents: () =>
+                storageTypes(configPath, major) +
+                `
+declare global {
+  /** Return the project's Files client, including its configured plugin extensions. */
+  const useServerFiles: typeof import('nuxt-files-sdk/runtime').useServerFiles
+  /** Delegate a mirror operation to the native Files SDK. */
+  const syncFiles: typeof import('nuxt-files-sdk/runtime').syncFiles
+  /** Delegate a transfer operation to the native Files SDK. */
+  const transferFiles: typeof import('nuxt-files-sdk/runtime').transferFiles
+}
+`,
         },
         { nuxt: true, nitro: true, shared: true },
     )

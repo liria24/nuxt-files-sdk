@@ -9,14 +9,14 @@ import {
     FILES_GATEWAY_PATH,
     FILES_SNAPSHOT_PATH,
     FILES_TOKEN_PATH,
-} from './snapshot'
+} from './paths'
 
 const authenticatedHandler = (name: string, path: string, environmentKey: string): string => {
     const template = addTemplate({
         filename: `nuxt-files-sdk/devtools-${name}.mjs`,
         write: true,
         getContents: () =>
-            `import '#nuxt-files-sdk/registry'\nimport { defineEventHandler } from 'nuxt/server'\nimport handler from ${JSON.stringify(path.replaceAll('\\', '/'))}\nexport default defineEventHandler(event => handler(event, process.env[${JSON.stringify(environmentKey)}] || ''))\n`,
+            `import { registry } from '#nuxt-files-sdk/registry'\nimport { defineEventHandler } from 'nuxt/server'\nimport handler from ${JSON.stringify(path.replaceAll('\\', '/'))}\nvoid registry\nexport default defineEventHandler(event => handler(event, process.env[${JSON.stringify(environmentKey)}] || ''))\n`,
     })
     return template.dst.replaceAll('\\', '/')
 }

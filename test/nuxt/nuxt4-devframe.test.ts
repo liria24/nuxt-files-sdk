@@ -55,8 +55,6 @@ describe('Nuxt DevFrame development endpoint', async () => {
         const listener = await context.nuxt!.server!.listen(0, { hostname: '127.0.0.1' })
         context.url = listener.url
         ;(context.teardown ??= []).push(() => listener.close())
-        const api = await fetch(url('/api/files'))
-        expect(api.status, await api.text()).toBe(200)
         const response = await fetch(url(filesTabs[0]!.view.src))
         const html = await response.text()
         expect(response.status, html).toBe(200)
@@ -68,32 +66,38 @@ describe('Nuxt DevFrame development endpoint', async () => {
         expect(script.status, javascript).toBe(200)
         expect(script.headers.get('content-type')).toContain('javascript')
         expect(javascript).not.toMatch(/from\s*["'](?:devframe|files-sdk)/u)
-        const unauthorized = await fetch(url('/__nuxt-files-sdk-api/snapshot'))
+        const unauthorized = await fetch(url('/__nuxt-files-api/snapshot'))
         expect(unauthorized.status).toBe(401)
         for (const headers of [{}, { 'x-nuxt-files-sdk-bootstrap': 'nuxt-v3' }, { 'x-nuxt-devtools-token': 'wrong' }]) {
-            expect((await fetch(url('/__nuxt-files-sdk-api/token'), { headers })).status).toBe(401)
+            expect((await fetch(url('/__nuxt-files-api/token'), { headers })).status).toBe(401)
         }
         const host = (context.nuxt as unknown as { devtools: { ensureDevAuthToken(token: string): Promise<void> } })
             .devtools
         await expect(host.ensureDevAuthToken('fixture-native-token')).resolves.toBeUndefined()
-        const tokenResponse = await fetch(url('/__nuxt-files-sdk-api/token'), {
+        const tokenResponse = await fetch(url('/__nuxt-files-api/token'), {
             headers: { 'x-nuxt-devtools-token': 'fixture-native-token' },
         })
         expect(tokenResponse.status, await tokenResponse.clone().text()).toBe(200)
         const token = (await tokenResponse.json()) as { token: string }
         authorization = `Bearer ${token.token}`
-        const snapshot = await $fetch<FilesDevtoolsSnapshot>('/__nuxt-files-sdk-api/snapshot', {
+        const snapshot = await $fetch<FilesDevtoolsSnapshot>('/__nuxt-files-api/snapshot', {
             headers: { authorization },
         })
         expect(snapshot.storages).toEqual([
-            { name: 'archive', adapter: 'fs', plugins: ['versioning'], initialized: true },
-            { name: 'blob', adapter: 'fs', plugins: [], initialized: true },
+            { name: 'archive', adapter: 'fs', plugins: ['versioning'], initialized: false },
+            { name: 'blob', adapter: 'fs', plugins: [], initialized: false },
         ])
         expect(snapshot.diagnostics).toEqual([])
+        const api = await fetch(url('/api/files'))
+        expect(api.status, await api.text()).toBe(200)
+        const initialized = await $fetch<FilesDevtoolsSnapshot>('/__nuxt-files-api/snapshot', {
+            headers: { authorization },
+        })
+        expect(initialized.storages).toEqual(snapshot.storages.map((storage) => ({ ...storage, initialized: true })))
     })
 
     test('[DEV-005] browses, uploads, downloads, and deletes through the native Files gateway', async () => {
-        const endpoint = url('/__nuxt-files-sdk-api/files?storage=blob')
+        const endpoint = url('/__nuxt-files-api/files?storage=blob')
         const origin = new URL(endpoint).origin
         const access = await fetch(`${endpoint}&op=devtools`, { headers: { authorization } }).then(
             (response) => response.json() as Promise<{ write: boolean; maxUploadSize: number }>,

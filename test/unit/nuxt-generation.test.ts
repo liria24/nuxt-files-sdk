@@ -85,7 +85,13 @@ test('Nuxt generates one shared lazy registry graph without Nitro startup initia
     expect(registry).toContain('from "#files-sdk/memory"')
     expect(registry).not.toContain('files-sdk/loader')
     expect(runtime).toContain("import { registry } from '#nuxt-files-sdk/registry'")
-    expect(runtime).toContain('void registry')
+    expect(runtime).toContain('registry.get(name)')
+    expect(runtime).toContain("import { sync, transfer } from '#files-sdk'")
+    expect(runtime).toContain('sync(files(source), files(destination), options)')
+    expect(runtime).toContain('transfer(files(source), files(destination), options)')
+    expect(await kit.templates.get('nuxt-files-sdk/runtime.d.ts')!.getContents()).toMatch(
+        /export \* from .+runtime\.js/u,
+    )
     expect(handler).toContain("import { defineEventHandler, deriveSecret } from 'nuxt/server'")
     expect(handler).toContain("from 'nuxt-files-sdk/runtime'")
     expect(handler).toContain('router.handle(event.req)')
@@ -116,6 +122,9 @@ test('Nuxt public type generation contributes to server, app, shared and node pr
     expect(payload.serverTsConfig.compilerOptions.paths['#files-sdk']).toBeDefined()
     expect(payload.serverTsConfig.compilerOptions.paths['files-sdk']).toBeUndefined()
     expect(payload.serverTsConfig.compilerOptions.paths['nuxt-files-sdk/runtime']?.[0]).toMatch(/runtime\.d\.ts$/u)
+    const declarations = await kit.templates.get('nuxt-files-sdk/storage-registry.d.ts')!.getContents()
+    expect(declarations).toContain("const useServerFiles: typeof import('nuxt-files-sdk/runtime').useServerFiles")
+    expect(declarations).toContain("Return the project's Files client")
 })
 
 test('non-Nitro builders retain basic runtime and reject an explicitly configured Gateway', async () => {

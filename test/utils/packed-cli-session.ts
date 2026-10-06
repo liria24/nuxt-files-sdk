@@ -6,16 +6,28 @@ import { request } from 'node:http'
 import { createServer } from 'node:net'
 import { dirname, resolve } from 'node:path'
 
+import { closeOwnedProcess, runCommand } from './fixture'
+
 interface SessionOptions {
     consumer: string
-    install: (directory: string) => Promise<string>
-    runScript: (directory: string, script: string) => Promise<string>
+    install: (directory: string, options?: { signal?: AbortSignal; timeout?: number }) => Promise<string>
+    runScript: (
+        directory: string,
+        script: string,
+        options?: { signal?: AbortSignal; timeout?: number },
+    ) => Promise<string>
     onProgress?: (message: string) => void
 }
 
 export interface PackedCliSessionReport {
     nuxt: string
     cli: string
+    localReferenceUpdated: true
+    aliasLayerRelativeUpdated: true
+    installOnlyRecovery: true
+    npmHiddenMetadataChanged: boolean
+    configReload: { kind: 'soft'; revision: 2; pidUnchanged: true }
+    hardRestart: { trigger: 'dotenv-marker'; revision: 2; pidChanged: true; urlRetained: true; curlDiscovery: true }
     disconnectAbort:
         | { status: 'propagated'; signalIdentity: true; normalRequestsAborted: false }
         | {
@@ -26,6 +38,11 @@ export interface PackedCliSessionReport {
               source: '@nuxt/nitro-server/dist/runtime/utils/event.mjs:toWebRequest$1'
               detail: string
           }
+}
+
+const assertIdentity = (value: Record<string, any>) => {
+    for (const name of ['earlyOwned', 'owned', 'reused', 'earlyReused', 'appSecretMatchesRuntime'])
+        assert.equal(value[name], true, name)
 }
 
 const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms))
@@ -72,17 +89,14 @@ const withEnvironment = async <T>(env: NodeJS.ProcessEnv, action: () => Promise<
     }
 }
 
-const run = (command: string, args: string[], cwd: string, env = process.env, timeout = 120_000): Promise<string> =>
-    new Promise((done, fail) => {
-        const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], timeout })
-        let output = ''
-        child.stdout.on('data', (chunk) => (output += chunk))
-        child.stderr.on('data', (chunk) => (output += chunk))
-        child.once('error', fail)
-        child.once('close', (code) =>
-            code === 0 ? done(output) : fail(new Error(`${command} exited ${code}.\n${output}`)),
-        )
-    })
+const run = (
+    command: string,
+    args: string[],
+    cwd: string,
+    env = process.env,
+    timeout = 120_000,
+    signal?: AbortSignal,
+) => runCommand(command, args, { cwd, env, timeout, ...(signal ? { signal } : {}) })
 
 const eventually = async <T>(name: string, action: () => Promise<T | undefined>, budget = 90_000): Promise<T> => {
     const deadline = Date.now() + budget
@@ -106,114 +120,15 @@ const allocatePort = async (): Promise<number> => {
     return address.port
 }
 
-const alive = (pid: number): boolean => {
-    try {
-        process.kill(pid, 0)
-        return true
-    } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
-        throw error
-    }
-}
+/** Native CLI shutdown uses its file-bootstrap IPC; shared cleanup verifies the captured tree. */
+const closeOwnedCli = (child: ChildProcess, reported: Set<number>, directory: string) =>
+    closeOwnedProcess(child, { cwd: directory, reported, ipcMessage: 'files-cli-stop' })
 
-/** Capture the owned tree before native shutdown; cleanup failures remain test failures. */
-const closeOwnedCli = async (child: ChildProcess, reported: Set<number>, directory: string): Promise<void> => {
-    const errors: string[] = []
-    const owned = new Set<number>(reported)
-    if (child.pid) owned.add(child.pid)
-    try {
-        if (process.platform === 'win32') {
-            const listing = JSON.parse(
-                await run(
-                    'powershell.exe',
-                    [
-                        '-NoProfile',
-                        '-NonInteractive',
-                        '-Command',
-                        'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress',
-                    ],
-                    directory,
-                    process.env,
-                    10_000,
-                ),
-            ) as { ProcessId: number; ParentProcessId: number }[]
-            let changed = true
-            while (changed) {
-                changed = false
-                for (const row of listing)
-                    if (owned.has(row.ParentProcessId) && !owned.has(row.ProcessId)) {
-                        owned.add(row.ProcessId)
-                        changed = true
-                    }
-            }
-        } else {
-            const listing = await run('ps', ['-eo', 'pid=,pgid='], directory, process.env, 10_000)
-            for (const row of listing.trim().split('\n')) {
-                const [pid, group] = row.trim().split(/\s+/u).map(Number)
-                if (pid && group === child.pid) owned.add(pid)
-            }
-        }
-    } catch (error) {
-        errors.push(`Owned-process enumeration failed: ${String(error)}`)
-    }
-    const exited = () => child.exitCode !== null || child.signalCode !== null
-    if (!exited()) {
-        if (child.connected) {
-            await new Promise<void>((done) => {
-                const timeout = setTimeout(() => {
-                    errors.push('Native shutdown IPC send timed out')
-                    done()
-                }, 2000)
-                try {
-                    child.send('files-cli-stop', (error) => {
-                        clearTimeout(timeout)
-                        if (error) errors.push(`Native shutdown IPC failed: ${error.message}`)
-                        done()
-                    })
-                } catch (error) {
-                    clearTimeout(timeout)
-                    errors.push(String(error))
-                    done()
-                }
-            })
-        } else if (process.platform !== 'win32') child.kill('SIGTERM')
-        else errors.push('Windows native shutdown IPC channel is unavailable')
-    }
-    const deadline = Date.now() + 20_000
-    while ((!exited() || [...owned].some(alive)) && Date.now() < deadline) await wait(100)
-    if (!exited() || [...owned].some(alive)) {
-        errors.push('Native CLI shutdown exceeded its cleanup deadline')
-        if (process.platform === 'win32' && child.pid) {
-            try {
-                await run('taskkill', ['/PID', String(child.pid), '/T', '/F'], directory, process.env, 10_000)
-            } catch (error) {
-                errors.push(`Scoped Windows fallback failed: ${String(error)}`)
-            }
-        } else if (child.pid) {
-            try {
-                process.kill(-child.pid, 'SIGKILL')
-            } catch (error) {
-                if ((error as NodeJS.ErrnoException).code !== 'ESRCH') errors.push(String(error))
-            }
-        }
-    }
-    try {
-        await eventually(
-            'owned CLI processes disappear',
-            async () => ([...owned].every((pid) => !alive(pid)) ? true : undefined),
-            10_000,
-        )
-    } catch (error) {
-        errors.push(String(error))
-    }
-    if (errors.length) throw new Error(errors.join('\n'))
-}
-
-const scanSecrets = async (directory: string, secrets: string[]): Promise<void> => {
+const scanSecrets = async (directory: string, secrets: string[], installedRoot?: string): Promise<void> => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
-        if (entry.name === 'node_modules' || entry.name === '.git') continue
         const path = resolve(directory, entry.name)
-        if (entry.isDirectory()) await scanSecrets(path, secrets)
+        if (path === installedRoot || entry.name === '.git') continue
+        if (entry.isDirectory()) await scanSecrets(path, secrets, installedRoot)
         else if (entry.isFile()) {
             const contents = await readFile(path)
             assert(
@@ -225,12 +140,13 @@ const scanSecrets = async (directory: string, secrets: string[]): Promise<void> 
 }
 
 const scanConsumer = async (directory: string, secrets: string[]) => {
-    await scanSecrets(directory, secrets)
+    await scanSecrets(directory, secrets, resolve(directory, 'node_modules'))
     for (const root of generatedRoots(directory)) if (await exists(root)) await scanSecrets(root, secrets)
 }
 
 const nuxtConfiguration = (revision: number) => `export default defineNuxtConfig({
   compatibilityDate: '2026-09-04', modules: ['nuxt-files-sdk'], devtools: { enabled: false },
+  extends: ['./layer'],
   runtimeConfig: { appSecret: '', cliRevision: ${revision} },
 })\n`
 
@@ -391,6 +307,32 @@ export const runPackedNuxtCliSession = async ({
     let report: PackedCliSessionReport | undefined
     const pids = new Set<number>()
     const failures: string[] = []
+    const deadlineAt = Date.now() + 450_000
+    const deadline = new AbortController()
+    let shutdown: Promise<void> | undefined
+    const stop = () => {
+        if (!child) return Promise.resolve()
+        return (shutdown ??= closeOwnedCli(child, pids, directory))
+    }
+    const abortSession = () => {
+        deadline.abort()
+        void stop().catch((error: unknown) => failures.push(`Deadline cleanup: ${String(error)}`))
+    }
+    const deadlineTimer = setTimeout(abortSession, 450_000)
+    deadlineTimer.unref()
+    const commandOptions = () => ({
+        signal: deadline.signal,
+        timeout: Math.max(1, Math.min(290_000, deadlineAt - Date.now())),
+    })
+    const sessionPoll = <T>(label: string, action: () => Promise<T | undefined>, budget = 90_000): Promise<T> =>
+        eventually(
+            label,
+            async () => {
+                if (deadline.signal.aborted) throw new Error('Packed CLI session exceeded its bounded deadline')
+                return action()
+            },
+            Math.max(1, Math.min(budget, deadlineAt - Date.now())),
+        )
     try {
         await mkdir(directory, { recursive: true })
         manifest.type = 'module'
@@ -399,9 +341,15 @@ export const runPackedNuxtCliSession = async ({
         await writeFile(resolve(directory, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
         const npmrc = resolve(consumer, '.npmrc')
         if (await exists(npmrc)) await writeFile(resolve(directory, '.npmrc'), await readFile(npmrc))
-        for (const path of ['server/api', 'server/plugins', 'server/middleware'])
+        for (const path of ['server/api', 'server/plugins', 'server/middleware', 'layer'])
             await mkdir(resolve(directory, path), { recursive: true })
         await writeFile(resolve(directory, 'nuxt.config.ts'), nuxtConfiguration(1))
+        await writeFile(
+            resolve(directory, 'layer/nuxt.config.ts'),
+            `import { fileURLToPath } from 'node:url'\nexport default defineNuxtConfig({ alias: { '@files-cli-layer': fileURLToPath(new URL('.', import.meta.url)) } })\n`,
+        )
+        await writeFile(resolve(directory, 'layer/index.ts'), "export { authorize } from './permission'\n")
+        await writeFile(resolve(directory, 'layer/permission.ts'), authorization('carol'))
         await writeFile(resolve(directory, 'files.config.ts'), filesConfiguration)
         await writeFile(resolve(directory, 'policy.ts'), authorization('alice'))
         await writeFile(resolve(directory, 'server/plugins/00-files.ts'), plugin)
@@ -410,7 +358,7 @@ export const runPackedNuxtCliSession = async ({
             resolve(directory, 'server/middleware/context.ts'),
             `import { defineEventHandler } from 'nuxt/server'\nexport default defineEventHandler(event => { event.context.cliUser = event.req.headers.get('x-files-user'); event.context.cliSignal = event.req.signal })\n`,
         )
-        const installed = await withEnvironment(preparedEnv, () => install(directory))
+        const installed = await withEnvironment(preparedEnv, () => install(directory, commandOptions()))
         assert(
             canaries.every((secret) => !installed.includes(secret)),
             'Installation log contains no secret',
@@ -425,13 +373,15 @@ export const runPackedNuxtCliSession = async ({
                 ],
                 directory,
                 preparedEnv,
+                120_000,
+                deadline.signal,
             ),
         ) as { nuxt: string; cli: string; bin: string; adapter: string }
         const [major, minor] = versions.nuxt.split('.').map(Number)
         assert(major === 4 && minor !== undefined && minor >= 6, 'Use supported stable Nuxt 4.6 or later')
         assert.match(versions.cli, /^4\./u, 'Use installed CLI 4')
         for (const script of ['prepare', 'build']) {
-            const output = await withEnvironment(preparedEnv, () => runScript(directory, script))
+            const output = await withEnvironment(preparedEnv, () => runScript(directory, script, commandOptions()))
             assert(
                 canaries.every((secret) => !output.includes(secret)),
                 `${script} log contains no secret`,
@@ -485,12 +435,8 @@ export const runPackedNuxtCliSession = async ({
             }
             return undefined
         }
-        let current = await eventually('real forked CLI readiness', status, 120_000)
+        let current = await sessionPoll('real forked CLI readiness', status, 120_000)
         pids.add(current.pid)
-        const assertIdentity = (value: Record<string, any>) => {
-            for (const name of ['earlyOwned', 'owned', 'reused', 'earlyReused', 'appSecretMatchesRuntime'])
-                assert.equal(value[name], true, name)
-        }
         assertIdentity(current)
         assert.equal(current.revision, 1)
         const endpoint = `${base}/api/route-a?selector=archive`
@@ -517,6 +463,8 @@ export const runPackedNuxtCliSession = async ({
                 ],
                 directory,
                 runtimeEnv,
+                120_000,
+                deadline.signal,
             )
         assert.deepEqual(
             JSON.parse((await curl()).trim()),
@@ -565,7 +513,7 @@ export const runPackedNuxtCliSession = async ({
             )
         }
         assert.deepEqual((await gateway(`${base}/api/route-b?selector=archive`, { op: 'list' })).body.items, [])
-        current = await eventually('native request metadata', status)
+        current = await sessionPoll('native request metadata', status)
         assert.deepEqual(current.order.slice(0, 2), ['user', 'bridge'], 'User hook precedes the native Nitro bridge')
         assert(current.actions > 0)
         assert(
@@ -592,12 +540,12 @@ export const runPackedNuxtCliSession = async ({
             () => false,
             (error: unknown) => (error as Error).name === 'AbortError',
         )
-        await eventually('real disconnect probe reached authorize', async () =>
+        await sessionPoll('real disconnect probe reached authorize', async () =>
             (await status())?.abortStarted ? true : undefined,
         )
         controller.abort()
         assert.equal(await cancelled, true, 'The real client request was aborted')
-        const observed = await eventually(
+        const observed = await sessionPoll(
             'disconnect observation settles',
             async () => {
                 const value = await status()
@@ -629,10 +577,140 @@ export const runPackedNuxtCliSession = async ({
                 detail: 'Native Request/signal forwarding passed. Real client disconnect did not cancel the Nuxt Nitro 2 portable Request; its installed adapter creates Request without a signal/disconnect listener.',
             }
         }
-        report = { nuxt: versions.nuxt, cli: versions.cli, disconnectAbort }
         onProgress?.(
             `Native HTTP/curl, RequestEvent, hooks and endpoint binding passed; disconnect: ${disconnectAbort.status}`,
         )
+        const awaitGateway = (label: string, user: string, healthy: boolean) =>
+            sessionPoll(label, async () => {
+                const result = await gateway(endpoint, { op: 'list' }, user).catch((error: unknown) => {
+                    lastHttpFailure = String(error)
+                    return undefined
+                })
+                if (result && result.status !== 200)
+                    lastHttpFailure = `HTTP ${result.status}: ${JSON.stringify(result.body).slice(0, 8000)}`
+                return result && (healthy ? result.status === 200 : result.status >= 500) ? true : undefined
+            })
+        // Refresh a directly referenced local policy, with no files.config save as a trigger.
+        await writeFile(resolve(directory, 'policy.ts'), authorization('bob'))
+        await awaitGateway('local policy refresh', 'bob', true)
+        assert.equal((await gateway(endpoint, { op: 'list' }, 'alice')).status, 401)
+        const syntaxOffset = log.length
+        await writeFile(resolve(directory, 'policy.ts'), 'export const authorize = (\n')
+        await awaitGateway('syntax error fails closed', 'bob', false)
+        await sessionPoll('syntax error reached the real evaluator', async () =>
+            /Unexpected|ParseError|Transform failed/u.test(log.slice(syntaxOffset)) ? true : undefined,
+        )
+        await writeFile(resolve(directory, 'policy.ts'), authorization('alice'))
+        await awaitGateway('syntax correction resumes native requests', 'alice', true)
+        const invalid = filesConfiguration.replace("storage: 'blob'", "storage: 'missing'")
+        const invalidOffset = log.length
+        await writeFile(resolve(directory, 'files.config.ts'), invalid)
+        await awaitGateway('invalid route storage fails closed', 'alice', false)
+        await sessionPoll('invalid storage reached configuration validation', async () =>
+            log.slice(invalidOffset).includes('[nuxt-files-sdk:unknown-storage]') ? true : undefined,
+        )
+        await writeFile(resolve(directory, 'files.config.ts'), filesConfiguration)
+        await awaitGateway('configuration correction resumes native requests', 'alice', true)
+        // The layer supplies the alias; its export adds a relative graph edge.
+        await writeFile(resolve(directory, 'policy.ts'), "export { authorize } from '@files-cli-layer/index'\n")
+        await awaitGateway('layer alias graph is active', 'carol', true)
+        assert.equal((await gateway(endpoint, { op: 'list' }, 'alice')).status, 401)
+        await writeFile(resolve(directory, 'layer/permission.ts'), authorization('bob'))
+        await awaitGateway('layer relative policy refresh', 'bob', true)
+        assert.equal((await gateway(endpoint, { op: 'list' }, 'alice')).status, 401)
+        // A newly referenced module must join the watch graph, not just the initial sources.
+        await writeFile(resolve(directory, 'layer/next-permission.ts'), authorization('dana'))
+        await writeFile(resolve(directory, 'layer/index.ts'), "export { authorize } from './next-permission'\n")
+        await awaitGateway('new referenced graph edge', 'dana', true)
+        assert.equal((await gateway(endpoint, { op: 'list' }, 'bob')).status, 401)
+        await writeFile(resolve(directory, 'layer/next-permission.ts'), authorization('alice'))
+        await awaitGateway('new relative source is watched', 'alice', true)
+        // Keep the configuration broken until install alone makes this dependency available.
+        const dependencyOffset = log.length
+        await writeFile(resolve(directory, 'layer/next-permission.ts'), authorization('alice', true))
+        await awaitGateway('missing dependency fails closed', 'alice', false)
+        await sessionPoll('missing import reached the native resolver', async () =>
+            /(?:Cannot find|could not be resolved|Failed to resolve)[^\n]*files-cli-late-number|files-cli-late-number[^\n]*(?:could not be resolved|Cannot find)/u.test(
+                log.slice(dependencyOffset),
+            )
+                ? true
+                : undefined,
+        )
+        const late = resolve(directory, '.late-dependency')
+        await mkdir(late, { recursive: true })
+        await writeFile(
+            resolve(late, 'package.json'),
+            JSON.stringify({ name: 'files-cli-late-number', version: '1.0.0', type: 'module', exports: './index.js' }),
+        )
+        await writeFile(resolve(late, 'index.js'), "export default value => typeof value === 'number'\n")
+        const metadataPath = resolve(directory, 'node_modules/.package-lock.json')
+        const metadataBefore = (await exists(metadataPath)) ? await readFile(metadataPath, 'utf8') : undefined
+        manifest.dependencies['files-cli-late-number'] = 'file:.late-dependency'
+        await writeFile(resolve(directory, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+        const installation = await withEnvironment(runtimeEnv, () => install(directory, commandOptions()))
+        assert(
+            canaries.every((secret) => !installation.includes(secret)),
+            'Dependency install log contains no secret',
+        )
+        const metadataAfter = (await exists(metadataPath)) ? await readFile(metadataPath, 'utf8') : undefined
+        const npmHiddenMetadataChanged = metadataAfter !== undefined && metadataBefore !== metadataAfter
+        if (metadataBefore !== undefined)
+            assert(
+                npmHiddenMetadataChanged,
+                'npm install updates its hidden completion metadata even when the root lockfile is disabled',
+            )
+        await awaitGateway('dependency addition without another edit', 'alice', true)
+        onProgress?.('Local and alias/layer graph refresh, syntax/config repair, and install-only recovery passed')
+        current = await sessionPoll('metadata before configuration reload', status)
+        const previousPid = current.pid as number
+        pids.add(previousPid)
+        await writeFile(resolve(directory, 'nuxt.config.ts'), nuxtConfiguration(2))
+        current = await sessionPoll(
+            'native Nuxt config soft reload',
+            async () => {
+                const value = await status()
+                return value?.revision === 2 ? value : undefined
+            },
+            120_000,
+        )
+        assert.equal(current.pid, previousPid, 'CLI 4 reloads Nuxt configuration in place')
+        // CLI 4's native dotenv watcher is the explicit hard-restart trigger.
+        await writeFile(resolve(directory, '.env'), 'FILES_CLI_RESTART_MARKER=2\n')
+        current = await sessionPoll(
+            'native dotenv hard restart replaces serving process',
+            async () => {
+                const value = await status()
+                return value?.revision === 2 && value.pid !== previousPid ? value : undefined
+            },
+            120_000,
+        )
+        pids.add(current.pid)
+        assertIdentity(current)
+        const restarted = await gateway(endpoint, { op: 'list' })
+        assert.equal(restarted.status, 200, 'The same public serving URL returns after hard restart')
+        assert.deepEqual(
+            JSON.parse((await curl()).trim()),
+            restarted.body,
+            'Native curl lock discovery survives hard restart',
+        )
+        report = {
+            nuxt: versions.nuxt,
+            cli: versions.cli,
+            disconnectAbort,
+            localReferenceUpdated: true,
+            aliasLayerRelativeUpdated: true,
+            installOnlyRecovery: true,
+            npmHiddenMetadataChanged,
+            configReload: { kind: 'soft', revision: 2, pidUnchanged: true },
+            hardRestart: {
+                trigger: 'dotenv-marker',
+                revision: 2,
+                pidChanged: true,
+                urlRetained: true,
+                curlDiscovery: true,
+            },
+        }
+        onProgress?.('Native soft reload, real hard restart, same HTTP URL and curl discovery passed')
         await scanConsumer(directory, canaries)
         assert(
             canaries.every((secret) => !JSON.stringify(current).includes(secret) && !log.includes(secret)),
@@ -641,9 +719,10 @@ export const runPackedNuxtCliSession = async ({
     } catch (error) {
         failures.push(String(error))
     } finally {
+        clearTimeout(deadlineTimer)
         if (child) {
             try {
-                await closeOwnedCli(child, pids, directory)
+                await stop()
             } catch (error) {
                 failures.push(`CLI cleanup: ${String(error)}`)
             }
@@ -671,6 +750,8 @@ export const runPackedNuxtCliSession = async ({
             failures.push('The exact archive changed')
         await rm(directory, { recursive: true, force: true })
     }
+    clearTimeout(deadlineTimer)
+    if (deadline.signal.aborted) failures.push('Packed CLI session exceeded its bounded deadline')
     if (failures.length)
         throw new Error(redact(`${failures.join('\n')}\nLast HTTP failure: ${lastHttpFailure}\nCLI output:\n${log}`))
     assert(report)

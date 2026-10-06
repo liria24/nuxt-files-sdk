@@ -40,7 +40,7 @@ describe('Files DevTools HTTP authentication', () => {
         expect(() => registry.get()).toThrow('private provider details')
         expect(inspectFiles().diagnostics).toEqual([{ code: 'NUXT_FILES_ADAPTER_INIT_FAILED', adapter: 'memory' }])
         const { token } = await createFilesDevtoolsToken('snapshot-secret')
-        const req = new Request('http://localhost/__nuxt-files-sdk-api/snapshot', {
+        const req = new Request('http://localhost/__nuxt-files-api/snapshot', {
             headers: { authorization: `Bearer ${token}` },
         })
         const response = await snapshot(

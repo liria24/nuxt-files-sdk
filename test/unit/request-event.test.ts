@@ -27,3 +27,12 @@ test('standalone Nitro adaptation retains Request, signal, URL, context and port
     controller.abort()
     expect(event.req.signal.aborted).toBe(true)
 })
+
+test('standalone response adaptation preserves separate portable Set-Cookie headers', () => {
+    const event = nitroRequestEvent(new Request('https://files.test/gateway'), {})
+    event.res.headers.append('set-cookie', 'first=a; Expires=Wed, 21 Oct 2026 07:28:00 GMT')
+    event.res.headers.append('set-cookie', 'second=b; HttpOnly')
+    const response = nitroResponse(new Response('body', { headers: { 'x-sdk': 'preserved' } }), event)
+    expect(response.headers.getSetCookie()).toEqual(event.res.headers.getSetCookie())
+    expect(response.headers.get('x-sdk')).toBe('preserved')
+})

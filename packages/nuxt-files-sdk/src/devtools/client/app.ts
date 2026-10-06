@@ -3,6 +3,7 @@ import type { StoredFile } from 'files-sdk'
 import { createFilesClient } from 'files-sdk/client'
 
 import { isFilesDevtoolsDiagnostic, type FilesDevtoolsFailure } from '../diagnostics'
+import { FILES_GATEWAY_PATH, FILES_SNAPSHOT_PATH, FILES_TOKEN_PATH } from '../paths'
 import type { FilesDevtoolsSnapshot } from '../snapshot'
 import { FilesBrowser } from './browser'
 
@@ -82,7 +83,7 @@ const requestAccessToken = async (): Promise<AccessToken> => {
         // Nuxt DevTools v3 stores the token after its native authorization flow.
         const token = localStorage.getItem('__nuxt_dev_token__')
         if (!token) throw new Error('Authorize this browser in Nuxt DevTools, then refresh Files.')
-        const response = await fetch('./token', { headers: { 'x-nuxt-devtools-token': token } })
+        const response = await fetch(FILES_TOKEN_PATH, { headers: { 'x-nuxt-devtools-token': token } })
         if (!response.ok) throw new Error(`DevTools authentication failed (${response.status}).`)
         const value: unknown = await response.json()
         if (isAccessToken(value)) return value
@@ -108,7 +109,8 @@ const fetchJson = async (url: string, signal?: AbortSignal): Promise<unknown> =>
 
 const browser = new FilesBrowser((storage) =>
     createFilesClient({
-        endpoint: storage === undefined ? './files' : './files?storage=' + encodeURIComponent(storage),
+        endpoint:
+            storage === undefined ? FILES_GATEWAY_PATH : `${FILES_GATEWAY_PATH}?storage=${encodeURIComponent(storage)}`,
         headers: authorizationHeaders,
     }),
 )
@@ -221,7 +223,7 @@ const refreshSnapshot = async (request: ReturnType<FilesBrowser['capture']>, for
     snapshotController?.abort()
     const controller = (snapshotController = new AbortController())
     try {
-        const next = await fetchJson('./snapshot', controller.signal)
+        const next = await fetchJson(FILES_SNAPSHOT_PATH, controller.signal)
         if (request.current() && !controller.signal.aborted && isSnapshot(next)) {
             snapshot = next
             renderSnapshot()
@@ -409,8 +411,8 @@ const initialize = async (): Promise<void> => {
     const request = browser.capture()
     try {
         const [snapshotResponse, accessResponse] = await Promise.all([
-            fetchJson('./snapshot', controller.signal),
-            fetchJson('./files?op=devtools', controller.signal),
+            fetchJson(FILES_SNAPSHOT_PATH, controller.signal),
+            fetchJson(`${FILES_GATEWAY_PATH}?op=devtools`, controller.signal),
         ])
         if (id !== initializationId || !request.current()) return
         if (!isSnapshot(snapshotResponse) || !isAccess(accessResponse)) {
