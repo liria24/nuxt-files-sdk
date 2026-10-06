@@ -2,7 +2,26 @@ import { resolve } from 'node:path'
 
 import { expect, test, vi } from 'vitest'
 
-import { selectedSourcePlugin } from '../../packages/nuxt-files-sdk/src/integration/nitro'
+import { inlineNuxtRuntime, selectedSourcePlugin } from '../../packages/nuxt-files-sdk/src/integration/nitro'
+
+test('Nuxt runtime inlining preserves native Windows and nested pnpm resolver paths', () => {
+    for (const name of ['nuxt', 'nuxt3', 'nuxt-nightly']) {
+        for (const prefix of ['D:/app/node_modules/', 'C:/app/node_modules/.pnpm/' + name + '@4.6.0/node_modules/']) {
+            const path = prefix + name + '/dist/runtime/server/renderer/index.js'
+            expect(inlineNuxtRuntime(path.replaceAll('/', '\\'))).toBe(true)
+            expect(inlineNuxtRuntime(path)).toBe(false)
+        }
+    }
+    for (const path of [
+        'D:/app/server/api/index.ts',
+        'D:/app/node_modules/h3/dist/index.mjs',
+        'D:/app/node_modules/nuxt-files-sdk/dist/runtime/index.js',
+        'D:/app/node_modules/nuxt/package.json',
+        'D:/app/node_modules/nuxt/dist-other/index.js',
+    ]) {
+        expect(inlineNuxtRuntime(path.replaceAll('/', '\\'))).toBe(false)
+    }
+})
 
 type Resolver = (id: string, importer: string, options: { skipSelf: true }) => Promise<{ id: string } | null>
 test.each(['selected.ts', 'selected.dev.ts'])(

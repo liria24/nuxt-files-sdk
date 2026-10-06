@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -122,11 +122,17 @@ export const runFixture = async (
 
 export const readOutput = async (directory: string, runtimeOnly = false): Promise<string> => {
     const contents: string[] = []
+    const visited = new Set<string>()
     const visit = async (path: string): Promise<void> => {
+        const canonical = await realpath(path)
+        if (visited.has(canonical)) return
+        visited.add(canonical)
         for (const entry of await readdir(path, { withFileTypes: true })) {
             const child = resolve(path, entry.name)
-            if (entry.isDirectory()) await visit(child)
-            else if (!runtimeOnly || /\.(?:js|mjs|cjs|html|css)$/u.test(child))
+            // Windows package managers emit directory junctions in deployment outputs.
+            const metadata = entry.isSymbolicLink() ? await stat(child) : entry
+            if (metadata.isDirectory()) await visit(child)
+            else if (metadata.isFile() && (!runtimeOnly || /\.(?:js|mjs|cjs|html|css)$/u.test(child)))
                 contents.push(await readFile(child, 'utf8'))
         }
     }

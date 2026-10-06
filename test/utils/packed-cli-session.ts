@@ -441,7 +441,7 @@ export const runPackedNuxtCliSession = async ({
         assert.equal(current.revision, 1)
         const endpoint = `${base}/api/route-a?selector=archive`
         const first = await gateway(endpoint, { op: 'list' })
-        assert.equal(first.status, 200)
+        assert.equal(first.status, 200, `Initial Gateway response: ${JSON.stringify(first.body)}`)
         assert.deepEqual(first.body, { items: [] })
         assert.equal(
             first.headers.get('x-files-policy'),
