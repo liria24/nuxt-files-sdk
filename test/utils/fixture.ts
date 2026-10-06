@@ -224,8 +224,15 @@ export const startFixtureServer = async (
 // Bounded system utilities must not recursively enumerate themselves on timeout.
 const processUtility = (command: string, args: string[], cwd: string, timeout = 10_000): Promise<string> =>
     new Promise((done, fail) => {
+        const started = Date.now()
         execFile(command, args, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 }, (error, stdout, stderr) => {
-            if (error) fail(new Error(`${command} process utility failed: ${error.message}\n${stderr}`))
+            if (error)
+                fail(
+                    new Error(
+                        `${command} process utility failed after ${Date.now() - started}ms (limit ${timeout}ms; code=${String(error.code)}; signal=${String(error.signal)}; killed=${String(error.killed)}): ${error.message}\n${stderr}`,
+                        { cause: error },
+                    ),
+                )
             else done(stdout)
         })
     })
@@ -265,9 +272,10 @@ export const closeOwnedProcess = async (
                         '-NoProfile',
                         '-NonInteractive',
                         '-Command',
-                        'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress',
+                        'Get-CimInstance -ClassName Win32_Process -Property ProcessId,ParentProcessId -ErrorAction Stop | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress',
                     ],
                     cwd,
+                    30_000,
                 ),
             ) as { ProcessId: number; ParentProcessId: number } | { ProcessId: number; ParentProcessId: number }[]
             const rows = Array.isArray(raw) ? raw : [raw]

@@ -145,7 +145,21 @@ const scanConsumer = async (directory: string, secrets: string[]) => {
 }
 
 const nuxtConfiguration = (revision: number) => `export default defineNuxtConfig({
-  compatibilityDate: '2026-09-04', modules: ['nuxt-files-sdk'], devtools: { enabled: false },
+  compatibilityDate: '2026-09-04',
+  modules: ['nuxt-files-sdk', function filesCliLifecycle(_options, nuxt) {
+    const started = Date.now()
+    const observe = (scope, hooks) => {
+      const emit = (phase, event) => {
+        if (['close', 'restart', 'ready', 'nitro:init', 'nitro:config', 'build:before', 'build:done', 'dev:reload'].includes(event.name))
+          console.info('[Files CLI lifecycle] ' + JSON.stringify({ scope, phase, hook: event.name, pid: process.pid, ms: Date.now() - started }))
+      }
+      hooks.beforeEach(event => emit('before', event))
+      hooks.afterEach(event => emit('after', event))
+    }
+    observe('nuxt', nuxt.hooks)
+    nuxt.hook('nitro:init', nitro => observe('nitro', nitro.hooks))
+  }],
+  devtools: { enabled: false },
   extends: ['./layer'],
   runtimeConfig: { appSecret: '', cliRevision: ${revision} },
 })\n`
@@ -216,7 +230,7 @@ export default defineEventHandler(() => {
 const gateway = async (url: string, body: object, user = 'alice') => {
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-files-user': user },
+        headers: { accept: 'application/json', 'content-type': 'application/json', 'x-files-user': user },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(15_000),
     })
@@ -369,14 +383,18 @@ export const runPackedNuxtCliSession = async ({
                 [
                     '--input-type=module',
                     '-e',
-                    `import { createRequire } from 'node:module'; import { readFileSync } from 'node:fs'; import { pathToFileURL, fileURLToPath } from 'node:url'; const r=createRequire(import.meta.url); const n=r.resolve('nuxt/package.json'); const c=createRequire(n); const cli=c.resolve('@nuxt/cli/cli'); console.log(JSON.stringify({ nuxt: JSON.parse(readFileSync(n,'utf8')).version, cli: JSON.parse(readFileSync(new URL('../package.json',pathToFileURL(cli)),'utf8')).version, bin: fileURLToPath(new URL('./bin/nuxt.mjs',pathToFileURL(n))), adapter: c.resolve('@nuxt/nitro-server/package.json') }))`,
+                    `import { createRequire } from 'node:module'; import { readFileSync } from 'node:fs'; import { pathToFileURL, fileURLToPath } from 'node:url'; const r=createRequire(import.meta.url); const n=r.resolve('nuxt/package.json'); const c=createRequire(n); const cli=c.resolve('@nuxt/cli/cli'); const adapter=c.resolve('@nuxt/nitro-server/package.json'); console.log(JSON.stringify({ node: process.version, nuxt: JSON.parse(readFileSync(n,'utf8')).version, cli: JSON.parse(readFileSync(new URL('../package.json',pathToFileURL(cli)),'utf8')).version, nitro: JSON.parse(readFileSync(createRequire(adapter).resolve('nitropack/package.json'),'utf8')).version, bin: fileURLToPath(new URL('./bin/nuxt.mjs',pathToFileURL(n))), adapter }))`,
                 ],
                 directory,
                 preparedEnv,
                 120_000,
                 deadline.signal,
             ),
-        ) as { nuxt: string; cli: string; bin: string; adapter: string }
+        ) as { node: string; nuxt: string; cli: string; nitro: string; bin: string; adapter: string }
+        console.info(
+            '[Packed Nuxt CLI versions]',
+            JSON.stringify({ node: versions.node, nuxt: versions.nuxt, cli: versions.cli, nitro: versions.nitro }),
+        )
         const [major, minor] = versions.nuxt.split('.').map(Number)
         assert(major === 4 && minor !== undefined && minor >= 6, 'Use supported stable Nuxt 4.6 or later')
         assert.match(versions.cli, /^4\./u, 'Use installed CLI 4')
@@ -427,7 +445,10 @@ export const runPackedNuxtCliSession = async ({
             if (child!.exitCode !== null || child!.signalCode !== null)
                 throw new Error('Real Nuxt CLI exited before completion')
             try {
-                const response = await fetch(`${base}/api/session`, { signal: AbortSignal.timeout(1500) })
+                const response = await fetch(`${base}/api/session`, {
+                    headers: { accept: 'application/json' },
+                    signal: AbortSignal.timeout(1500),
+                })
                 if (response.ok) return response.json()
                 lastHttpFailure = `HTTP ${response.status}: ${(await response.text()).slice(0, 8000)}`
             } catch (error) {
