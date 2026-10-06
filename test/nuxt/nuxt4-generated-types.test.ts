@@ -18,7 +18,7 @@ afterAll(async () => {
     await cleanFixture('nuxt4')
 })
 
-test('[TYPE-001][API-002][API-003] generated named/default/native/plugin types pass actual typecheck', () =>
+test('[TYPE-001][TYPE-017][API-002][API-003] generated named/default/native/plugin types pass actual typecheck', () =>
     expect(checkGeneratedTypes(directory)).resolves.toBeUndefined())
 test.each(invalidTypeCases)('[$id] rejects $name in an actual generated consumer', (entry) =>
     expect(checkInvalidType(directory, entry)).resolves.toBeUndefined(),

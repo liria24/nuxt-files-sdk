@@ -26,6 +26,7 @@ export interface NitroIntegration {
         plugins: string[]
         handlers?: { route: string; handler: string }[]
         alias?: Record<string, string>
+        virtual?: Record<string, string>
         externals?: { inline?: unknown[] }
     }
     unimport?: {
@@ -78,6 +79,42 @@ export const optionalAwsSdkDependencies = (
         ? [...AWS_CORE_DEPENDENCIES, AWS_MULTIPART_DEPENDENCY]
         : [AWS_MULTIPART_DEPENDENCY]
     return optional.filter((dependency) => !options.resolvable(dependency))
+}
+
+const missingAwsSdkShim = (dependency: string): string =>
+    `throw new Error(${JSON.stringify(`[nuxt-files-sdk:missing-optional-dependency] ${dependency} is required for this Files SDK operation. Install it or select the provider's fetch client.`)})\n`
+
+const awsVirtualId = (dependency: string): string =>
+    `virtual:nuxt-files-sdk/optional/${dependency.replaceAll(/[^a-z0-9]+/giu, '-')}`
+
+/** Apply the retained Nitro 2 workerd compatibility after native preset resolution. */
+export const wireNuxtNitroAwsOptions = (
+    value: unknown,
+    options: { sdk: ReturnType<typeof resolveOwnedSdk>; adapters: ProviderSlug[]; nitroMajor: number },
+): string[] => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const nitro = value as Pick<NitroIntegration, 'options'>
+    const aliases = (nitro.options.alias ??= {})
+    for (const dependency of [...AWS_CORE_DEPENDENCIES, AWS_MULTIPART_DEPENDENCY]) {
+        const id = awsVirtualId(dependency)
+        if (aliases[dependency] === id && nitro.options.virtual?.[id] === missingAwsSdkShim(dependency)) {
+            delete aliases[dependency]
+            delete nitro.options.virtual[id]
+        }
+    }
+    const missing = optionalAwsSdkDependencies(options.adapters, {
+        nitroMajor: options.nitroMajor,
+        preset: nitro.options.preset,
+        resolvable: (dependency) =>
+            Object.hasOwn(aliases, dependency) ||
+            resolvePackage(dependency, pathToFileURL(options.sdk.manifestPath)).status === 'resolved',
+    })
+    for (const dependency of missing) {
+        const id = awsVirtualId(dependency)
+        aliases[dependency] = id
+        ;(nitro.options.virtual ??= {})[id] = missingAwsSdkShim(dependency)
+    }
+    return missing
 }
 
 const nitroMajorVersion = (nitro: NitroIntegration): number => nitro.meta?.majorVersion ?? ('routing' in nitro ? 3 : 2)
@@ -290,14 +327,7 @@ export const setupNitroFilesIntegration = async (
     nitro.options.plugins.push(pluginPath.replaceAll('\\', '/'))
     writeRuntime = async (): Promise<void> => {
         await mkdir(directory, { recursive: true })
-        await Promise.all(
-            shimFiles.map(({ dependency, path }) =>
-                writeFile(
-                    path,
-                    `throw new Error(${JSON.stringify(`[nuxt-files-sdk:missing-optional-dependency] ${dependency} is required for this Files SDK operation. Install it or select the provider's fetch client.`)})\n`,
-                ),
-            ),
-        )
+        await Promise.all(shimFiles.map(({ dependency, path }) => writeFile(path, missingAwsSdkShim(dependency))))
         await writeFile(selectedPath, prepared.source)
         const mergePath = fileURLToPath(new URL('../config/merge.js', import.meta.url)).replaceAll('\\', '/')
         const selectedBranches = options.environments
