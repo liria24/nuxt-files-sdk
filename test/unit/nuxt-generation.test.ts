@@ -11,6 +11,7 @@ const kit = vi.hoisted(() => ({
     handlers: [] as Array<{ route: string; handler: { nuxt: string } }>,
     major: 2,
     warn: vi.fn<(message: unknown) => void>(),
+    startTask: vi.fn<() => { stop: () => void; update: () => void }>(() => ({ stop: () => {}, update: () => {} })),
 }))
 vi.mock('@nuxt/kit', () => ({
     addTemplate: (template: { filename: string; getContents: () => string | Promise<string> }) => {
@@ -26,17 +27,21 @@ vi.mock('@nuxt/kit', () => ({
     addServerHandler: (handler: (typeof kit.handlers)[number]) => kit.handlers.push(handler),
     resolveServerVariant: (variants: Record<string, number>) =>
         variants[kit.major === 2 ? 'nitro2' : kit.major === 3 ? 'nitro3' : 'nuxt'],
-    logger: { warn: kit.warn },
+    useLogger: () => ({ warn: kit.warn }),
+    useTerminal: () => ({ startTask: kit.startTask }),
+    getAddDependencyCommand: async () => 'npm install --save adapter-sdk',
 }))
 
 import { setupNuxtFilesIntegration } from '../../packages/nuxt-files-sdk/src/integration/nuxt'
 
 const directories: string[] = []
+const typeConfig = () => ({ include: [] as string[], compilerOptions: { paths: {} as Record<string, string[]> } })
 afterEach(async () => {
     await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
     kit.templates.clear()
     kit.handlers.length = 0
     kit.warn.mockClear()
+    kit.startTask.mockClear()
 })
 
 const setup = async (source: string, major = 2) => {
@@ -69,6 +74,7 @@ test('Nuxt generates one shared lazy registry graph without Nitro startup initia
         routes: [{ path: '/files', operations: ['list'] }],
     })`)
     expect(active).toBe(true)
+    expect(kit.startTask).not.toHaveBeenCalled()
     expect(hooks.has('nitro:init')).toBe(false)
     expect(kit.templates.has('nuxt-files-sdk/plugin.mjs')).toBe(false)
     const registry = await kit.templates.get('nuxt-files-sdk/registry.mjs')!.getContents()
@@ -94,16 +100,15 @@ test('Nuxt generates one shared lazy registry graph without Nitro startup initia
 
 test('Nuxt public type generation contributes to server, app, shared and node programs', async () => {
     const { hooks, configPath } = await setup(`export default { storage: { adapter: 'memory' } }`)
-    const config = () => ({ include: [] as string[], compilerOptions: { paths: {} as Record<string, string[]> } })
     const payload = {
         references: [],
         nodeReferences: [],
         sharedReferences: [],
         serverReferences: [],
-        tsConfig: config(),
-        nodeTsConfig: config(),
-        sharedTsConfig: config(),
-        serverTsConfig: config(),
+        tsConfig: typeConfig(),
+        nodeTsConfig: typeConfig(),
+        sharedTsConfig: typeConfig(),
+        serverTsConfig: typeConfig(),
     }
     hooks.get('prepare:types')!(payload)
     expect(payload.serverReferences).toHaveLength(1)
@@ -111,4 +116,14 @@ test('Nuxt public type generation contributes to server, app, shared and node pr
     expect(payload.serverTsConfig.compilerOptions.paths['#files-sdk']).toBeDefined()
     expect(payload.serverTsConfig.compilerOptions.paths['files-sdk']).toBeUndefined()
     expect(payload.serverTsConfig.compilerOptions.paths['nuxt-files-sdk/runtime']?.[0]).toMatch(/runtime\.d\.ts$/u)
+})
+
+test('non-Nitro builders retain basic runtime and reject an explicitly configured Gateway', async () => {
+    const basic = await setup(`export default { storage: { adapter: 'memory' } }`, 0)
+    expect(basic.active).toBe(true)
+    expect(await kit.templates.get('nuxt-files-sdk/registry.mjs')!.getContents()).not.toContain('useNitroApp')
+    expect(kit.handlers).toEqual([])
+    await expect(
+        setup(`export default { storage: { adapter: 'memory' }, routes: [{ path: '/files' }] }`, 0),
+    ).rejects.toThrow('[nuxt-files-sdk:gateway-unavailable]')
 })

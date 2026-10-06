@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'CLI-001',
+        guarantee: 'Long terminal work ends on success or failure while short work remains quiet',
+        source: 'test/unit/terminal.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'BUILDER-001',
         guarantee: 'Basic runtime remains available when Gateway, DevTools or Nitro hooks are unsupported',
         source: 'test/unit/capabilities.test.ts',

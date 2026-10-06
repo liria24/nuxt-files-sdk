@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-import { addServerHandler, addTemplate, addTypeTemplate, logger, resolveServerVariant } from '@nuxt/kit'
+import { addServerHandler, addTemplate, addTypeTemplate, resolveServerVariant, useLogger, useTerminal } from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
 import { parseSync } from 'oxc-parser'
 
@@ -9,10 +9,12 @@ import { prepareFilesConfig } from '../config/prepare'
 import { fileHash } from '../runtime/development'
 import { filesBuilderCapabilities, requireFilesGateway } from './capabilities'
 import { deploymentTarget, storageDependencies } from './dependencies'
-import { dependencySession, diagnoseDependencies, reportDependencyIssues } from './diagnostics'
+import { dependencySession, diagnoseDependencies } from './diagnostics'
 import { configSources, subpathDependencies } from './imports'
 import { storageTypes, wireNuxtNitroOptions } from './nitro'
+import { reportNuxtDependencyIssues } from './nuxt-diagnostics'
 import { registerSdkAliases, resolveOwnedSdk, resolvePackage, sdkTypePaths } from './resolve'
+import { withFilesTask } from './terminal'
 import { watchFiles } from './update'
 
 const normalized = (path: string): string => path.replaceAll('\\', '/')
@@ -45,6 +47,8 @@ export interface NuxtFilesIntegrationOptions {
 
 /** Generate one runtime import graph; Nuxt never initializes Files through a Nitro startup plugin. */
 export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIntegrationOptions): Promise<boolean> => {
+    const logger = useLogger('nuxt-files-sdk')
+    const terminal = useTerminal()
     const configPath = normalized(options.configPath)
     const sdk = resolveOwnedSdk()
     nuxt.options.alias = registerSdkAliases(nuxt.options.alias, sdk, ['browser', 'import'])
@@ -60,7 +64,26 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
             alias: nuxt.options.alias,
             injectImports: injectConfigImports,
         })
-    const prepared = await prepare()
+    let prepared
+    try {
+        prepared = await withFilesTask(terminal, 'Preparing Files configuration', prepare)
+    } catch (error) {
+        try {
+            await reportNuxtDependencyIssues(
+                diagnoseDependencies(
+                    sdk,
+                    graph.sdkImports.flatMap((subpath) => subpathDependencies(sdk, subpath)),
+                    nuxt.options.alias,
+                ),
+                dependencySession(nuxt.options.rootDir),
+                logger,
+                nuxt.options.rootDir,
+            )
+        } catch {
+            /* Supplementary advice must not replace the original configuration error. */
+        }
+        throw error
+    }
     if (Object.entries(inputHashes).some(([path, hash]) => fileHash(path) !== hash)) {
         throw new Error(
             '[nuxt-files-sdk:config-changed] Files configuration changed during preparation. Retry preparation.',
@@ -87,7 +110,7 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
             ],
             async () => {
                 watcher?.add(configSources(configPath, nuxt.options.alias).files)
-                await prepare()
+                await withFilesTask(terminal, 'Updating Files configuration', prepare)
                 await nuxt.callHook('restart')
             },
             (error) => logger.warn(error instanceof Error ? error.message : String(error)),
@@ -139,7 +162,7 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     )
     for (const subpath of graph.sdkImports) requirements.push(...subpathDependencies(sdk, subpath))
     const diagnostics = diagnoseDependencies(sdk, requirements, nuxt.options.alias)
-    reportDependencyIssues(diagnostics, dependencySession(nuxt.options.rootDir), (message) => logger.warn(message))
+    await reportNuxtDependencyIssues(diagnostics, dependencySession(nuxt.options.rootDir), logger, nuxt.options.rootDir)
     watcher?.add(
         requirements.flatMap(({ dependency, conditions }) => {
             const result = resolvePackage(dependency, pathToFileURL(sdk.manifestPath), conditions)
