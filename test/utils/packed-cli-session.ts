@@ -368,7 +368,7 @@ export const runPackedNuxtCliSession = async ({
         )
         const versions = JSON.parse(
             await run(
-                'node',
+                process.execPath,
                 [
                     '--input-type=module',
                     '-e',
@@ -405,8 +405,9 @@ export const runPackedNuxtCliSession = async ({
             bootstrap,
             `import { pathToFileURL } from 'node:url'\nconst [bin, ...args] = process.argv.slice(2)\nprocess.argv = [process.execPath, bin, ...args]\nprocess.on('message', message => { if (message === 'files-cli-stop') process.emit('SIGTERM') })\nawait import(pathToFileURL(bin).href)\n`,
         )
+        // Own the current Node runtime directly so IPC and exit events refer to the bootstrap process.
         child = spawn(
-            'node',
+            process.execPath,
             [
                 bootstrap,
                 versions.bin,
@@ -426,6 +427,7 @@ export const runPackedNuxtCliSession = async ({
                 stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
             },
         )
+        onProgress?.(`Native CLI supervisor PID ${child.pid}; executable ${process.execPath}`)
         let spawnError: Error | undefined
         child.once('error', (error) => (spawnError = error))
         child.stdout!.on('data', (chunk) => (log += chunk))
