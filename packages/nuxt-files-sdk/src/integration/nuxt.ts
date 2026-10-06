@@ -7,6 +7,7 @@ import { parseSync } from 'oxc-parser'
 
 import { prepareFilesConfig } from '../config/prepare'
 import { fileHash } from '../runtime/development'
+import { filesBuilderCapabilities, requireFilesGateway } from './capabilities'
 import { deploymentTarget, storageDependencies } from './dependencies'
 import { dependencySession, diagnoseDependencies, reportDependencyIssues } from './diagnostics'
 import { configSources, subpathDependencies } from './imports'
@@ -96,6 +97,8 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     if (!prepared) return false
 
     const major = resolveServerVariant({ nitro2: 2, nitro3: 3, nuxt: 0 }) ?? 0
+    const capabilities = filesBuilderCapabilities(major === 2 ? 'nitro2' : major === 3 ? 'nitro3' : 'nuxt')
+    requireFilesGateway(prepared.routes.length > 0, capabilities.gateway)
     const mode = nuxt.options.dev ? '.dev' : ''
     const template = (name: string, contents: string): string =>
         normalized(
@@ -168,7 +171,7 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
             registry,
             resolved,
             selected,
-            development: !!nuxt.options.dev,
+            development: nuxt.options.dev,
         }),
     )
 

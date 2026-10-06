@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'BUILDER-001',
+        guarantee: 'Basic runtime remains available when Gateway, DevTools or Nitro hooks are unsupported',
+        source: 'test/unit/capabilities.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'RESOLVE-002',
         guarantee:
             'Packed consumers retain owned SDK identity without a direct SDK dependency and with isolated workspace/Layer competing SDKs',

@@ -1,10 +1,18 @@
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 
-import { addImports, addServerImports, defineNuxtModule, getNuxtModuleVersion } from '@nuxt/kit'
+import {
+    addImports,
+    addServerImports,
+    defineNuxtModule,
+    getNuxtModuleVersion,
+    logger,
+    resolveServerVariant,
+} from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
 
 import { filesDevtoolsWriteEnabled, shouldEnableFilesDevtools, type FilesDevtoolsOptions } from './devtools/enabled'
+import { filesBuilderCapabilities } from './integration/capabilities'
 import { moduleMeta } from './meta'
 
 /** Options for the Nuxt Files SDK module. */
@@ -27,6 +35,13 @@ export default defineNuxtModule<ModuleOptions>({
         const configPath = resolve(nuxt.options.rootDir, options.config)
         const active = await setupNuxtFilesIntegration(nuxt, { configPath })
         if (!active) return
+        const capabilities = filesBuilderCapabilities(
+            resolveServerVariant<'nuxt' | 'nitro2' | 'nitro3'>({
+                nuxt: 'nuxt',
+                nitro2: 'nitro2',
+                nitro3: 'nitro3',
+            }),
+        )
 
         addServerImports([
             { name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' },
@@ -40,6 +55,12 @@ export default defineNuxtModule<ModuleOptions>({
         }
 
         if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
+            if (!capabilities.devtools) {
+                logger.warn(
+                    '[nuxt-files-sdk:devtools-unavailable] Files DevTools is unavailable with this server builder. Basic Files runtime remains enabled.',
+                )
+                return
+            }
             const version = await getNuxtModuleVersion('@nuxt/devtools', nuxt)
             const { setupFilesDevtools } = await import('./devtools')
             const secrets = { token: randomUUID() }
