@@ -1,5 +1,12 @@
 export const contracts = [
     {
+        id: 'CLI-003',
+        guarantee:
+            'Observed child exit prevents unsafe PID reuse probes while descendant permission errors remain failures',
+        source: 'test/unit/process-cleanup.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'ARCHIVE-001',
         guarantee: 'All stable platform and package-manager consumers verify the same immutable packed archive',
         source: 'test/unit/packed-artifact.test.ts',
