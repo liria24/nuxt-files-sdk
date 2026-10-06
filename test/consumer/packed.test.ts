@@ -1,7 +1,10 @@
+import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, resolve } from 'node:path'
 
+import npmManifest from 'npm/package.json' with { type: 'json' }
 import { afterAll, beforeAll, describe, expect, test } from 'vite-plus/test'
 
 import { invalidTypeCases } from '../types/invalid/cases'
@@ -12,6 +15,7 @@ import {
     outputPaths,
     packPackage,
     readOutput,
+    repositoryRoot,
     runCommand,
     startFixtureServer,
     unusedPlugins,
@@ -37,6 +41,10 @@ if (!['bun', 'npm', 'pnpm'].includes(requestedPackageManager)) {
 }
 const packageManager = requestedPackageManager as 'bun' | 'npm' | 'pnpm'
 const packageManagerShell = process.platform === 'win32' && packageManager !== 'bun'
+let npmBin: string
+let npmAuditConsumer: string | undefined
+const runNpm = (args: string[], options: { cwd: string; signal?: AbortSignal; timeout?: number }) =>
+    runCommand(process.execPath, [npmBin, ...args], options)
 const consumerFixtures = packageManager === 'bun' ? ['nuxt4', 'nitro-v2', 'nitro-v3'] : ['nuxt4']
 if (packageManager === 'pnpm') consumerFixtures.push('workspace')
 const installConsumer = (
@@ -46,11 +54,13 @@ const installConsumer = (
     packageManager === 'bun'
         ? runCommand('bun', ['install', '--ignore-scripts'], { cwd: directory, ...options })
         : packageManager === 'npm'
-          ? runCommand(packageManager, ['install', '--ignore-scripts', '--package-lock=false'], {
-                cwd: directory,
-                shell: packageManagerShell,
-                ...options,
-            })
+          ? runNpm(
+                ['install', '--ignore-scripts', '--package-lock=false', '--no-audit', '--no-fund', '--progress=false'],
+                {
+                    cwd: directory,
+                    ...options,
+                },
+            )
           : runCommand(packageManager, ['install', '--ignore-scripts', '--no-frozen-lockfile'], {
                 cwd: directory,
                 shell: packageManagerShell,
@@ -61,15 +71,34 @@ const runConsumerScript = (
     script: string,
     options: { signal?: AbortSignal; timeout?: number } = {},
 ): Promise<string> =>
-    runCommand(packageManager, ['run', script], {
-        cwd: directory,
-        env: { NUXT_AWS_SECRET_ACCESS_KEY: secret },
-        shell: packageManagerShell,
-        ...options,
-    })
+    packageManager === 'npm'
+        ? runCommand(process.execPath, [npmBin, 'run', script], {
+              cwd: directory,
+              env: { NUXT_AWS_SECRET_ACCESS_KEY: secret },
+              ...options,
+          })
+        : runCommand(packageManager, ['run', script], {
+              cwd: directory,
+              env: { NUXT_AWS_SECRET_ACCESS_KEY: secret },
+              shell: packageManagerShell,
+              ...options,
+          })
 
 describe('Packed consumer', () => {
     beforeAll(async () => {
+        if (packageManager === 'npm') {
+            const manifestPath = createRequire(import.meta.url).resolve('npm/package.json')
+            const workspace = JSON.parse(await readFile(resolve(repositoryRoot, 'package.json'), 'utf8'))
+            assert.equal(npmManifest.version, workspace.devDependencies.npm, 'Use the workspace-pinned npm CLI')
+            npmBin = resolve(dirname(manifestPath), npmManifest.bin.npm)
+            const version = await runNpm(['--version'], { cwd: repositoryRoot })
+            assert.equal(version.trim(), npmManifest.version, 'Published npm CLI matches its manifest')
+            // oxlint-disable-next-line no-console
+            console.info(
+                '[Packed npm CLI]',
+                JSON.stringify({ version: npmManifest.version, node: process.execPath, bin: npmBin }),
+            )
+        }
         process.env.NUXT_AWS_SECRET_ACCESS_KEY = secret
         try {
             packed = await packPackage()
@@ -88,7 +117,19 @@ describe('Packed consumer', () => {
 
     afterAll(async () => {
         delete process.env.NUXT_AWS_SECRET_ACCESS_KEY
-        if (packed) await rm(packed.directory, { recursive: true, force: true })
+        try {
+            if (npmAuditConsumer) {
+                // Preserve npm install's informational advisory report separately from
+                // the functional deadline. No fixes or dependency changes are requested.
+                const report = await runNpm(['audit', '--package-lock=false', '--audit-level=none', '--json'], {
+                    cwd: npmAuditConsumer,
+                })
+                // oxlint-disable-next-line no-console
+                console.info('[Packed npm advisory report]', report)
+            }
+        } finally {
+            if (packed) await rm(packed.directory, { recursive: true, force: true })
+        }
     })
 
     test('[PKG-001][PKG-002] tarball contains only the declared release files', () => {
@@ -254,6 +295,7 @@ describe('Packed consumer', () => {
                     await writeFile(resolve(consumer, 'package.json'), JSON.stringify(consumerPackage, null, 2))
                 }
                 await stage('install', () => installConsumer(consumer, { signal }))
+                if (packageManager === 'npm') npmAuditConsumer = consumer
                 const installed = JSON.parse(
                     await stage('owned SDK resolution', () =>
                         runCommand(

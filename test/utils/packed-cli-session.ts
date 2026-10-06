@@ -773,7 +773,13 @@ await import(pathToFileURL(bin).href)
                 .digest('hex') !== digest
         )
             failures.push('The exact archive changed')
-        await rm(directory, { recursive: true, force: true })
+        try {
+            await rm(directory, { recursive: true, force: true })
+        } catch (error) {
+            // Keep the owned-process failure and its native CLI trace when Windows
+            // still holds a directory open; failed removal must remain fatal too.
+            failures.push(`Consumer directory cleanup: ${String(error)}`)
+        }
     }
     clearTimeout(deadlineTimer)
     if (deadline.signal.aborted) failures.push('Packed CLI session exceeded its bounded deadline')
