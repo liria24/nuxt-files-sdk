@@ -7,6 +7,7 @@ import { createServer } from 'node:net'
 import { dirname, resolve } from 'node:path'
 
 import { closeOwnedProcess, runCommand } from './fixture'
+import { nuxtLifecycleModule } from './nuxt-lifecycle'
 
 interface SessionOptions {
     consumer: string
@@ -146,19 +147,7 @@ const scanConsumer = async (directory: string, secrets: string[]) => {
 
 const nuxtConfiguration = (revision: number) => `export default defineNuxtConfig({
   compatibilityDate: '2026-09-04',
-  modules: ['nuxt-files-sdk', function filesCliLifecycle(_options, nuxt) {
-    const started = Date.now()
-    const observe = (scope, hooks) => {
-      const emit = (phase, event) => {
-        if (['close', 'restart', 'ready', 'nitro:init', 'nitro:config', 'build:before', 'build:done', 'dev:reload'].includes(event.name))
-          console.info('[Files CLI lifecycle] ' + JSON.stringify({ scope, phase, hook: event.name, pid: process.pid, ms: Date.now() - started }))
-      }
-      hooks.beforeEach(event => emit('before', event))
-      hooks.afterEach(event => emit('after', event))
-    }
-    observe('nuxt', nuxt.hooks)
-    nuxt.hook('nitro:init', nitro => observe('nitro', nitro.hooks))
-  }],
+  modules: ['nuxt-files-sdk', ${nuxtLifecycleModule}],
   devtools: { enabled: false },
   extends: ['./layer'],
   runtimeConfig: { appSecret: '', cliRevision: ${revision} },
@@ -391,6 +380,7 @@ export const runPackedNuxtCliSession = async ({
                 deadline.signal,
             ),
         ) as { node: string; nuxt: string; cli: string; nitro: string; bin: string; adapter: string }
+        // oxlint-disable-next-line no-console
         console.info(
             '[Packed Nuxt CLI versions]',
             JSON.stringify({ node: versions.node, nuxt: versions.nuxt, cli: versions.cli, nitro: versions.nitro }),
@@ -777,5 +767,13 @@ export const runPackedNuxtCliSession = async ({
         throw new Error(redact(`${failures.join('\n')}\nLast HTTP failure: ${lastHttpFailure}\nCLI output:\n${log}`))
     assert(report)
     onProgress?.('Owned processes, listener and lock cleaned; archive digest unchanged')
+    // oxlint-disable-next-line no-console
+    console.info(
+        '[Packed Nuxt CLI lifecycle]\n' +
+            log
+                .split('\n')
+                .filter((line) => line.includes('[Files CLI lifecycle]'))
+                .join('\n'),
+    )
     return report
 }

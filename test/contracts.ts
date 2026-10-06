@@ -64,6 +64,12 @@ export const contracts = [
         job: 'test-nuxt4',
     },
     {
+        id: 'UPDATE-003',
+        guarantee: 'After Nitro 2 close unsubscribes dev:reload handlers, later dispatches cannot recreate worker IPC',
+        source: 'test/nitro/dev-close.test.ts',
+        job: 'test-nitro2',
+    },
+    {
         id: 'DEP-003',
         guarantee: 'Dependency inspection stays silent for uncertainty and reports only changed confirmed failures',
         source: 'test/unit/diagnostics.test.ts',
