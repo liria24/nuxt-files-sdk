@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'IMPORT-001',
+        guarantee: 'Aliased configuration and referenced files re-evaluate without duplicate fallback side effects',
+        source: 'test/unit/import-strategy.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'CLI-001',
         guarantee: 'Long terminal work ends on success or failure while short work remains quiet',
         source: 'test/unit/terminal.test.ts',
