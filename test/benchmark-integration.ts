@@ -15,6 +15,9 @@ import {
     startFixtureServer,
 } from './utils/fixture'
 
+// Use Nitro's supported TCP worker transport on hosts that restrict abstract Unix sockets.
+process.env.NITRO_NO_UNIX_SOCKET ??= '1'
+
 // Report timings, never use machine-dependent elapsed time as a correctness gate.
 const elapsed = async (run: () => Promise<unknown>) => {
     const start = performance.now()
@@ -42,14 +45,33 @@ for (const name of ['nuxt4', 'nitro-v2']) {
     await cleanFixture(name)
     await installFixture(name)
     const cwd = fixtureDirectory(name)
+    const frameworkName = name === 'nuxt4' ? 'nuxt' : 'nitropack'
+    const framework = JSON.parse(
+        await readFile(resolve(cwd, 'node_modules', frameworkName, 'package.json'), 'utf8'),
+    ) as {
+        version: string
+    }
     const timings: Record<string, number> = {}
     for (const script of ['prepare', 'typecheck', 'build']) {
         timings[`${script}Ms`] = await elapsed(() => runCommand('bun', ['run', script], { cwd }))
     }
     const outputBytes = await directorySize(resolve(cwd, '.output'))
-    const generatedBytes = await directorySize(
-        resolve(cwd, name === 'nuxt4' ? '.nuxt/nuxt-files-sdk' : '.nitro/nuxt-files-sdk'),
-    )
+    // Preparation and production can use separate build directories. Count both before dev adds files.
+    const generatedDirectories: Record<string, number> = {}
+    const generatedPaths =
+        name === 'nuxt4'
+            ? ['.nuxt/nuxt-files-sdk', 'node_modules/.cache/nuxt/.nuxt/nuxt-files-sdk']
+            : ['.nitro/nuxt-files-sdk', 'node_modules/.nitro/nuxt-files-sdk']
+    for (const path of generatedPaths) {
+        const directory = resolve(cwd, path)
+        const exists = await stat(directory).catch((error: unknown) => {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined
+            throw error
+        })
+        if (exists?.isDirectory()) generatedDirectories[path] = await directorySize(directory)
+    }
+    if (!Object.keys(generatedDirectories).length) throw new Error(`No Files generation directory found for ${name}`)
+    const generatedBytes = Object.values(generatedDirectories).reduce((total, bytes) => total + bytes, 0)
     if (name === 'nuxt4') {
         const start = performance.now()
         const server = await startFixtureServer(name, { development: true, readyPath: '/api/files' })
@@ -60,9 +82,11 @@ for (const name of ['nuxt4', 'nitro-v2']) {
         }
     }
     fixtures[name] = {
+        framework: { name: frameworkName, version: framework.version },
         ...timings,
         outputBytes,
         generatedBytes,
+        generatedDirectories,
         installedBytes: await directorySize(resolve(cwd, 'node_modules')),
         packageManifests: (await outputPaths(resolve(cwd, 'node_modules'))).filter((path) =>
             path.endsWith('/package.json'),
@@ -80,6 +104,7 @@ const report = {
     node: (await runCommand('node', ['--version'])).trim(),
     bun: (await runCommand('bun', ['--version'])).trim(),
     platform: process.platform,
+    nitroNoUnixSocket: process.env.NITRO_NO_UNIX_SOCKET,
     sdk: sdk.version,
     commit: (await runCommand('git', ['rev-parse', 'HEAD'])).trim(),
     moduleImportMedianMs: samples.toSorted((a, b) => a - b)[3],
