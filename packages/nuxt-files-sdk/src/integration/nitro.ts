@@ -387,6 +387,11 @@ export const selectedSourcePlugin = (options: { selected: string; source: string
     }
 }
 
+/** Preserve Nuxt's runtime inline rules when Nitro 2 receives native Windows resolver paths. */
+export const inlineNuxtRuntime = (id: string): boolean =>
+    id.includes('\\') &&
+    /^(?:nuxt|nuxt3|nuxt-nightly)\/dist\//u.test(id.replaceAll('\\', '/').split('node_modules/').at(-1)!)
+
 /** Native bundle settings stay in the Nitro adapter, including Nuxt's Nitro-backed path. */
 export const wireNuxtNitroOptions = (
     value: unknown,
@@ -412,6 +417,9 @@ export const wireNuxtNitroOptions = (
     )
     const inline = ((config.externals ??= {}).inline ??= [])
     inline.push('nuxt-files-sdk', options.runtime, options.registry, options.resolved, options.selected)
+    // Nitro 2 normalizes the original ID, but checks resolved Windows IDs without normalization.
+    // A public inline callback preserves only the runtime prefixes Nuxt already inlines.
+    inline.push(inlineNuxtRuntime)
     if (!options.development) inline.push('files-sdk')
     const plugins = ((config.rollupConfig ??= {}).plugins ??= [])
     plugins.push(
