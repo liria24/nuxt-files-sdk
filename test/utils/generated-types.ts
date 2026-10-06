@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -9,6 +9,8 @@ import { createMessageConnection, StreamMessageReader, StreamMessageWriter } fro
 import { invalidTypeCases } from '../types/invalid/cases'
 import { closeOwnedProcess, repositoryRoot, runCommand } from './fixture'
 
+type TypeCheckOptions = { signal?: AbortSignal }
+
 export const cleanTypeContracts = async (directory: string): Promise<void> => {
     invalidTypeRuns.delete(directory)
     for (const name of ['.contract-docs', '.contract-invalid', '.contract-examples', '.contract-config-autoimport']) {
@@ -16,7 +18,8 @@ export const cleanTypeContracts = async (directory: string): Promise<void> => {
     }
 }
 
-export const checkGeneratedTypes = async (directory: string): Promise<void> => {
+export const checkGeneratedTypes = async (directory: string, options: TypeCheckOptions = {}): Promise<void> => {
+    options.signal?.throwIfAborted()
     const imports = await readFile(resolve(directory, '.nuxt/types/nitro-imports.d.ts'), 'utf8')
     const registry = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/registry.mjs'), 'utf8').catch(() =>
         readFile(resolve(directory, 'node_modules/.cache/nuxt/.nuxt/nuxt-files-sdk/registry.mjs'), 'utf8'),
@@ -61,11 +64,13 @@ void [helperIsAny, configIsAny]
     ])
     await runCommand('bun', ['x', 'vue-tsc', '--noEmit', '-p', '.contract-config-autoimport/tsconfig.json'], {
         cwd: directory,
+        ...options,
     })
 }
 
 const invalidTypeRuns = new Map<string, Promise<string>>()
-const compileInvalidTypes = async (directory: string): Promise<string> => {
+const compileInvalidTypes = async (directory: string, options: TypeCheckOptions): Promise<string> => {
+    options.signal?.throwIfAborted()
     const invalidDirectory = resolve(directory, '.contract-invalid')
     await rm(invalidDirectory, { recursive: true, force: true })
     await mkdir(invalidDirectory, { recursive: true })
@@ -84,19 +89,25 @@ const compileInvalidTypes = async (directory: string): Promise<string> => {
     return runCommand(
         'bun',
         ['x', 'vue-tsc', '--noEmit', '--pretty', 'false', '-p', '.contract-invalid/tsconfig.json'],
-        { cwd: directory },
+        { cwd: directory, ...options },
     ).then(
         () => '',
-        (failure: unknown) => String(failure),
+        (failure: unknown) => {
+            options.signal?.throwIfAborted()
+            return String(failure)
+        },
     )
 }
 
 export const checkInvalidType = async (
     directory: string,
     { id, diagnostic }: (typeof invalidTypeCases)[number],
+    options: TypeCheckOptions = {},
 ): Promise<void> => {
-    if (!invalidTypeRuns.has(directory)) invalidTypeRuns.set(directory, compileInvalidTypes(directory))
+    options.signal?.throwIfAborted()
+    if (!invalidTypeRuns.has(directory)) invalidTypeRuns.set(directory, compileInvalidTypes(directory, options))
     const output = await invalidTypeRuns.get(directory)!
+    options.signal?.throwIfAborted()
     const errors = output
         .split('\n')
         .filter((line) => line.includes(id + '.ts('))
@@ -104,7 +115,8 @@ export const checkInvalidType = async (
     expect(errors, output).toMatch(diagnostic)
 }
 
-export const checkPublicExamples = async (directory: string): Promise<void> => {
+export const checkPublicExamples = async (directory: string, options: TypeCheckOptions = {}): Promise<void> => {
+    options.signal?.throwIfAborted()
     const examplesDirectory = resolve(directory, '.contract-examples')
     await mkdir(examplesDirectory, { recursive: true })
     await writeFile(
@@ -122,7 +134,10 @@ export const checkPublicExamples = async (directory: string): Promise<void> => {
             ],
         }),
     )
-    await runCommand('bun', ['x', 'vue-tsc', '--noEmit', '-p', '.contract-examples/tsconfig.json'], { cwd: directory })
+    await runCommand('bun', ['x', 'vue-tsc', '--noEmit', '-p', '.contract-examples/tsconfig.json'], {
+        cwd: directory,
+        ...options,
+    })
 }
 
 const hoverSource = `import module, { type ModuleOptions } from 'nuxt-files-sdk'
@@ -152,7 +167,11 @@ const options: ModuleOptions = {
 void options
 `
 
-export const checkHoverDocumentation = async (directory: string): Promise<void> => {
+export const checkHoverDocumentation = async (
+    directory: string,
+    options: TypeCheckOptions & { onStart?: (child: ChildProcess) => void } = {},
+): Promise<void> => {
+    options.signal?.throwIfAborted()
     const docsDirectory = resolve(directory, '.contract-docs')
     const sourcePath = resolve(docsDirectory, 'hover.ts')
     const configPath = resolve(docsDirectory, 'tsconfig.json')
@@ -174,11 +193,15 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             }),
         ),
     ])
+    options.signal?.throwIfAborted()
     const child = spawn(
         process.execPath,
         [resolve(repositoryRoot, 'node_modules/typescript/bin/tsc'), '--lsp', '--stdio'],
         { cwd: docsDirectory, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] },
     )
+    const cancelled = Promise.withResolvers<never>()
+    const abort = () => cancelled.reject(options.signal?.reason ?? new Error('TypeScript hover validation cancelled'))
+    options.signal?.addEventListener('abort', abort, { once: true })
     const closed = Promise.withResolvers<void>()
     child.once('close', () => closed.resolve())
     let stderr = ''
@@ -206,6 +229,7 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
         let timer: ReturnType<typeof setTimeout> | undefined
         try {
             return await Promise.race([
+                cancelled.promise,
                 params === undefined ? connection.sendRequest<T>(method) : connection.sendRequest<T>(method, params),
                 new Promise<never>((_, reject) => {
                     timer = setTimeout(
@@ -223,19 +247,25 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             clearTimeout(timer)
         }
     }
+    const notify = (method: string, params?: unknown) =>
+        Promise.race([
+            params === undefined ? connection.sendNotification(method) : connection.sendNotification(method, params),
+            cancelled.promise,
+        ])
     let failure: unknown
     let naturallyClosed = false
     try {
+        options.onStart?.(child)
         await request('initialize', {
             processId: process.pid,
             rootUri: pathToFileURL(docsDirectory).href,
             capabilities: { textDocument: { hover: { contentFormat: ['markdown', 'plaintext'] } } },
             initializationOptions: { disablePushDiagnostics: true },
         })
-        await connection.sendNotification('initialized', {})
-        await registration.promise
+        await notify('initialized', {})
+        await Promise.race([registration.promise, cancelled.promise])
         const uri = pathToFileURL(sourcePath).href
-        await connection.sendNotification('textDocument/didOpen', {
+        await notify('textDocument/didOpen', {
             textDocument: { uri, languageId: 'typescript', version: 1, text: hoverSource },
         })
         for (const marker of [
@@ -264,13 +294,14 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             expect(documentation, marker).toContain('```')
             expect(documentation.replace(/```[\s\S]*?```/gu, '').trim().length, marker).toBeGreaterThan(0)
         }
-        await connection.sendNotification('textDocument/didClose', { textDocument: { uri } })
+        await notify('textDocument/didClose', { textDocument: { uri } })
         expect(await request<null>('shutdown')).toBeNull()
-        await connection.sendNotification('exit')
+        await notify('exit')
         let closeTimer: ReturnType<typeof setTimeout> | undefined
         try {
             await Promise.race([
                 closed.promise,
+                cancelled.promise,
                 new Promise<never>((_, reject) => {
                     closeTimer = setTimeout(
                         () => reject(new Error('TypeScript language server did not close after exit.')),
@@ -285,6 +316,7 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
     } catch (error) {
         failure = error
     } finally {
+        options.signal?.removeEventListener('abort', abort)
         clearTimeout(registrationTimer)
         try {
             // Windows's public Node shim owns a native compiler child; capture it before terminating the shim.

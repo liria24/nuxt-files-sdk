@@ -171,8 +171,9 @@ export const nuxtBuildDirectory = async (directory: string): Promise<string> => 
 
 export const startFixtureServer = async (
     name: string,
-    options: { development?: boolean; readyPath?: string } = {},
+    options: { development?: boolean; readyPath?: string; signal?: AbortSignal } = {},
 ): Promise<{ url: string; close: () => Promise<void>; output: () => string }> => {
+    options.signal?.throwIfAborted()
     const reservation = createServer()
     await new Promise<void>((ready, reject) => {
         reservation.once('error', reject)
@@ -200,23 +201,38 @@ export const startFixtureServer = async (
     child.stdout.on('data', (chunk) => (output += chunk))
     child.stderr.on('data', (chunk) => (output += chunk))
     const url = `http://127.0.0.1:${port}`
+    let closing: Promise<void> | undefined
+    const close = () => {
+        options.signal?.removeEventListener('abort', abort)
+        return (closing ??= closeProcess(child))
+    }
+    const abort = () => {
+        void close().catch(() => {})
+    }
+    options.signal?.addEventListener('abort', abort, { once: true })
+    if (options.signal?.aborted) abort()
     try {
         for (let attempt = 0; attempt < (options.development ? 300 : 100); attempt += 1) {
+            options.signal?.throwIfAborted()
             if (spawnError) throw spawnError
             if (child.exitCode !== null || child.signalCode !== null)
                 throw new Error(`Fixture server exited early.\n${output}`)
             if (
-                await fetch(`${url}${options.readyPath ?? ''}`, { signal: AbortSignal.timeout(500) })
+                await fetch(`${url}${options.readyPath ?? ''}`, {
+                    signal: options.signal
+                        ? AbortSignal.any([options.signal, AbortSignal.timeout(500)])
+                        : AbortSignal.timeout(500),
+                })
                     .then((response) => (options.readyPath ? response.ok : true))
                     .catch(() => false)
             ) {
-                return { url, close: () => closeProcess(child), output: () => output }
+                return { url, close, output: () => output }
             }
             await new Promise((resolveWait) => setTimeout(resolveWait, 100))
         }
         throw new Error(`Fixture server did not start.\n${output}`)
     } catch (error) {
-        await closeProcess(child)
+        await close()
         throw error
     }
 }

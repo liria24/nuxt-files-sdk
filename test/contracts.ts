@@ -1,5 +1,11 @@
 export const contracts = [
     {
+        id: 'CLI-004',
+        guarantee: 'Test cancellation drains owned consumer processes before teardown and prevents later stages',
+        source: 'test/unit/consumer-cancellation.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'CLI-003',
         guarantee:
             'Observed child exit prevents unsafe PID reuse probes while descendant permission errors remain failures',
