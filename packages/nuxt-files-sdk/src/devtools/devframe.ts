@@ -11,7 +11,7 @@ import {
     isFilesDevtoolsFailure,
     type FilesDevtoolsDiagnostic,
 } from './diagnostics'
-import { FILES_DEVTOOLS_PATH } from './snapshot'
+import { FILES_DEVTOOLS_PATH } from './paths'
 
 interface FilesDevframeMessage {
     id: string

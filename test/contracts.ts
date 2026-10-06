@@ -1,5 +1,49 @@
 export const contracts = [
     {
+        id: 'ARCHIVE-001',
+        guarantee: 'All stable platform and package-manager consumers verify the same immutable packed archive',
+        source: 'test/unit/packed-artifact.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'CLI-002',
+        guarantee:
+            'An isolated exact archive survives real CLI startup, repair, dependency addition, restart and termination',
+        source: 'test/consumer/packed.test.ts',
+        job: 'test-consumer',
+    },
+    {
+        id: 'GATEWAY-006',
+        guarantee: 'Native RequestEvent, auth and SDK endpoint binding stay intact across HTTP and CLI transport',
+        source: 'test/consumer/packed.test.ts',
+        job: 'test-consumer',
+    },
+    {
+        id: 'SECRET-001',
+        guarantee:
+            'Runtime secret precedence and derivation preserve standalone Nitro boundaries without cached failures',
+        source: 'test/unit/gateway-secret.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'IMPORT-001',
+        guarantee: 'Aliased configuration and referenced files re-evaluate without duplicate fallback side effects',
+        source: 'test/unit/import-strategy.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'CLI-001',
+        guarantee: 'Long terminal work ends on success or failure while short work remains quiet',
+        source: 'test/unit/terminal.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'BUILDER-001',
+        guarantee: 'Basic runtime remains available when Gateway, DevTools or Nitro hooks are unsupported',
+        source: 'test/unit/capabilities.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'RESOLVE-002',
         guarantee:
             'Packed consumers retain owned SDK identity without a direct SDK dependency and with isolated workspace/Layer competing SDKs',

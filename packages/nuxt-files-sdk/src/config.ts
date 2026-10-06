@@ -1,6 +1,6 @@
+import type { RequestEvent } from '@nuxt/schema'
 import type { Adapter, FilesHooks, FilesOptions, FilesPlugin, ProviderSlug } from 'files-sdk'
 import type { AuthorizeContext, AuthorizeResult, CreateFilesRouterOptions } from 'files-sdk/api'
-import type { H3Event } from 'h3'
 
 import type { ProviderFactories } from './runtime/provider-types'
 
@@ -42,7 +42,7 @@ export type StorageConfig<
 export type FilesRoute = Omit<CreateFilesRouterOptions, 'files' | 'authorize'> & {
     path: string
     storage?: string
-    authorize?: (context: AuthorizeContext & { event: H3Event }) => AuthorizeResult | Promise<AuthorizeResult>
+    authorize?: (context: AuthorizeContext & { event: RequestEvent }) => AuthorizeResult | Promise<AuthorizeResult>
 }
 
 export type StorageSet = StorageConfig | Record<string, StorageConfig>

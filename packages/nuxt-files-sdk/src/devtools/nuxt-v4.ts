@@ -5,7 +5,7 @@ import type { Nuxt } from '@nuxt/schema'
 import { createEmbedded } from 'devframe/adapters/embedded'
 
 import { createFilesDevframe } from './devframe'
-import { FILES_DEVTOOLS_PATH } from './snapshot'
+import { FILES_DEVTOOLS_PATH } from './paths'
 
 export const setupNuxtV4Devtools = (
     nuxt: Nuxt,

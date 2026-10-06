@@ -1,36 +1,33 @@
-import { setup, url, useTestContext } from '@nuxt/test-utils/e2e'
-import { describe, expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
-import { cleanFixture, fixtureDirectory, installFixture } from '../utils/fixture'
+import { cleanFixture, installFixture, startFixtureServer } from '../utils/fixture'
 
-await cleanFixture('nuxt5-nightly')
-await installFixture('nuxt5-nightly')
-
-describe('Nuxt DevTools v4 nightly integration', async () => {
-    await setup({
-        rootDir: fixtureDirectory('nuxt5-nightly'),
-        browser: false,
-        dev: true,
-        server: false,
-        build: true,
-    })
-
-    test('serves the embedded DevFrame UI and configured registry snapshot', async () => {
-        const context = useTestContext()
-        const listener = await context.nuxt!.server!.listen(0, { hostname: '127.0.0.1' })
-        context.url = listener.url
-        ;(context.teardown ??= []).push(() => listener.close())
-        const api = await fetch(url('/api/files'))
-        expect(api.status, await api.text()).toBe(200)
-        const response = await fetch(url('/__nuxt-files-sdk/'))
+// The distributed Nuxt 5 builder is exercised through its real CLI, rather than Nuxt 4's legacy listen API.
+test('experimental Nuxt 5 serves its embedded DevFrame UI and authenticated snapshot route', async () => {
+    await cleanFixture('nuxt5-nightly')
+    await installFixture('nuxt5-nightly')
+    vi.stubEnv('VITEST', undefined)
+    vi.stubEnv('TEST', undefined)
+    vi.stubEnv('NODE_ENV', 'development')
+    const server = await startFixtureServer('nuxt5-nightly', { development: true, readyPath: '/__nuxt-files-sdk/' })
+    try {
+        const response = await fetch(`${server.url}/__nuxt-files-sdk/`)
         const html = await response.text()
         expect(response.status, html).toBe(200)
-        expect(html).toContain('<title>Files</title>')
-        const script = await fetch(url('/__nuxt-files-sdk/app.js'))
-        const javascript = await script.text()
-        expect(script.status, javascript).toBe(200)
-        expect(javascript).not.toMatch(/from\s*["'](?:devframe|files-sdk)/u)
-        const unauthorized = await fetch(url('/__nuxt-files-sdk/snapshot'))
-        expect(unauthorized.status).toBe(401)
-    })
+        expect(html, server.output()).toContain('<title>Files</title>')
+        const script = await fetch(`${server.url}/__nuxt-files-sdk/app.js`)
+        expect(script.status).toBe(200)
+        const client = await script.text()
+        expect(client).not.toMatch(/from\s*["'](?:devframe|files-sdk)/u)
+        for (const path of ['/__nuxt-files-api/token', '/__nuxt-files-api/snapshot', '/__nuxt-files-api/files']) {
+            expect(client).toContain(path)
+        }
+        expect((await fetch(`${server.url}/__nuxt-files-api/snapshot`)).status).toBe(401)
+        const api = await fetch(`${server.url}/api/files`)
+        expect(api.status, await api.text()).toBe(200)
+    } finally {
+        await server.close()
+        await cleanFixture('nuxt5-nightly')
+        vi.unstubAllEnvs()
+    }
 })

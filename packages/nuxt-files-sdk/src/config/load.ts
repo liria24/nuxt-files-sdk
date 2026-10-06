@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { FilesConfig } from '../config'
 import { registerSdkAliases, resolveOwnedSdk } from '../integration/resolve'
 import { normalizeFilesConfig } from '../runtime/normalize'
+import { createFilesConfigEvaluator } from './evaluate'
 import { mergeFilesConfig } from './merge'
 
 export interface FilesConfigLoaderOptions {
@@ -35,14 +36,15 @@ export const loadFilesConfig = async ({
     source,
 }: FilesConfigLoaderOptions): Promise<FilesConfig | undefined> => {
     const { loadConfig } = await import('c12')
-    const { createJiti } = await import('jiti')
-    const jiti = createJiti(import.meta.url, {
+    // A normal import cannot honor source aliases/injection or fresh referenced files.
+    // Force source evaluation once; never retry an authored failure with another loader.
+    const sdk = resolveOwnedSdk()
+    const evaluate = await createFilesConfigEvaluator({
         alias: {
-            ...registerSdkAliases(alias ?? {}, resolveOwnedSdk()),
+            ...registerSdkAliases(alias ?? {}, sdk),
             'nuxt-files-sdk/config': fileURLToPath(new URL('../config.js', import.meta.url)),
         },
-        interopDefault: true,
-        moduleCache: false,
+        nativeRoots: [sdk.root],
     })
     const { config, layers } = await loadConfig<Record<string, unknown>>({
         cwd: dirname(configPath),
@@ -58,7 +60,7 @@ export const loadFilesConfig = async ({
         import: async (id) => {
             const input = source ?? (await readFile(id, 'utf8'))
             const code = injectImports ? (await injectImports(input, id)).code : input
-            return jiti.evalModule(code, { filename: id, async: true })
+            return evaluate(id, code)
         },
     })
     if (config.storage === undefined && layers?.some(({ config: layer }) => layer && hasEnvironmentStorage(layer)))

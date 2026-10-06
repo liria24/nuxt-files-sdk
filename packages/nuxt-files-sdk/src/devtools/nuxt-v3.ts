@@ -1,6 +1,6 @@
 import type { Nuxt } from '@nuxt/schema'
 
-import { FILES_DEVTOOLS_PATH } from './snapshot'
+import { FILES_DEVTOOLS_PATH } from './paths'
 
 export const setupNuxtV3Devtools = (nuxt: Nuxt): void => {
     nuxt.hook('devtools:customTabs', (tabs) => {

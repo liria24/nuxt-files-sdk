@@ -22,6 +22,19 @@ jobs:
               with: { persist-credentials: false }
             - uses: ./.github/actions/setup
             - run: bun run build
+            - run: bun run peers:sync --check
+            - name: Pack one immutable consumer archive
+              run: |
+                  mkdir -p "$RUNNER_TEMP/files-artifact"
+                  npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/files-artifact" ./packages/nuxt-files-sdk
+                  mv "$RUNNER_TEMP/files-artifact/"*.tgz "$RUNNER_TEMP/files-artifact/nuxt-files-sdk.tgz"
+                  sha256sum "$RUNNER_TEMP/files-artifact/nuxt-files-sdk.tgz" | cut -d ' ' -f 1 > "$RUNNER_TEMP/files-artifact/sha256.txt"
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: files-sdk-packed
+                  path: ${{ runner.temp }}/files-artifact
+                  if-no-files-found: error
+                  retention-days: 7
 
     typecheck:
         permissions:
@@ -119,41 +132,45 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
+                os: [ubuntu-latest, windows-latest]
+                package-manager: [bun, npm, pnpm]
+                compatibility: [minimum, latest-supported]
                 include:
                     - compatibility: minimum
-                      nuxt: '4.0.0'
+                      nuxt: '4.6.0'
                       nitro2: '2.13.0'
                     - compatibility: latest-supported
-                      nuxt: '^4.0.0'
+                      nuxt: '^4.6.0'
                       nitro2: '^2.13.0'
         env:
+            NUXT_FILES_PACKAGE_MANAGER: ${{ matrix.package-manager }}
             NUXT_FILES_NUXT_VERSION: ${{ matrix.nuxt }}
             NUXT_FILES_NITRO2_VERSION: ${{ matrix.nitro2 }}
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-              with: { persist-credentials: false }
-            - uses: ./.github/actions/setup
-            - run: bun run test:consumer
-    test-package-managers:
-        permissions:
-            contents: read
-        needs: build
-        strategy:
-            fail-fast: false
-            matrix:
-                package-manager: [npm, pnpm]
-        env:
-            NUXT_FILES_PACKAGE_MANAGER: ${{ matrix.package-manager }}
-            NUXT_FILES_NUXT_VERSION: '^4.0.0'
-        runs-on: ubuntu-latest
+        runs-on: ${{ matrix.os }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
               with: { persist-credentials: false }
             - uses: ./.github/actions/setup
             - if: matrix.package-manager == 'pnpm'
               run: npm install --global pnpm@10.25.0
-            - run: bun run test:consumer
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+              with:
+                  name: files-sdk-packed
+                  path: ${{ runner.temp }}/files-artifact
+            - name: Verify and test the same archive
+              env:
+                  NUXT_FILES_TARBALL: ${{ runner.temp }}/files-artifact/nuxt-files-sdk.tgz
+              run: bun scripts/verify-packed-artifact.ts && bun run test:consumer
+    test-vite-server-experimental:
+        permissions:
+            contents: read
+        continue-on-error: true
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+              with: { persist-credentials: false }
+            - uses: ./.github/actions/setup
+            - run: bun run test:vite-server
     test-size:
         permissions:
             contents: read
@@ -186,7 +203,6 @@ jobs:
             - test-nitro2
             - test-nitro3
             - test-consumer
-            - test-package-managers
             - test-size
             - benchmark
         runs-on: ubuntu-latest

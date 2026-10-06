@@ -35,10 +35,11 @@
         "test:size": "vitest run --project bundle",
         "benchmark": "bun test/benchmark.ts",
         "benchmark:integration": "bun test/benchmark-integration.ts",
-        "docs:prepare": "bun run build && bun run --cwd=docs prepare:types"
+        "docs:prepare": "bun run build && bun run --cwd=docs prepare:types",
+        "test:vite-server": "vitest run --project vite-server"
     },
     "devDependencies": {
-        "@nuxt/schema": "^4.5.2",
+        "@nuxt/schema": "^4.6.0",
         "@nuxt/test-utils": "^4.3.2",
         "files-sdk": "2.6.2",
         "knip": "^6.38.0",

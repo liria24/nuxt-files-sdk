@@ -18,9 +18,11 @@ export const cleanTypeContracts = async (directory: string): Promise<void> => {
 
 export const checkGeneratedTypes = async (directory: string): Promise<void> => {
     const imports = await readFile(resolve(directory, '.nuxt/types/nitro-imports.d.ts'), 'utf8')
-    const plugin = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/plugin.mjs'), 'utf8')
+    const registry = await readFile(resolve(directory, '.nuxt/nuxt-files-sdk/registry.mjs'), 'utf8').catch(() =>
+        readFile(resolve(directory, 'node_modules/.cache/nuxt/.nuxt/nuxt-files-sdk/registry.mjs'), 'utf8'),
+    )
     expect(imports).not.toMatch(/node_modules\/nuxt-files-sdk\/runtime/u)
-    expect(plugin).not.toContain('files-sdk/loader')
+    expect(registry).not.toContain('files-sdk/loader')
 }
 
 const invalidTypeRuns = new Map<string, Promise<string>>()
@@ -73,7 +75,9 @@ export const checkPublicExamples = async (directory: string): Promise<void> => {
             include: [
                 '../.nuxt/types/imports.d.ts',
                 '../.nuxt/types/nitro.d.ts',
+                '../.nuxt/nuxt.server.d.ts',
                 '../.nuxt/nuxt-files-sdk/storage-registry.d.ts',
+                '../node_modules/.cache/nuxt/.nuxt/nuxt-files-sdk/storage-registry.d.ts',
                 '../files.config.ts',
                 '../types.contract.ts',
             ],
@@ -121,7 +125,13 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             configPath,
             JSON.stringify({
                 extends: '../.nuxt/tsconfig.server.json',
-                include: ['../.nuxt/types/nitro.d.ts', '../.nuxt/nuxt-files-sdk/storage-registry.d.ts', './hover.ts'],
+                include: [
+                    '../.nuxt/types/nitro.d.ts',
+                    '../.nuxt/nuxt.server.d.ts',
+                    '../.nuxt/nuxt-files-sdk/storage-registry.d.ts',
+                    '../node_modules/.cache/nuxt/.nuxt/nuxt-files-sdk/storage-registry.d.ts',
+                    './hover.ts',
+                ],
             }),
         ),
     ])

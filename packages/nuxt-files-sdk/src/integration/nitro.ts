@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import type { ProviderSlug } from 'files-sdk'
@@ -102,7 +102,7 @@ declare module 'nuxt-files-sdk/runtime' {
   interface NuxtFilesSingleStorage { value: SingleStorage<typeof config> }
   interface NuxtFilesStorageRegistry extends StorageRegistry<typeof config> {}
 }
-${hookTypes(nitroMajor >= 3 ? 'nitro/types' : 'nitropack/types')}
+${nitroMajor === 0 ? '' : hookTypes(nitroMajor >= 3 ? 'nitro/types' : 'nitropack/types')}
 export {}
 `
 
@@ -162,9 +162,14 @@ export const setupNitroFilesIntegration = async (
             ...graph.files,
             sdk.manifestPath,
             ...[...roots].flatMap((root) =>
-                ['package.json', 'bun.lock', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'].map((name) =>
-                    resolve(root, name),
-                ),
+                [
+                    'package.json',
+                    'bun.lock',
+                    'package-lock.json',
+                    'pnpm-lock.yaml',
+                    'yarn.lock',
+                    'node_modules/.package-lock.json',
+                ].map((name) => resolve(root, name)),
             ),
         ]
         watcher = watchFiles(
@@ -323,24 +328,20 @@ export default (nitroApp) => configureFiles(config, {
         await Promise.all(
             routePaths.map((path, index) => {
                 const route = routes[index]!
-                const handler =
-                    nitroMajorVersion(nitro) >= 3 ? 'router.handle(event.req)' : 'createRouteHandler(router)(event)'
+                const request = nitroMajorVersion(nitro) >= 3 ? 'event.req' : 'toWebRequest(event)'
                 return writeFile(
                     path,
                     `import config from ${JSON.stringify(resolvedPath.replaceAll('\\', '/'))}
 import { createFilesRouter } from '#files-sdk/api'
-${nitroMajorVersion(nitro) >= 3 ? '' : "import { createRouteHandler } from '#files-sdk/nitro'"}
+${nitroMajorVersion(nitro) >= 3 ? '' : "import { toWebRequest } from 'h3'"}
+import { nitroRequestEvent, nitroResponse } from ${JSON.stringify(fileURLToPath(new URL('./nitro-event.js', import.meta.url)).replaceAll('\\', '/'))}
 import { getFiles } from ${JSON.stringify(internalPath)}
+import { resolveGatewaySecret } from ${JSON.stringify(fileURLToPath(new URL('../runtime/gateway-secret.js', import.meta.url)).replaceAll('\\', '/'))}
 ${nitro.options.dev ? `import { developmentConfigCurrent } from ${JSON.stringify(fileURLToPath(new URL('../runtime/development.js', import.meta.url)).replaceAll('\\', '/'))}\nconst inputHashes = ${JSON.stringify(inputHashes)}` : ''}
 
 const route = config.routes[${index}]
 const environmentSecret = typeof process === 'undefined' ? undefined : process.env?.FILES_API_SECRET
-const secret = route.authorize
-  ? route.secret || environmentSecret || crypto.randomUUID() + crypto.randomUUID()
-  : route.secret
-if (route.authorize && !route.secret && !environmentSecret) {
-  console.warn('[nuxt-files-sdk:gateway-secret] Set FILES_API_SECRET for upload tokens shared across processes.')
-}
+const secret = await resolveGatewaySecret(route.secret, environmentSecret)
 let sharedRouter
 const makeRouter = (event) => createFilesRouter({
   ...route,
@@ -348,10 +349,11 @@ const makeRouter = (event) => createFilesRouter({
   secret,
   authorize: route.authorize && ((context) => route.authorize({ ...context, event })),
 })
-export default (event) => {
+export default async (event) => {
   ${nitro.options.dev ? `if (!developmentConfigCurrent(inputHashes)) return new Response('Files configuration is being updated.', { status: 503 })` : ''}
-  const router = route.authorize ? makeRouter(event) : (sharedRouter ??= makeRouter(event))
-  return ${handler}
+  const portable = nitroRequestEvent(${request}, event.context)
+  const router = route.authorize ? makeRouter(portable) : (sharedRouter ??= makeRouter(portable))
+  return nitroResponse(await router.handle(portable.req), portable)
 }
 `,
                 )
@@ -360,4 +362,63 @@ export default (event) => {
     }
     await writeRuntime()
     return true
+}
+
+/** Preserve TypeScript compilation when Nuxt places its build directory inside node_modules. */
+export const selectedSourcePlugin = (options: { selected: string; source: string; configPath: string }) => {
+    const selected = options.selected.replaceAll('\\', '/')
+    const id = `nuxt-files-sdk:${basename(selected)}`
+    return {
+        name: 'nuxt-files-sdk-selected-source',
+        resolveId(
+            this: {
+                resolve(source: string, importer: string, options: { skipSelf: true }): Promise<{ id: string } | null>
+            },
+            source: string,
+            importer?: string,
+        ) {
+            if (source.replaceAll('\\', '/') === selected) return id
+            if (importer === id) return this.resolve(source, options.configPath, { skipSelf: true })
+            return null
+        },
+        load(source: string) {
+            return source === id ? options.source : null
+        },
+    }
+}
+
+/** Native bundle settings stay in the Nitro adapter, including Nuxt's Nitro-backed path. */
+export const wireNuxtNitroOptions = (
+    value: unknown,
+    options: {
+        sdk: ReturnType<typeof resolveOwnedSdk>
+        runtime: string
+        registry: string
+        resolved: string
+        selected: string
+        selectedSource: string
+        configPath: string
+        development: boolean
+    },
+): void => {
+    // The public schema deliberately does not embed Nitro's native option types.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const config = value as Pick<NitroIntegration['options'], 'alias' | 'externals'> & {
+        rollupConfig?: { plugins?: unknown[] }
+    }
+    config.alias = registerSdkAliases(
+        { ...config.alias, 'nuxt-files-sdk/runtime': options.runtime, '#nuxt-files-sdk/registry': options.registry },
+        options.sdk,
+    )
+    const inline = ((config.externals ??= {}).inline ??= [])
+    inline.push('nuxt-files-sdk', options.runtime, options.registry, options.resolved, options.selected)
+    if (!options.development) inline.push('files-sdk')
+    const plugins = ((config.rollupConfig ??= {}).plugins ??= [])
+    plugins.push(
+        selectedSourcePlugin({
+            selected: options.selected,
+            source: options.selectedSource,
+            configPath: options.configPath,
+        }),
+    )
 }

@@ -1,11 +1,11 @@
+import type { RequestEvent } from '@nuxt/schema'
 import type { Files } from 'files-sdk'
 import { createFilesRouter, type FilesOperation } from 'files-sdk/api'
-import { createRouteHandler } from 'files-sdk/nitro'
 
 import { useServerFiles } from '../runtime'
 import { inspectFiles } from '../runtime/internal'
 import { authorizeFilesDevtoolsRequest } from './auth'
-import { FILES_DEVTOOLS_MAX_UPLOAD_SIZE } from './snapshot'
+import { FILES_DEVTOOLS_MAX_UPLOAD_SIZE } from './paths'
 
 const readOperations = ['capabilities', 'list', 'exists', 'download'] as const satisfies readonly FilesOperation[]
 const writeOperations = [...readOperations, 'upload', 'delete'] as const satisfies readonly FilesOperation[]
@@ -27,22 +27,20 @@ const resolveFiles = (request: Request): Files => {
 }
 
 export const createFilesDevtoolsHandler = (write: boolean) => {
-    const handleFiles = createRouteHandler(
-        createFilesRouter({
-            files: resolveFiles,
-            operations: filesDevtoolsOperations(write),
-            maxUploadSize: FILES_DEVTOOLS_MAX_UPLOAD_SIZE,
-            secret: crypto.randomUUID(),
-        }),
-    )
-    return async (event: Parameters<typeof handleFiles>[0], secret: string): Promise<Response> => {
-        if (!(await authorizeFilesDevtoolsRequest(event.node.req, secret))) {
+    const router = createFilesRouter({
+        files: resolveFiles,
+        operations: filesDevtoolsOperations(write),
+        maxUploadSize: FILES_DEVTOOLS_MAX_UPLOAD_SIZE,
+        secret: crypto.randomUUID(),
+    })
+    return async (event: RequestEvent, secret: string): Promise<Response> => {
+        if (!(await authorizeFilesDevtoolsRequest(event.req, secret))) {
             return new Response(null, { status: 401 })
         }
-        const url = new URL(event.node.req.url ?? '/', 'http://nuxt-files-sdk.local')
-        if (event.node.req.method === 'GET' && url.searchParams.get('op') === 'devtools') {
+        const url = event.url
+        if (event.req.method === 'GET' && url.searchParams.get('op') === 'devtools') {
             return Response.json({ write, maxUploadSize: FILES_DEVTOOLS_MAX_UPLOAD_SIZE })
         }
-        return handleFiles(event)
+        return router.handle(event.req)
     }
 }
