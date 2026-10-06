@@ -273,9 +273,76 @@ export const closeOwnedProcess = async (
     const captured = new Set<number>()
     const depth = new Map<number, number>()
     const errors: string[] = []
+    const retired = new Set<number>()
+    let lastAlivePid: number | undefined
     const closed = () => child.exitCode !== null || child.signalCode !== null
     // The exact child's exit witness is stronger than a new probe of its reusable numeric PID.
-    const alive = (pid: number) => (pid === child.pid ? !closed() : ownedPidAlive(pid))
+    const alive = async (pid: number, deadline: number): Promise<boolean> => {
+        if (pid === child.pid) return !closed()
+        if (retired.has(pid)) return false
+        try {
+            const present = ownedPidAlive(pid)
+            if (!present) retired.add(pid)
+            return present
+        } catch (error) {
+            if (process.platform !== 'win32' || ((error as Error).cause as NodeJS.ErrnoException)?.code !== 'EPERM')
+                throw error
+            const origin = [captured.has(pid) && 'captured', options.reported?.has(pid) && 'reported']
+                .filter(Boolean)
+                .join('/')
+            const remaining = Math.min(5000, deadline - Date.now())
+            if (remaining <= 0)
+                throw new Error(`${String(error)} (${origin}; exit reconciliation budget exhausted)`, { cause: error })
+            try {
+                const rows: unknown = JSON.parse(
+                    await processUtility(
+                        'powershell.exe',
+                        [
+                            '-NoProfile',
+                            '-NonInteractive',
+                            '-Command',
+                            `ConvertTo-Json -InputObject @(Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId = ${pid}' -Property ProcessId -ErrorAction Stop | Select-Object ProcessId) -Compress`,
+                        ],
+                        cwd,
+                        remaining,
+                    ),
+                )
+                if (
+                    !Array.isArray(rows) ||
+                    rows.some(
+                        (row: unknown) =>
+                            !row || typeof row !== 'object' || !('ProcessId' in row) || row.ProcessId !== pid,
+                    )
+                )
+                    throw new Error('Invalid Windows process reconciliation result', { cause: error })
+                if (rows.length === 0) {
+                    // Successful absence is an exit witness. Never adopt a later reuse of this number.
+                    retired.add(pid)
+                    return false
+                }
+            } catch (reconciliationError) {
+                throw new Error(
+                    `${String(error)} (${origin}; exit reconciliation failed: ${String(reconciliationError)})`,
+                    {
+                        cause: reconciliationError,
+                    },
+                )
+            }
+            throw new Error(`${String(error)} (${origin}; Windows still reports this PID)`, { cause: error })
+        }
+    }
+    const anyAlive = async (deadline: number): Promise<boolean> => {
+        if (!closed()) {
+            lastAlivePid = child.pid
+            return true
+        }
+        for (const pid of owned)
+            if (await alive(pid, deadline)) {
+                lastAlivePid = pid
+                return true
+            }
+        return false
+    }
     if (child.pid) {
         owned.add(child.pid)
         captured.add(child.pid)
@@ -345,25 +412,33 @@ export const closeOwnedProcess = async (
         } else child.kill('SIGTERM')
     }
     const deadline = Date.now() + 20_000
-    while ((!closed() || [...owned].some(alive)) && Date.now() < deadline)
-        await new Promise((done) => setTimeout(done, 100))
-    if (!closed() || [...owned].some(alive)) {
-        errors.push('Native process shutdown exceeded its cleanup deadline')
+    while (Date.now() < deadline && (await anyAlive(deadline))) await new Promise((done) => setTimeout(done, 100))
+    if (await anyAlive(deadline)) {
+        errors.push(
+            `Native process shutdown exceeded its cleanup deadline (alive=${lastAlivePid}; root=${child.pid}, exit=${child.exitCode}, signal=${child.signalCode}; reported=${[...(options.reported ?? [])].join(',')}; captured=${[...captured].join(',')})`,
+        )
         if (process.platform === 'win32') {
             // The supervisor can exit before a descendant: use the pre-shutdown snapshot.
-            const survivors = [...captured].filter(alive).toSorted((a, b) => (depth.get(b) ?? 0) - (depth.get(a) ?? 0))
             const fallbackDeadline = Date.now() + 10_000
+            const survivors: number[] = []
+            for (const pid of captured) if (await alive(pid, fallbackDeadline)) survivors.push(pid)
+            survivors.sort((a, b) => (depth.get(b) ?? 0) - (depth.get(a) ?? 0))
             for (const pid of survivors) {
+                if (Date.now() >= fallbackDeadline) {
+                    errors.push('Scoped Windows fallback exceeded its total budget')
+                    break
+                }
+                if (!(await alive(pid, fallbackDeadline))) continue
                 const remaining = fallbackDeadline - Date.now()
                 if (remaining <= 0) {
                     errors.push('Scoped Windows fallback exceeded its total budget')
                     break
                 }
-                if (!alive(pid)) continue
                 try {
                     await processUtility('taskkill', ['/PID', String(pid), '/T', '/F'], cwd, remaining)
                 } catch (error) {
-                    if (alive(pid)) errors.push(`Scoped Windows fallback failed for ${pid}: ${String(error)}`)
+                    if (await alive(pid, fallbackDeadline))
+                        errors.push(`Scoped Windows fallback failed for ${pid}: ${String(error)}`)
                 }
             }
         } else if (child.pid) {
@@ -375,9 +450,9 @@ export const closeOwnedProcess = async (
         }
     }
     const forcedDeadline = Date.now() + 10_000
-    while ((!closed() || [...owned].some(alive)) && Date.now() < forcedDeadline)
+    while (Date.now() < forcedDeadline && (await anyAlive(forcedDeadline)))
         await new Promise((done) => setTimeout(done, 100))
-    if (!closed() || [...owned].some(alive)) errors.push('Captured owned processes survived bounded cleanup')
+    if (await anyAlive(forcedDeadline)) errors.push('Captured owned processes survived bounded cleanup')
     if (errors.length) throw new Error(errors.join('\n'))
 }
 

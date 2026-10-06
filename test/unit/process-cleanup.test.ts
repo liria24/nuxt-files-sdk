@@ -4,23 +4,27 @@ import { afterEach, expect, test, vi } from 'vite-plus/test'
 
 const utility = vi.hoisted(() => ({
     descendant: false,
+    reconciliationOutput: '[]',
+    reconciliationError: null as Error | null,
     exec: vi.fn<
         (
             command: string,
-            _args: string[],
+            args: string[],
             _options: unknown,
-            callback: (error: null, stdout: string, stderr: string) => void,
+            callback: (error: Error | null, stdout: string, stderr: string) => void,
         ) => void
-    >((command, _args, _options, callback) =>
-        callback(
-            null,
-            command === 'powershell.exe'
-                ? JSON.stringify(utility.descendant ? [{ ProcessId: 123456788, ParentProcessId: 123456789 }] : [])
-                : utility.descendant
-                  ? '123456788 123456789'
-                  : '',
-            '',
-        ),
+    >((command, args, _options, callback) =>
+        command === 'powershell.exe' && args.some((arg) => arg.includes('-Filter'))
+            ? callback(utility.reconciliationError, utility.reconciliationOutput, '')
+            : callback(
+                  null,
+                  command === 'powershell.exe'
+                      ? JSON.stringify(utility.descendant ? [{ ProcessId: 123456788, ParentProcessId: 123456789 }] : [])
+                      : utility.descendant
+                        ? '123456788 123456789'
+                        : '',
+                  '',
+              ),
     ),
 }))
 vi.mock('node:child_process', async (original) => ({
@@ -30,10 +34,16 @@ vi.mock('node:child_process', async (original) => ({
 
 import { closeOwnedProcess } from '../utils/fixture'
 
+const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+const initialExec = utility.exec.getMockImplementation()!
 afterEach(() => {
+    Object.defineProperty(process, 'platform', platform)
     vi.restoreAllMocks()
     utility.exec.mockClear()
+    utility.exec.mockImplementation(initialExec)
     utility.descendant = false
+    utility.reconciliationOutput = '[]'
+    utility.reconciliationError = null
 })
 
 const exitedChild = (exitCode: number | null, signalCode: NodeJS.Signals | null): ChildProcess => {
@@ -72,6 +82,7 @@ test.each(['captured', 'reported'] as const)(
             throw permissionError()
         })
         utility.descendant = ownership === 'captured'
+        utility.reconciliationOutput = JSON.stringify([{ ProcessId: 123456788 }])
         await expect(
             closeOwnedProcess(child, ownership === 'reported' ? { reported: new Set([123456788]) } : {}),
         ).rejects.toThrow('Owned PID 123456788 liveness probe failed: Error: kill EPERM')
@@ -86,4 +97,97 @@ test('[CLI-003] an exited root PID that has been reused is never targeted', asyn
     await closeOwnedProcess(child)
     expect(probe).not.toHaveBeenCalled()
     expect(kill).not.toHaveBeenCalled()
+})
+
+test('[CLI-003] an ESRCH exit witness permanently retires an owned PID', async () => {
+    const probe = vi
+        .spyOn(process, 'kill')
+        .mockImplementationOnce(() => {
+            throw Object.assign(new Error('exited'), { code: 'ESRCH' })
+        })
+        .mockReturnValue(true)
+    await closeOwnedProcess(exitedChild(0, null), { reported: new Set([123456788]) })
+    expect(probe).toHaveBeenCalledExactlyOnceWith(123456788, 0)
+    expect(utility.exec.mock.calls.some(([command]) => command === 'taskkill')).toBe(false)
+})
+
+const windows = () => Object.defineProperty(process, 'platform', { ...platform, value: 'win32' })
+const descendantPid = 123456788
+const reported = new Set([descendantPid])
+const reconciliationCalls = () =>
+    utility.exec.mock.calls.filter(
+        ([command, args]) => command === 'powershell.exe' && args.some((arg) => arg.includes('-Filter')),
+    )
+
+test.each(['captured', 'reported'] as const)(
+    '[CLI-003] Windows confirms an inaccessible %s PID has exited before retiring it',
+    async (ownership) => {
+        windows()
+        utility.descendant = ownership === 'captured'
+        const probe = vi.spyOn(process, 'kill').mockImplementation(() => {
+            throw permissionError()
+        })
+        await closeOwnedProcess(exitedChild(0, null), ownership === 'reported' ? { reported } : {})
+        expect(probe).toHaveBeenCalledExactlyOnceWith(descendantPid, 0)
+        expect(reconciliationCalls()).toHaveLength(1)
+        expect(utility.exec.mock.calls.some(([command]) => command === 'taskkill')).toBe(false)
+    },
+)
+
+test.each(['captured', 'reported'] as const)(
+    '[CLI-003] Windows preserves a genuine inaccessible %s PID failure',
+    async (ownership) => {
+        windows()
+        utility.descendant = ownership === 'captured'
+        utility.reconciliationOutput = JSON.stringify([{ ProcessId: descendantPid }])
+        vi.spyOn(process, 'kill').mockImplementation(() => {
+            throw permissionError()
+        })
+        await expect(
+            closeOwnedProcess(exitedChild(0, null), ownership === 'reported' ? { reported } : {}),
+        ).rejects.toThrow('Windows still reports this PID')
+        expect(reconciliationCalls()).toHaveLength(1)
+        expect(utility.exec.mock.calls.some(([command]) => command === 'taskkill')).toBe(false)
+    },
+)
+
+test.each(['not-json', 'null', '[{"ProcessId":999}]'])(
+    '[CLI-003] malformed Windows exit evidence cannot hide a permission failure: %s',
+    async (output) => {
+        windows()
+        utility.reconciliationOutput = output
+        vi.spyOn(process, 'kill').mockImplementation(() => {
+            throw permissionError()
+        })
+        await expect(closeOwnedProcess(exitedChild(0, null), { reported })).rejects.toThrow(
+            'exit reconciliation failed',
+        )
+    },
+)
+
+test('[CLI-003] a failed Windows query cannot hide a permission failure', async () => {
+    windows()
+    utility.reconciliationError = new Error('CIM query denied')
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+        throw permissionError()
+    })
+    await expect(closeOwnedProcess(exitedChild(0, null), { reported })).rejects.toThrow('CIM query denied')
+})
+
+test('[CLI-003] a retired Windows PID is never re-adopted when the number reappears', async () => {
+    windows()
+    const probe = vi.spyOn(process, 'kill').mockImplementation(() => {
+        throw permissionError()
+    })
+    const exec = utility.exec.getMockImplementation()!
+    utility.exec.mockImplementation((command, args, options, callback) => {
+        exec(command, args, options, callback)
+        if (args.some((arg) => arg.includes('-Filter')))
+            utility.reconciliationOutput = JSON.stringify([{ ProcessId: descendantPid }])
+    })
+    await closeOwnedProcess(exitedChild(0, null), { reported })
+    expect(probe).toHaveBeenCalledExactlyOnceWith(descendantPid, 0)
+    expect(reconciliationCalls()).toHaveLength(1)
+    expect(utility.exec.mock.calls.some(([command]) => command === 'taskkill')).toBe(false)
+    utility.exec.mockImplementation(exec)
 })
