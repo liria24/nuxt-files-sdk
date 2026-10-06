@@ -1,7 +1,7 @@
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 
 import { cleanFixture, fixtureDirectory, installFixture, startFixtureServer } from '../utils/fixture'
 import { nuxtLifecycleModule } from '../utils/nuxt-lifecycle'

@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 import { $fetch, setup, url, useTestContext } from '@nuxt/test-utils/e2e'
 import { createFilesClient } from 'files-sdk/client'
-import { afterAll, describe, expect, test, vi } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vite-plus/test'
 
 import type { FilesDevtoolsSnapshot } from '../../packages/nuxt-files-sdk/src/devtools/snapshot'
 import { cleanFixture, fixtureDirectory, installFixture } from '../utils/fixture'

@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 
 import { stopNitroDevReloadOnClose } from '../../packages/nuxt-files-sdk/src/integration/nitro-dev-close'
 

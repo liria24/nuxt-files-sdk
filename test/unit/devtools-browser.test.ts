@@ -1,6 +1,6 @@
 import type { AdapterCapabilities } from 'files-sdk'
 import type { FilesClient } from 'files-sdk/client'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 
 import { FilesBrowser } from '../../packages/nuxt-files-sdk/src/devtools/client/browser'
 

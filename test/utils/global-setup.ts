@@ -1,4 +1,4 @@
-import type { TestProject } from 'vitest/node'
+import type { TestProject } from 'vite-plus/test/node'
 
 import { runCommand } from './fixture'
 

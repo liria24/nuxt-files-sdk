@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { afterAll, expect, test, vi } from 'vitest'
+import { afterAll, expect, test, vi } from 'vite-plus/test'
 
 import {
     registerSdkAliases,

@@ -1,5 +1,5 @@
 import { memory } from 'files-sdk/memory'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 
 import type { FilesConfig, StorageConfig } from '../../packages/nuxt-files-sdk/src/config'
 import { selectedAdapters } from '../../packages/nuxt-files-sdk/src/config/prepare'

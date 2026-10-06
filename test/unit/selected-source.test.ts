@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 
 import { inlineNuxtRuntime, selectedSourcePlugin } from '../../packages/nuxt-files-sdk/src/integration/nitro'
 

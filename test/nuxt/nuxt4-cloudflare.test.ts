@@ -1,7 +1,7 @@
 import { readdir, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 
 import { fixtureDirectory, installFixture, readOutput, runCommand } from '../utils/fixture'
 

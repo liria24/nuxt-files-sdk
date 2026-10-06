@@ -1,6 +1,6 @@
 import { memory } from 'files-sdk/memory'
 import { listEnvVars } from 'files-sdk/providers'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 
 import { withNuxtEnvironment } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 import { FilesRegistry } from '../../packages/nuxt-files-sdk/src/runtime/registry'

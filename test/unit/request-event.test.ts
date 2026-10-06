@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 
 import { nitroRequestEvent, nitroResponse } from '../../packages/nuxt-files-sdk/src/integration/nitro-event'
 

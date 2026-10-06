@@ -2,7 +2,7 @@
     "extends": "../tsconfig.json",
     "compilerOptions": {
         "lib": ["ES2024", "DOM"],
-        "types": ["node", "vitest/globals"]
+        "types": ["node", "vite-plus/test/globals"]
     },
     "include": ["**/*.ts"],
     "exclude": ["fixtures"]

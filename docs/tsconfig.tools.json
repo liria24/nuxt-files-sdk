@@ -1,0 +1,9 @@
+{
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "composite": true,
+        "tsBuildInfoFile": "./.nuxt/files-config.tsbuildinfo",
+        "types": ["node"]
+    },
+    "include": ["files.config.ts", "typecheck.ts", "types/files-config.d.ts"]
+}

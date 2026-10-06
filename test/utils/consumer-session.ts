@@ -1,4 +1,4 @@
-import type { TestContext } from 'vitest'
+import type { TestContext } from 'vite-plus/test'
 
 export interface ConsumerSession {
     signal: AbortSignal

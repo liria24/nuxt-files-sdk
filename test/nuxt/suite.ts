@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 
 import { $fetch, setup, url } from '@nuxt/test-utils/e2e'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 
 import { cleanFixture, installFixture } from '../utils/fixture'
 import { assertGatewayListing } from '../utils/gateway'

@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 
 const command = vi.hoisted(() =>
     vi.fn<(...args: unknown[]) => Promise<string>>(async () => 'pnpm add "@aws-sdk/client-s3@^3"'),

@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 import { parse } from 'yaml'
 
 import { contracts } from '../contracts'
@@ -101,7 +101,7 @@ test('[REL-002] mandatory jobs and the release artifact fail closed', async () =
         'workflows/release.yml',
     ]) {
         expect(await readFile(resolve(repositoryRoot, '.github', path), 'utf8'), path).toContain(
-            'bun-version-file: package.json',
+            'version-file: package.json',
         )
     }
     const release = await readFile(resolve(repositoryRoot, '.github/workflows/release.yml'), 'utf8')

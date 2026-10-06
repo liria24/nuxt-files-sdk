@@ -1,6 +1,6 @@
 import { ChildProcess } from 'node:child_process'
 
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vite-plus/test'
 
 const utility = vi.hoisted(() => ({
     descendant: false,

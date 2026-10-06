@@ -4,7 +4,7 @@ import type { MemoryAdapter } from 'files-sdk/memory'
 import type { R2Adapter } from 'files-sdk/r2'
 import type { RustfsAdapter } from 'files-sdk/rustfs'
 import { versioning } from 'files-sdk/versioning'
-import { describe, expect, expectTypeOf, test } from 'vitest'
+import { describe, expect, expectTypeOf, test } from 'vite-plus/test'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
 import {

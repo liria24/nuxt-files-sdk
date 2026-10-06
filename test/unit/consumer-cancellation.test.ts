@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
-import { expect, test, vi, type TestContext } from 'vitest'
+import { expect, test, vi, type TestContext } from 'vite-plus/test'
 
 import { withConsumerSession } from '../utils/consumer-session'
 import { closeOwnedProcess, runCommand, startFixtureServer } from '../utils/fixture'

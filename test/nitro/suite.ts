@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test } from 'vite-plus/test'
 
 import { fixtureDirectory, readOutput, runCommand, runFixture, startFixtureServer } from '../utils/fixture'
 import { assertGatewayListing, postGateway } from '../utils/gateway'

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 
 import type { DependencyRequirement } from '../../packages/nuxt-files-sdk/src/integration/dependencies'
 import { diagnoseDependencies, reportDependencyIssues } from '../../packages/nuxt-files-sdk/src/integration/diagnostics'

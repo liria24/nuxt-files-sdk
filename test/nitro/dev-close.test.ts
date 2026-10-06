@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 
 import { resolvePackage } from '../../packages/nuxt-files-sdk/src/integration/resolve'
 import { fixtureDirectory, installFixture, repositoryRoot, runCommand } from '../utils/fixture'

@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 
-import { beforeAll, describe, expect, test } from 'vitest'
+import { beforeAll, describe, expect, test } from 'vite-plus/test'
 
 import { directorySize, fixtureDirectory, outputPaths, readOutput, runFixture, unusedPlugins } from '../utils/fixture'
 

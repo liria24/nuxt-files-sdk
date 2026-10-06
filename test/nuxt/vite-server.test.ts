@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 
 import { cleanFixture, fixtureDirectory, runCommand, runFixture, startFixtureServer } from '../utils/fixture'
 

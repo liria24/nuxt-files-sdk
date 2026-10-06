@@ -3,7 +3,7 @@
 ## Sources of truth
 
 - Package/tool versions and compatibility ranges belong in `package.json`, package and fixture manifests, lockfiles, and `.github/workflows/ci.yml`, not prose. CI reads Bun from the root `packageManager` field.
-- Run `bun run test`, not `bun test`: the former selects this repository's Vitest projects; the latter invokes Bun's separate test runner.
+- Vite+ owns formatting, linting, tests and package builds through `vite.config.ts`. Run `bun run test` or `vp run test`, never `bun test`: package scripts select the configured Vite+ projects. Native Nuxt/Nitro fixture commands remain unchanged.
 - Tests stay under `test/`. `test/contracts.ts` owns the contract ID, guarantee, test source, and blocking-job mapping. Keep IDs on executable tests or negative compilation cases; the unit project checks registration and CI coverage.
 - For verification and release readiness, use `.agents/skills/verify-release/SKILL.md`. Keep durable repository constraints here and reproducible procedures in that skill, without duplicating reports under `docs/`.
 - Canonical public examples live in `test/fixtures/nuxt4/`; generated-type tests compile them both locally and in a packed consumer. Keep `docs/content/` examples aligned with those fixtures and the current source types. README prose is not a test input; keep it as a short entry point to the web documentation.

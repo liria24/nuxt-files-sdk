@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 import { memory } from 'files-sdk/memory'
-import { afterAll, describe, expect, test, vi } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vite-plus/test'
 
 import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
 import { gatewayRoutes, providerCode, selectedAdapters } from '../../packages/nuxt-files-sdk/src/config/prepare'

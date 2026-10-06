@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 
 import { gatewayRoutes } from '../../packages/nuxt-files-sdk/src/config/prepare'
 import { configSources } from '../../packages/nuxt-files-sdk/src/integration/imports'

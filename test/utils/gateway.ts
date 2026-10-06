@@ -1,4 +1,4 @@
-import { expect } from 'vitest'
+import { expect } from 'vite-plus/test'
 
 export const postGateway = (url: string, body: object, user?: string, signal?: AbortSignal) =>
     fetch(url, {

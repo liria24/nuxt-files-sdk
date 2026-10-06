@@ -1,0 +1,94 @@
+import { readFile } from 'node:fs/promises'
+
+import { defineConfig } from 'vite-plus'
+
+import { moduleMeta } from './src/meta.ts'
+
+const manifest: { version: string } = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'))
+
+export default defineConfig({
+    pack: [
+        {
+            attw: { level: 'error', profile: 'esm-only' },
+            clean: true,
+            copy: [
+                { from: 'src/devtools/client/index.html', to: 'dist/devtools/client' },
+                { from: '../../README.md', to: '.' },
+            ],
+            deps: {
+                dts: { neverBundle: true },
+                neverBundle: true,
+                onlyImport: [
+                    '@nuxt/kit',
+                    '@nuxt/schema',
+                    '@nuxt/devtools-kit',
+                    'c12',
+                    'devframe',
+                    'exsolve',
+                    'files-sdk',
+                    'h3',
+                    'jiti',
+                    'local-pkg',
+                    'oxc-parser',
+                    'resolve.exports',
+                    'verkit',
+                    'node:crypto',
+                    'node:fs',
+                    'node:fs/promises',
+                    'node:module',
+                    'node:path',
+                    'node:url',
+                ],
+            },
+            dts: true,
+            entry: {
+                config: 'src/config.ts',
+                module: 'src/module.ts',
+                nitro: 'src/nitro.ts',
+                runtime: 'src/runtime.ts',
+                'integration/nitro-event': 'src/integration/nitro-event.ts',
+                'runtime/internal': 'src/runtime/internal.ts',
+                'runtime/development': 'src/runtime/development.ts',
+                'runtime/gateway-secret': 'src/runtime/gateway-secret.ts',
+                'config/merge': 'src/config/merge.ts',
+                'devtools/files-read': 'src/devtools/files-read.ts',
+                'devtools/files-write': 'src/devtools/files-write.ts',
+                'devtools/nuxt-v3-handler': 'src/devtools/nuxt-v3-handler.ts',
+                'devtools/snapshot': 'src/devtools/snapshot.ts',
+                'devtools/token': 'src/devtools/token.ts',
+            },
+            exports: false,
+            format: ['esm'],
+            platform: 'neutral',
+            publint: true,
+            sourcemap: false,
+            unbundle: true,
+            plugins: [
+                {
+                    name: 'nuxt-module-metadata',
+                    generateBundle() {
+                        this.emitFile({
+                            type: 'asset',
+                            fileName: 'module.json',
+                            source: JSON.stringify({ ...moduleMeta, version: manifest.version }, null, 2) + '\n',
+                        })
+                    },
+                },
+            ],
+        },
+        {
+            clean: false,
+            deps: {
+                alwaysBundle: [/^(?:birpc|devframe|files-sdk|nostics|p-map|ufo)(?:\/|$)/u],
+                onlyBundle: [/^(?:birpc|devframe|files-sdk|nostics|p-map|ufo)(?:\/|$)/u],
+            },
+            dts: false,
+            entry: { app: 'src/devtools/client/app.ts' },
+            format: ['esm'],
+            minify: true,
+            outDir: 'dist/devtools/client',
+            platform: 'browser',
+            sourcemap: false,
+        },
+    ],
+})

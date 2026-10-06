@@ -1,5 +1,5 @@
 import type { Nuxt } from '@nuxt/schema'
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vite-plus/test'
 
 import { verifyFilesDevtoolsToken } from '../../packages/nuxt-files-sdk/src/devtools/auth'
 import { createFilesDevframe } from '../../packages/nuxt-files-sdk/src/devtools/devframe'

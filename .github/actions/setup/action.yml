@@ -1,11 +1,12 @@
 name: Setup workspace
-description: Install the pinned Node/Bun toolchain and dependencies
+description: Install the pinned Node/Bun/Vite+ toolchain and dependencies
 runs:
     using: composite
     steps:
-        - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-          with: { node-version: 24 }
-        - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-          with: { bun-version-file: package.json }
+        - uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
+          with:
+              version-file: package.json
+              node-version: 24
+              run-install: false
         - shell: bash
-          run: bun ci
+          run: vp install --frozen-lockfile

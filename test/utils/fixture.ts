@@ -86,7 +86,7 @@ export const runCommand = (
 let packageBuild: Promise<string> | undefined
 
 export const buildPackage = async (): Promise<string> => {
-    if (process.env.VITEST && (await import('vitest')).inject('filesPackageBuilt')) return ''
+    if (process.env.VITEST && (await import('vite-plus/test')).inject('filesPackageBuilt')) return ''
     return (packageBuild ??= runCommand('bun', ['run', 'build']))
 }
 

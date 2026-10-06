@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, test } from 'vitest'
+import { afterAll, beforeAll, expect, test } from 'vite-plus/test'
 
 import { invalidTypeCases } from '../types/invalid/cases'
 import { cleanFixture, fixtureDirectory, runFixture } from '../utils/fixture'

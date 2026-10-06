@@ -1,6 +1,6 @@
 import { FilesError } from 'files-sdk'
 import { fs } from 'files-sdk/fs'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vite-plus/test'
 
 import { FilesRegistry } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 
 import { fixtureDirectory, readOutput, unusedPlugins } from '../utils/fixture'
 import { nitroSuite } from './suite'

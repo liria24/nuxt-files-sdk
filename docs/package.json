@@ -28,7 +28,7 @@
         "nuxt": "^4.6.0",
         "nuxt-files-sdk": "workspace:*",
         "nuxt-llms": "https://pkg.pr.new/nuxt-content/nuxt-llms/nuxt-llms@f6a9730",
-        "nuxt-og-image": "^6.9.1",
+        "nuxt-og-image": "^6.10.3",
         "rangi": "^2.2.0",
         "tailwindcss": "^4.3.3",
         "ufo": "^1.6.4",
@@ -37,7 +37,7 @@
     "devDependencies": {
         "nuxtseo-layer-devtools": "^5.3.16",
         "typescript6": "npm:typescript@6.0.3",
-        "vue-tsc": "^3.3.11",
-        "wrangler": "^4.143.0"
+        "vue-tsc": "^3.3.12",
+        "wrangler": "^4.147.0"
     }
 }

@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
-import { afterAll, expect, test } from 'vitest'
+import { afterAll, expect, test } from 'vite-plus/test'
 
 import { loadFilesConfig } from '../../packages/nuxt-files-sdk/src/config/load'
 import { mergeFilesConfig } from '../../packages/nuxt-files-sdk/src/config/merge'

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vite-plus/test'
 
 import { createFilesConfigEvaluator } from '../../packages/nuxt-files-sdk/src/config/evaluate'
 import { loadFilesConfig } from '../../packages/nuxt-files-sdk/src/config/load'

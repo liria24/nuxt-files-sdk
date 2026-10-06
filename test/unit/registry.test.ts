@@ -7,7 +7,7 @@ import { fs } from 'files-sdk/fs'
 import { memory } from 'files-sdk/memory'
 import { tiering } from 'files-sdk/tiering'
 import { versioning } from 'files-sdk/versioning'
-import { afterAll, describe, expect, test, vi } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vite-plus/test'
 
 import { defineFilesConfig, type FilesPluginContext } from '../../packages/nuxt-files-sdk/src/config'
 import { syncFiles, transferFiles, useServerFiles } from '../../packages/nuxt-files-sdk/src/runtime'

@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-import { expect, test } from 'vitest'
+import { expect, test } from 'vite-plus/test'
 
 import { docsCacheHeaders } from '../../docs/server/utils/cache-policy'
 import {

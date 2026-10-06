@@ -1,5 +1,5 @@
 import { PROVIDER_NAMES } from 'files-sdk/providers'
-import { expect, test, vi } from 'vitest'
+import { expect, test, vi } from 'vite-plus/test'
 
 import { deploymentTarget, storageDependencies } from '../../packages/nuxt-files-sdk/src/integration/dependencies'
 import { subpathDependencies } from '../../packages/nuxt-files-sdk/src/integration/imports'
