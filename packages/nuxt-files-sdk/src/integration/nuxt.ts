@@ -12,6 +12,7 @@ import { deploymentTarget, storageDependencies } from './dependencies'
 import { dependencySession, diagnoseDependencies } from './diagnostics'
 import { configSources, subpathDependencies } from './imports'
 import { storageTypes, wireNuxtNitroOptions } from './nitro'
+import { stopNitroDevReloadOnClose } from './nitro-dev-close'
 import { reportNuxtDependencyIssues } from './nuxt-diagnostics'
 import { registerSdkAliases, resolveOwnedSdk, resolvePackage, sdkTypePaths } from './resolve'
 import { withFilesTask } from './terminal'
@@ -120,6 +121,8 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     if (!prepared) return false
 
     const major = resolveServerVariant({ nitro2: 2, nitro3: 3, nuxt: 0 }) ?? 0
+    // This observes native development shutdown; Registry initialization stays in generated runtime imports.
+    if (nuxt.options.dev && major === 2) nuxt.hook('nitro:init', stopNitroDevReloadOnClose)
     const capabilities = filesBuilderCapabilities(major === 2 ? 'nitro2' : major === 3 ? 'nitro3' : 'nuxt')
     requireFilesGateway(prepared.routes.length > 0, capabilities.gateway)
     const mode = nuxt.options.dev ? '.dev' : ''

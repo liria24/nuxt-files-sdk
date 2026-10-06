@@ -7,7 +7,7 @@ import { expect } from 'vitest'
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from 'vscode-jsonrpc/node'
 
 import { invalidTypeCases } from '../types/invalid/cases'
-import { repositoryRoot, runCommand } from './fixture'
+import { closeOwnedProcess, repositoryRoot, runCommand } from './fixture'
 
 export const cleanTypeContracts = async (directory: string): Promise<void> => {
     invalidTypeRuns.delete(directory)
@@ -138,9 +138,12 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
     const child = spawn(
         process.execPath,
         [resolve(repositoryRoot, 'node_modules/typescript/bin/tsc'), '--lsp', '--stdio'],
-        { cwd: docsDirectory, stdio: ['pipe', 'pipe', 'pipe'] },
+        { cwd: docsDirectory, detached: process.platform !== 'win32', stdio: ['pipe', 'pipe', 'pipe'] },
     )
+    const closed = Promise.withResolvers<void>()
+    child.once('close', () => closed.resolve())
     let stderr = ''
+    const messages: string[] = []
     child.stderr.on('data', (chunk) => (stderr += chunk))
     const connection = createMessageConnection(
         new StreamMessageReader(child.stdout),
@@ -148,6 +151,11 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
     )
     const registration = Promise.withResolvers<void>()
     const registrationTimer = setTimeout(() => registration.resolve(), 5_000)
+    connection.onNotification('window/logMessage', (message: { type: number; message: string }) => {
+        messages.push(`${message.type}: ${message.message.slice(0, 2000)}`)
+        if (messages.length > 20) messages.shift()
+    })
+    connection.onError(([error]) => messages.push(`JSON-RPC: ${error.message}`))
     connection.onRequest((method) => {
         if (method === 'client/registerCapability') registration.resolve()
         return null
@@ -162,7 +170,12 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
                 params === undefined ? connection.sendRequest<T>(method) : connection.sendRequest<T>(method, params),
                 new Promise<never>((_, reject) => {
                     timer = setTimeout(
-                        () => reject(new Error(`TypeScript language server timed out handling ${method}.\n${stderr}`)),
+                        () =>
+                            reject(
+                                new Error(
+                                    `TypeScript language server timed out handling ${method} (exit=${String(child.exitCode)}, signal=${String(child.signalCode)}).\n${stderr}\n${messages.join('\n')}`,
+                                ),
+                            ),
                         30_000,
                     )
                 }),
@@ -171,11 +184,14 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             clearTimeout(timer)
         }
     }
+    let failure: unknown
+    let naturallyClosed = false
     try {
         await request('initialize', {
             processId: process.pid,
             rootUri: pathToFileURL(docsDirectory).href,
             capabilities: { textDocument: { hover: { contentFormat: ['markdown', 'plaintext'] } } },
+            initializationOptions: { disablePushDiagnostics: true },
         })
         await connection.sendNotification('initialized', {})
         await registration.promise
@@ -209,24 +225,38 @@ export const checkHoverDocumentation = async (directory: string): Promise<void> 
             expect(documentation, marker).toContain('```')
             expect(documentation.replace(/```[\s\S]*?```/gu, '').trim().length, marker).toBeGreaterThan(0)
         }
-        await request('shutdown')
+        await connection.sendNotification('textDocument/didClose', { textDocument: { uri } })
+        expect(await request<null>('shutdown')).toBeNull()
         await connection.sendNotification('exit')
-        child.stdin.end()
-        if (child.exitCode === null) {
-            await new Promise<void>((resolveExit) => {
-                const timer = setTimeout(() => {
-                    child.kill()
-                    resolveExit()
-                }, 5_000)
-                child.once('exit', () => {
-                    clearTimeout(timer)
-                    resolveExit()
-                })
-            })
+        let closeTimer: ReturnType<typeof setTimeout> | undefined
+        try {
+            await Promise.race([
+                closed.promise,
+                new Promise<never>((_, reject) => {
+                    closeTimer = setTimeout(
+                        () => reject(new Error('TypeScript language server did not close after exit.')),
+                        5_000,
+                    )
+                }),
+            ])
+        } finally {
+            clearTimeout(closeTimer)
         }
+        naturallyClosed = true
+    } catch (error) {
+        failure = error
     } finally {
         clearTimeout(registrationTimer)
+        try {
+            // Windows's public Node shim owns a native compiler child; capture it before terminating the shim.
+            if (!naturallyClosed) await closeOwnedProcess(child, { cwd: docsDirectory })
+        } catch (error) {
+            failure = failure
+                ? new AggregateError([failure, error], 'TypeScript hover validation and cleanup failed.')
+                : error
+        }
         connection.dispose()
-        if (child.exitCode === null) child.kill()
+        child.stdin.end()
     }
+    if (failure) throw failure
 }

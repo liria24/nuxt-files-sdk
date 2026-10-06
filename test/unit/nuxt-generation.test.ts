@@ -35,8 +35,10 @@ vi.mock('@nuxt/kit', () => ({
 import { setupNuxtFilesIntegration } from '../../packages/nuxt-files-sdk/src/integration/nuxt'
 
 const directories: string[] = []
+const closers: (() => unknown)[] = []
 const typeConfig = () => ({ include: [] as string[], compilerOptions: { paths: {} as Record<string, string[]> } })
 afterEach(async () => {
+    for (const close of closers.splice(0)) await close()
     await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
     kit.templates.clear()
     kit.handlers.length = 0
@@ -44,7 +46,7 @@ afterEach(async () => {
     kit.startTask.mockClear()
 })
 
-const setup = async (source: string, major = 2) => {
+const setup = async (source: string, major = 2, development = false) => {
     const root = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-nuxt-generation-'))
     directories.push(root)
     kit.directory = resolve(root, '.nuxt')
@@ -58,13 +60,15 @@ const setup = async (source: string, major = 2) => {
             workspaceDir: root,
             buildDir: kit.directory,
             alias: {},
-            dev: false,
-            envName: 'production',
+            dev: development,
+            envName: development ? 'development' : 'production',
             nitro: {},
         },
         hook: (name: string, callback: (...args: any[]) => unknown) => hooks.set(name, callback),
     } as unknown as Nuxt
     const active = await setupNuxtFilesIntegration(nuxt, { configPath })
+    const close = hooks.get('close')
+    if (close) closers.push(close)
     return { active, nuxt, hooks, configPath }
 }
 
@@ -102,6 +106,14 @@ test('Nuxt generates one shared lazy registry graph without Nitro startup initia
     hooks.get('nitro:config')!(config)
     expect(config.plugins).toEqual([])
     expect(config.alias?.['nuxt-files-sdk/runtime']).toBe(nuxt.options.alias['nuxt-files-sdk/runtime'])
+})
+
+test.each([0, 2, 3])('development server %s wires only the native Nitro 2 shutdown guard', async (major) => {
+    const { hooks } = await setup("export default { storage: { adapter: 'memory' } }", major, true)
+    expect(hooks.has('nitro:init')).toBe(major === 2)
+    expect(kit.templates.has('nuxt-files-sdk/plugin.dev.mjs')).toBe(false)
+    const registry = await kit.templates.get('nuxt-files-sdk/registry.dev.mjs')!.getContents()
+    expect(registry).toContain('configureFiles(config,')
 })
 
 test('Nuxt public type generation contributes to server, app, shared and node programs', async () => {
