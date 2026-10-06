@@ -294,7 +294,8 @@ export const checkHoverDocumentation = async (
             expect(documentation, marker).toContain('```')
             expect(documentation.replace(/```[\s\S]*?```/gu, '').trim().length, marker).toBeGreaterThan(0)
         }
-        await notify('textDocument/didClose', { textDocument: { uri } })
+        // Let shutdown close the test buffer and session together. A separate didClose
+        // schedules a snapshot update that can overlap Windows native-watcher teardown.
         expect(await request<null>('shutdown')).toBeNull()
         await notify('exit')
         let closeTimer: ReturnType<typeof setTimeout> | undefined
