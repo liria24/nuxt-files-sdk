@@ -243,7 +243,7 @@ const ownedPidAlive = (pid: number): boolean => {
         return true
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
-        throw error
+        throw new Error(`Owned PID ${pid} liveness probe failed: ${String(error)}`, { cause: error })
     }
 }
 
@@ -258,6 +258,8 @@ export const closeOwnedProcess = async (
     const depth = new Map<number, number>()
     const errors: string[] = []
     const closed = () => child.exitCode !== null || child.signalCode !== null
+    // The exact child's exit witness is stronger than a new probe of its reusable numeric PID.
+    const alive = (pid: number) => (pid === child.pid ? !closed() : ownedPidAlive(pid))
     if (child.pid) {
         owned.add(child.pid)
         captured.add(child.pid)
@@ -327,15 +329,13 @@ export const closeOwnedProcess = async (
         } else child.kill('SIGTERM')
     }
     const deadline = Date.now() + 20_000
-    while ((!closed() || [...owned].some(ownedPidAlive)) && Date.now() < deadline)
+    while ((!closed() || [...owned].some(alive)) && Date.now() < deadline)
         await new Promise((done) => setTimeout(done, 100))
-    if (!closed() || [...owned].some(ownedPidAlive)) {
+    if (!closed() || [...owned].some(alive)) {
         errors.push('Native process shutdown exceeded its cleanup deadline')
         if (process.platform === 'win32') {
             // The supervisor can exit before a descendant: use the pre-shutdown snapshot.
-            const survivors = [...captured]
-                .filter(ownedPidAlive)
-                .toSorted((a, b) => (depth.get(b) ?? 0) - (depth.get(a) ?? 0))
+            const survivors = [...captured].filter(alive).toSorted((a, b) => (depth.get(b) ?? 0) - (depth.get(a) ?? 0))
             const fallbackDeadline = Date.now() + 10_000
             for (const pid of survivors) {
                 const remaining = fallbackDeadline - Date.now()
@@ -343,11 +343,11 @@ export const closeOwnedProcess = async (
                     errors.push('Scoped Windows fallback exceeded its total budget')
                     break
                 }
-                if (!ownedPidAlive(pid)) continue
+                if (!alive(pid)) continue
                 try {
                     await processUtility('taskkill', ['/PID', String(pid), '/T', '/F'], cwd, remaining)
                 } catch (error) {
-                    if (ownedPidAlive(pid)) errors.push(`Scoped Windows fallback failed for ${pid}: ${String(error)}`)
+                    if (alive(pid)) errors.push(`Scoped Windows fallback failed for ${pid}: ${String(error)}`)
                 }
             }
         } else if (child.pid) {
@@ -359,9 +359,9 @@ export const closeOwnedProcess = async (
         }
     }
     const forcedDeadline = Date.now() + 10_000
-    while ((!closed() || [...owned].some(ownedPidAlive)) && Date.now() < forcedDeadline)
+    while ((!closed() || [...owned].some(alive)) && Date.now() < forcedDeadline)
         await new Promise((done) => setTimeout(done, 100))
-    if (!closed() || [...owned].some(ownedPidAlive)) errors.push('Captured owned processes survived bounded cleanup')
+    if (!closed() || [...owned].some(alive)) errors.push('Captured owned processes survived bounded cleanup')
     if (errors.length) throw new Error(errors.join('\n'))
 }
 
