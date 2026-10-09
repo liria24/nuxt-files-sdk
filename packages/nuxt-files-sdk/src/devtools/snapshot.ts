@@ -1,4 +1,5 @@
 import type { RequestEvent } from '@nuxt/schema'
+import type { AdapterCapabilities } from 'files-sdk'
 
 import type { DependencyDiagnostic } from '../integration/diagnostics'
 import { inspectFiles } from '../runtime/internal'
@@ -11,6 +12,7 @@ export interface FilesDevtoolsSnapshot {
         adapter: string
         plugins: string[]
         initialized: boolean
+        capabilities?: AdapterCapabilities
     }>
     diagnostics: FilesDevtoolsDiagnostic[]
     dependencies: DependencyDiagnostic[]

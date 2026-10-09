@@ -86,7 +86,7 @@ describe('Nuxt DevTools integration', () => {
         expect(filesDevtoolsWriteEnabled({ write: false })).toBe(false)
         expect(filesDevtoolsWriteEnabled({ enabled: false })).toBe(false)
         expect(filesDevtoolsWriteEnabled(false)).toBe(false)
-        expect(filesDevtoolsOperations(false)).toEqual(['capabilities', 'list', 'exists', 'download'])
+        expect(filesDevtoolsOperations(false)).toEqual(['capabilities', 'list', 'head', 'exists', 'download'])
         expect(filesDevtoolsOperations(false)).not.toContain('upload')
         expect(filesDevtoolsOperations(false)).not.toContain('delete')
     })

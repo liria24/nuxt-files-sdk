@@ -111,7 +111,10 @@ test('Nuxt generates one shared lazy registry graph without Nitro startup initia
     expect(handler).toContain("from 'nuxt-files-sdk/runtime'")
     expect(handler).toContain('router.handle(event.req)')
     expect(kit.handlers).toEqual([
-        { route: '/files', handler: { nuxt: kit.templates.get('nuxt-files-sdk/gateway-0.mjs')!.dst } },
+        {
+            route: '/files',
+            handler: { nuxt: kit.templates.get('nuxt-files-sdk/gateway-0.mjs')!.dst.replaceAll('\\', '/') },
+        },
     ])
     const config: { plugins: string[]; alias?: Record<string, string> } = { plugins: [] }
     hooks.get('nitro:config')!(config)
@@ -240,7 +243,7 @@ test('Nuxt public type generation contributes to server, app, shared and node pr
     }
     hooks.get('prepare:types')!(payload)
     expect(payload.serverReferences).toHaveLength(1)
-    expect(payload.serverTsConfig.include).toContain(configPath)
+    expect(payload.serverTsConfig.include).toContain(configPath.replaceAll('\\', '/'))
     expect(payload.serverTsConfig.compilerOptions.paths['#files-sdk']).toBeDefined()
     expect(payload.serverTsConfig.compilerOptions.paths['files-sdk']).toBeUndefined()
     expect(payload.serverTsConfig.compilerOptions.paths['nuxt-files-sdk/runtime']?.[0]).toMatch(/runtime\.d\.ts$/u)

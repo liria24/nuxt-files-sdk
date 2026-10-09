@@ -1,5 +1,5 @@
 import { connectDevframe } from 'devframe/client'
-import type { StoredFile } from 'files-sdk'
+import type { AdapterCapabilities, FileInfo } from 'files-sdk'
 import { createFilesClient } from 'files-sdk/client'
 
 import { isFilesDevtoolsDiagnostic, type FilesDevtoolsFailure } from '../diagnostics'
@@ -60,7 +60,8 @@ const isSnapshot = (value: unknown): value is Snapshot =>
             typeof item.adapter === 'string' &&
             Array.isArray(item.plugins) &&
             item.plugins.every((plugin) => typeof plugin === 'string') &&
-            typeof item.initialized === 'boolean',
+            typeof item.initialized === 'boolean' &&
+            (item.capabilities === undefined || isRecord(item.capabilities)),
     ) &&
     Array.isArray(value.dependencies) &&
     value.dependencies.every(
@@ -179,7 +180,7 @@ const renderBreadcrumbs = (): void => {
     breadcrumbs.replaceChildren(...nodes)
 }
 
-const fileRow = (file: StoredFile): HTMLTableRowElement => {
+const fileRow = (file: FileInfo): HTMLTableRowElement => {
     const row = document.createElement('tr')
     const name = document.createElement('td')
     name.className = 'file-name'
@@ -187,7 +188,7 @@ const fileRow = (file: StoredFile): HTMLTableRowElement => {
     const size = document.createElement('td')
     size.textContent = formatBytes(file.size)
     const type = document.createElement('td')
-    type.textContent = file.type || 'application/octet-stream'
+    type.textContent = file.contentType || 'application/octet-stream'
     const modified = document.createElement('td')
     modified.textContent = file.lastModified ? new Date(file.lastModified).toLocaleString() : '—'
     const actions = document.createElement('td')
@@ -352,6 +353,32 @@ const uploadFile = async (file: File): Promise<void> => {
     }
 }
 
+const capabilityDetails = (caps?: AdapterCapabilities): HTMLElement => {
+    if (!caps) {
+        const pending = document.createElement('span')
+        pending.textContent = 'Available after initialization'
+        return pending
+    }
+    const details = document.createElement('details')
+    const title = document.createElement('summary')
+    title.textContent = 'Native capabilities'
+    const values = document.createElement('dl')
+    const append = (value: unknown, path = ''): void => {
+        if (isRecord(value)) {
+            for (const [key, child] of Object.entries(value)) append(child, path ? `${path}.${key}` : key)
+            return
+        }
+        const label = document.createElement('dt')
+        label.textContent = path
+        const content = document.createElement('dd')
+        content.textContent = `${String(value)}${path.endsWith('maxExpiresIn') ? ' seconds' : ''}`
+        values.append(label, content)
+    }
+    append(caps)
+    details.append(title, values)
+    return details
+}
+
 const renderSnapshot = (): void => {
     element('#dependencies', HTMLElement).replaceChildren(
         ...snapshot.dependencies.map((item) => {
@@ -375,6 +402,9 @@ const renderSnapshot = (): void => {
             status.textContent = item.initialized ? 'Initialized' : 'Not initialized'
             statusCell.append(status)
             row.append(statusCell)
+            const capabilitiesCell = document.createElement('td')
+            capabilitiesCell.append(capabilityDetails(item.capabilities))
+            row.append(capabilitiesCell)
             return row
         }),
     )

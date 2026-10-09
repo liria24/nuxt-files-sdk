@@ -1,6 +1,7 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
+import { createFilesClient } from 'files-sdk/client'
 import { describe, expect, test } from 'vite-plus/test'
 
 import { fixtureDirectory, readOutput, runCommand, runFixture, startFixtureServer } from '../utils/fixture'
@@ -60,6 +61,21 @@ export const nitroSuite = (
                     assertGatewayListing(endpoint, ['bob.txt'], 'bob'),
                 ])
                 expect((await postGateway(endpoint, { op: 'delete', key: 'alice.txt' }, 'alice')).status).toBe(403)
+                const invalid = await postGateway(endpoint, { op: 'head', key: 123 }, 'alice')
+                expect(invalid.status).toBe(422)
+                expect(await invalid.json()).toMatchObject({ error: { code: 'Validation' } })
+                expect(
+                    (
+                        await postGateway(
+                            endpoint,
+                            {
+                                op: 'presign',
+                                files: [{ name: 'too-large.txt', size: 11, type: 'text/plain' }],
+                            },
+                            'alice',
+                        )
+                    ).status,
+                ).toBe(422)
 
                 const presigned = (await postGateway(
                     endpoint,
@@ -95,6 +111,15 @@ export const nitroSuite = (
                     'alice',
                 ).then((response) => response.json())) as { files: { key: string }[] }
                 expect(completed.files.map((file) => file.key)).toEqual([upload.key])
+                const client = createFilesClient({ endpoint, headers: { 'x-files-user': 'alice' } })
+                await expect(client.head(123 as never)).rejects.toMatchObject({ code: 'Invalid' })
+                expect(await client.head(upload.key)).toMatchObject({
+                    key: upload.key,
+                    size: 3,
+                    contentType: 'text/plain',
+                })
+                expect((await client.head([upload.key])).results).toHaveLength(1)
+                expect(await (await client.download(upload.key)).text()).toBe('new')
                 if (name === 'nitro-v3') {
                     await assertGatewayListing(`${server.url}/gateway/archive`, ['archive.txt'])
                 }
@@ -149,6 +174,11 @@ export const nitroSuite = (
                     await rm(wranglerOutput, { recursive: true, force: true })
                 }
             }
+            await runCommand('bunx', [name === 'nitro-v2' ? 'nitropack' : 'nitro', 'build'], {
+                cwd: cloudflare,
+                env: { NITRO_PRESET: 'node-server' },
+            })
+            expect(await readOutput(resolve(cloudflare, '.output'))).not.toMatch(/node_modules\/@aws-sdk\//u)
         })
     })
 }
