@@ -26,6 +26,14 @@ export default defineNuxtConfig({
 
     ignore: ['content/**'],
 
+    vite: {
+        optimizeDeps: {
+            // Nuxt 4.6's installed-component scan cannot resolve i18n's virtual #components import.
+            noDiscovery: true,
+            include: ['@comark/vue', '@vueuse/core', 'comark-content/client', 'rangi'],
+        },
+    },
+
     runtimeConfig: {
         docs: {
             repository: 'liria24/nuxt-files-sdk',
@@ -39,6 +47,7 @@ export default defineNuxtConfig({
 
     nitro: {
         preset: 'cloudflare-module',
+        sourceMap: false,
         errorHandler: fileURLToPath(new URL('./server/error.ts', import.meta.url)).replaceAll('\\', '/'),
         cloudflare: {
             deployConfig: true,
