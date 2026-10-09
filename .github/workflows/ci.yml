@@ -2,7 +2,7 @@ name: CI
 
 on:
     push:
-        branches: [main]
+        branches: [ main ]
     pull_request:
     merge_group:
     workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
                   npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/files-artifact" ./packages/nuxt-files-sdk
                   mv "$RUNNER_TEMP/files-artifact/"*.tgz "$RUNNER_TEMP/files-artifact/nuxt-files-sdk.tgz"
                   sha256sum "$RUNNER_TEMP/files-artifact/nuxt-files-sdk.tgz" | cut -d ' ' -f 1 > "$RUNNER_TEMP/files-artifact/sha256.txt"
-            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+            - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: files-sdk-packed
                   path: ${{ runner.temp }}/files-artifact
@@ -90,7 +90,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-latest, windows-latest]
+                os: [ ubuntu-latest, windows-latest ]
         runs-on: ${{ matrix.os }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -132,9 +132,9 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-latest, windows-latest]
-                package-manager: [bun, npm, pnpm]
-                compatibility: [minimum, latest-supported]
+                os: [ ubuntu-latest, windows-latest ]
+                package-manager: [ bun, npm, pnpm ]
+                compatibility: [ minimum, latest-supported ]
                 include:
                     - compatibility: minimum
                       nuxt: '4.6.0'
@@ -153,7 +153,7 @@ jobs:
             - uses: ./.github/actions/setup
             - if: matrix.package-manager == 'pnpm'
               run: npm install --global pnpm@10.25.0
-            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+            - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
               with:
                   name: files-sdk-packed
                   path: ${{ runner.temp }}/files-artifact
