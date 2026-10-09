@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { readFile, readdir } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
 
 const output = resolve(import.meta.dirname, '../docs/.output')
 const forbidden = [
@@ -20,7 +20,14 @@ await Promise.all(
         .filter((path) => path.isFile())
         .map(async (path) => {
             const file = resolve(path.parentPath, path.name)
+            const serverFile = relative(resolve(output, 'server'), file).replaceAll('\\', '/')
+            if (!serverFile.startsWith('../') && serverFile.endsWith('.map')) {
+                throw new Error(`Nitro source map found in ${file}`)
+            }
             const content = await readFile(file, 'utf8')
+            if (!serverFile.startsWith('../') && /\/[/*][#@]\s*sourceMappingURL=/u.test(content)) {
+                throw new Error(`Nitro source map reference found in ${file}`)
+            }
             hasLlmsRoute ||= /route\s*:\s*['"]\/llms\.txt['"]/.test(content)
             for (const marker of forbidden) {
                 if (content.includes(marker)) throw new Error(`${marker} found in ${file}`)
@@ -59,4 +66,6 @@ if (!hasLlmsRoute) throw new Error('llms.txt runtime route is missing')
 const deployConfig = await readFile(resolve(output, '../.wrangler/deploy/config.json'), 'utf8')
 if (!deployConfig.includes('wrangler.json')) throw new Error('Nitro Wrangler deploy redirect is missing')
 
-process.stdout.write('Production docs contain no DevTools routes, development storage, AI layer, or Markdown bodies.\n')
+process.stdout.write(
+    'Production docs contain no Nitro source maps, DevTools routes, development storage, AI layer, or Markdown bodies.\n',
+)
