@@ -1,0 +1,199 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+    "baseBranchPatterns": ["main"],
+    "branchPrefix": "renovate/",
+    "automerge": false,
+    "dependencyDashboard": true,
+    "timezone": "Asia/Tokyo",
+    "schedule": ["* * * * 0"],
+    "prConcurrentLimit": 1,
+    "branchConcurrentLimit": 1,
+    "prHourlyLimit": 1,
+    "rebaseWhen": "behind-base-branch",
+    "updateNotScheduled": true,
+    "ignoreScripts": true,
+    "constraints": {
+        "bun": "1.4.2"
+    },
+    "lockFileMaintenance": {
+        "enabled": false
+    },
+    "vulnerabilityAlerts": {
+        "enabled": true,
+        "schedule": [],
+        "minimumReleaseAge": null,
+        "dependencyDashboardApproval": false,
+        "automerge": false
+    },
+    "prBodyNotes": [
+        "Rebase onto the latest base, reapply manifest changes and regenerate existing bun.lock files with the pinned Bun. Commit manifests and locks together; frozen installation and all quality checks must pass."
+    ],
+    "packageRules": [
+        {
+            "description": "Apply npm policy to native Bun and npm dependencies",
+            "matchDatasources": ["npm"],
+            "minimumReleaseAge": "3 days"
+        },
+        {
+            "description": "Keep runtime and package-manager upgrades owner-managed",
+            "matchDepTypes": ["engines", "packageManager", "devEngines.runtime", "devEngines.packageManager"],
+            "enabled": false
+        },
+        {
+            "description": "Keep Bun pinned in manifests, workflow inputs and Renovate tool constraints",
+            "matchDepNames": ["bun"],
+            "enabled": false
+        },
+        {
+            "description": "Require approval for major updates",
+            "matchUpdateTypes": ["major"],
+            "dependencyDashboardApproval": true
+        },
+        {
+            "description": "Review public compatibility range changes",
+            "matchDepTypes": ["peerDependencies"],
+            "enabled": true,
+            "dependencyDashboardApproval": true,
+            "rangeStrategy": "replace"
+        },
+        {
+            "description": "Review breaking zero-major minor updates separately",
+            "matchDatasources": ["npm"],
+            "matchCurrentVersion": "/^0\\./",
+            "matchUpdateTypes": ["minor"],
+            "dependencyDashboardApproval": true
+        },
+        {
+            "description": "Pin and review GitHub Actions separately",
+            "matchManagers": ["github-actions"],
+            "groupName": "GitHub Actions",
+            "pinDigests": true,
+            "automerge": false
+        },
+        {
+            "description": "Keep Nuxt framework packages together",
+            "matchPackageNames": ["nuxt", "@nuxt/kit", "@nuxt/schema", "@nuxt/vite-builder"],
+            "groupName": "Nuxt framework"
+        },
+        {
+            "description": "Keep Vue and compiler packages together",
+            "matchPackageNames": ["vue", "/^@vue\\//"],
+            "groupName": "Vue and compiler"
+        },
+        {
+            "description": "Keep Vite+ core, Vite+ and Vitest together",
+            "matchPackageNames": ["vite", "vite-plus", "@voidzero-dev/vite-plus-core", "vitest", "/^@vitest\\//"],
+            "groupName": "Vite and test tooling"
+        },
+        {
+            "description": "Keep Comark integrations together",
+            "matchPackageNames": ["comark", "comark-content", "/^@comark\\//"],
+            "groupName": "Comark"
+        },
+        {
+            "description": "Preserve the existing prerelease series",
+            "matchDepNames": ["c12"],
+            "matchCurrentValue": "4.0.0-rc.2",
+            "allowedVersions": "/^4\\.0\\.\\d+-rc(?:[.\\d-]|$)/",
+            "dependencyDashboardApproval": true
+        },
+        {
+            "description": "Preserve the existing prerelease series",
+            "matchDepNames": ["@nuxt/devtools-kit"],
+            "matchCurrentValue": "4.0.0-beta.4",
+            "allowedVersions": "/^4\\.0\\.\\d+-beta(?:[.\\d-]|$)/",
+            "dependencyDashboardApproval": true
+        },
+        {
+            "description": "Preserve the existing prerelease series",
+            "matchDepNames": ["nitro"],
+            "matchCurrentValue": "^3.0.260903-beta",
+            "allowedVersions": "/^3\\.0\\.\\d+-beta(?:[.\\d-]|$)/",
+            "dependencyDashboardApproval": true
+        },
+        {
+            "description": "Preserve the existing prerelease series",
+            "matchDepNames": ["@nuxt/devtools"],
+            "matchCurrentValue": "4.0.0-alpha.19",
+            "allowedVersions": "/^4\\.0\\.\\d+-alpha(?:[.\\d-]|$)/",
+            "dependencyDashboardApproval": true
+        },
+        {
+            "description": "SDK changes require manual optional-peer generation in the same PR",
+            "matchPackageNames": ["files-sdk"],
+            "dependencyDashboardApproval": true,
+            "groupName": "Files SDK and generated optional peers",
+            "prBodyNotes": [
+                "After approving, run bun run peers:sync --write with the updated SDK, regenerate root and affected fixture locks, then bun run peers:sync --check and the minimum/latest consumer matrix. Hosted Renovate does not run this generator."
+            ]
+        },
+        {
+            "description": "Generated optional peer ranges are owned by files-sdk synchronization",
+            "matchFileNames": ["packages/nuxt-files-sdk/package.json"],
+            "matchDepTypes": ["peerDependencies"],
+            "matchDepNames": [
+                "@anthropic-ai/claude-agent-sdk",
+                "@aws-sdk/client-s3",
+                "@aws-sdk/lib-storage",
+                "@aws-sdk/s3-presigned-post",
+                "@aws-sdk/s3-request-presigner",
+                "@azure/core-auth",
+                "@azure/identity",
+                "@azure/storage-blob",
+                "@bunny.net/storage-sdk",
+                "@google-cloud/storage",
+                "@googleapis/drive",
+                "@microsoft/microsoft-graph-client",
+                "@nestjs/common",
+                "@netlify/blobs",
+                "@openai/agents",
+                "@opentelemetry/api",
+                "@supabase/storage-js",
+                "@sveltejs/kit",
+                "@tanstack/react-start",
+                "@vercel/blob",
+                "ai",
+                "astro",
+                "basic-ftp",
+                "box-typescript-sdk-gen",
+                "cloudinary",
+                "convex",
+                "disk",
+                "dropbox",
+                "fastify",
+                "firebase-admin",
+                "google-auth-library",
+                "h3",
+                "hono",
+                "koa",
+                "next",
+                "node-appwrite",
+                "openai",
+                "pocketbase",
+                "react",
+                "react-dom",
+                "ssh2-sftp-client",
+                "svelte",
+                "uploadthing",
+                "vue",
+                "webdav",
+                "zod"
+            ],
+            "enabled": false
+        },
+        {
+            "description": "Preserve minimum fixture TypeScript 6 independently of root TypeScript 7",
+            "matchFileNames": ["test/fixtures/**/package.json", "docs/package.json"],
+            "matchPackageNames": ["typescript"],
+            "allowedVersions": "<7",
+            "dependencyDashboardApproval": true
+        },
+        {
+            "description": "Nightly is an experimental fixture, not a stable support upgrade",
+            "matchFileNames": ["test/fixtures/nuxt5-nightly/package.json"],
+            "dependencyDashboardApproval": true,
+            "groupName": "Nuxt nightly fixture"
+        }
+    ]
+}
