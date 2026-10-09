@@ -43,21 +43,21 @@
         "@nuxt/schema": "^4.6.0",
         "@nuxt/test-utils": "^4.3.3",
         "files-sdk": "3.0.0",
-        "knip": "^6.39.0",
-        "npm": "11.21.0",
-        "pkg-pr-new": "^0.0.90",
+        "knip": "^6.41.0",
+        "npm": "12.2.0",
+        "pkg-pr-new": "^0.0.91",
         "sherif": "^1.13.0",
         "taze": "^21.3.0",
         "typescript": "^7.0.2",
-        "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
-        "vite-plus": "1.0.0",
-        "vitest": "5.0.1",
+        "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
+        "vite-plus": "1.1.0",
+        "vitest": "5.0.3",
         "vscode-jsonrpc": "^9.0.3",
         "yaml": "^2.9.1"
     },
     "overrides": {
-        "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
-        "vitest": "5.0.1"
+        "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
+        "vitest": "5.0.3"
     },
     "engines": {
         "node": "^24.11.0 || >=26.0.0"
