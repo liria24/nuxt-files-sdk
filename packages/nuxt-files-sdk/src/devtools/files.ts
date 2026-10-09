@@ -7,7 +7,13 @@ import { inspectFiles } from '../runtime/internal'
 import { authorizeFilesDevtoolsRequest } from './auth'
 import { FILES_DEVTOOLS_MAX_UPLOAD_SIZE } from './paths'
 
-const readOperations = ['capabilities', 'list', 'exists', 'download'] as const satisfies readonly FilesOperation[]
+const readOperations = [
+    'capabilities',
+    'list',
+    'head',
+    'exists',
+    'download',
+] as const satisfies readonly FilesOperation[]
 const writeOperations = [...readOperations, 'upload', 'delete'] as const satisfies readonly FilesOperation[]
 export const filesDevtoolsOperations = (write: boolean): readonly FilesOperation[] =>
     write ? writeOperations : readOperations

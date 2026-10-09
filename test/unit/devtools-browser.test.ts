@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from 'vite-plus/test'
 import { FilesBrowser } from '../../packages/nuxt-files-sdk/src/devtools/client/browser'
 
 const client = () => ({
-    capabilities: vi.fn<FilesClient['capabilities']>().mockResolvedValue({ delimiter: true } as AdapterCapabilities),
+    capabilities: vi.fn<FilesClient['capabilities']>().mockResolvedValue({ delimiter: 'slash' } as AdapterCapabilities),
     list: vi.fn<FilesClient['list']>().mockResolvedValue({ items: [] }),
     delete: vi.fn<(key: string) => Promise<void>>().mockResolvedValue(undefined),
 })
