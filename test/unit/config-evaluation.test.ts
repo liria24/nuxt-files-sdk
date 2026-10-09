@@ -157,7 +157,7 @@ exports.after = cycle.value`,
         }
         expect(value.helper).toEqual({ before: revision, after: revision })
         expect(value.value).toBe(4)
-        expect(value.resolved).toBe(helper)
+        expect(value.resolved.replaceAll('\\', '/')).toBe(helper.replaceAll('\\', '/'))
         expect(value.builtin).toBe('function')
         expect(counter.count).toBe(revision)
     }

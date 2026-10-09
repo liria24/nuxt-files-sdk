@@ -7,7 +7,8 @@ export default defineFilesConfig({
     routes: [
         {
             path: '/gateway',
-            operations: ['capabilities', 'list', 'upload'],
+            operations: ['capabilities', 'list', 'head', 'download', 'upload'],
+            maxUploadSize: 10,
             authorize: ({ req, event }) => {
                 const user = req.headers.get('x-files-user')
                 if (!user) throw new Error('Unauthorized')

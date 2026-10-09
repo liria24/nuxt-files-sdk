@@ -3,7 +3,7 @@ import type { SingleStorage, StorageRegistry } from 'nuxt-files-sdk/runtime'
 import { syncFiles as importedSyncFiles, transferFiles as importedTransferFiles } from 'nuxt-files-sdk/runtime'
 
 import { FilesError, sync, transfer } from '#files-sdk'
-import type { FileHandle, Files, FilesPlugin, StoredFile, SyncResult, TransferResult } from '#files-sdk'
+import type { FileHandle, FileInfo, Files, FilesPlugin, SyncResult, TransferResult } from '#files-sdk'
 import type { FsAdapter } from '#files-sdk/fs'
 import type { MemoryAdapter } from '#files-sdk/memory'
 import { memory } from '#files-sdk/memory'
@@ -87,10 +87,13 @@ const assertNativeTypes = async (): Promise<void> => {
     const inferredFiles = useServerFiles('blob')
     const isAny: IsAny<typeof inferredFiles> = false
     const deleted = await inferredFiles.delete(['missing.txt'])
-    deleted.deleted satisfies string[]
+    deleted.results satisfies string[]
     inferredFiles.raw.root satisfies string
     const handle: FileHandle = files.file('example.txt')
-    const stored: StoredFile = await handle.head()
+    const stored: FileInfo = await handle.head()
+    stored.contentType satisfies string
+    inferredFiles.capabilities.signedUrl.expiry satisfies 'exact' | 'provider' | 'none'
+    inferredFiles.capabilities.resumable satisfies boolean
     const archive = useServerFiles('archive')
     void syncFiles(files, archive)
     const versions = await archive.versions('example.txt')

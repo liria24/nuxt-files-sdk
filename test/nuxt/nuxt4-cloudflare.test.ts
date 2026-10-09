@@ -23,4 +23,6 @@ test('[BUNDLE-009] Nuxt Cloudflare retains lazy unnamed R2 without optional AWS 
     const output = await readOutput(resolve(directory, '.output'))
     expect(output).not.toMatch(/node_modules\/@aws-sdk\//u)
     expect(await readdir(resolve(directory, '.output/server'))).toContain('index.mjs')
+    await runCommand('bunx', ['nuxt', 'build'], { cwd: directory, env: { NITRO_PRESET: 'node-server' } })
+    expect(await readOutput(resolve(directory, '.output'))).not.toMatch(/node_modules\/@aws-sdk\//u)
 })

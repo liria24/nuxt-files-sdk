@@ -421,6 +421,13 @@ export const contracts = [
         job: 'test-nuxt4',
     },
     {
+        id: 'DEV-009',
+        guarantee:
+            'DevTools exposes only native capabilities of initialized clients without constructing other storages',
+        source: 'test/unit/devtools-capabilities.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'BUNDLE-001',
         guarantee: 'Server-only Nuxt does not include files-sdk/vue',
         source: 'test/bundle/bundle.test.ts',

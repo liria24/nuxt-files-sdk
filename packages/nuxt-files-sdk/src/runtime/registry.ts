@@ -10,6 +10,7 @@ import {
 } from 'files-sdk'
 
 import type { FilesConfig, FilesConfigInput, StorageBranches, StorageConfig, StorageNames } from '../config'
+import { filesDevtoolsCapabilities } from '../devtools/capabilities'
 import type { FilesDevtoolsDiagnosticCode } from '../devtools/diagnostics'
 import type { DependencyDiagnostic } from '../integration/diagnostics'
 import { normalizeFilesConfig, type StorageEntry } from './normalize'
@@ -161,6 +162,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
                 plugins:
                     pluginNames ?? (Array.isArray(storage.plugins) ? storage.plugins.map((plugin) => plugin.name) : []),
                 initialized: !!files,
+                ...(files ? { capabilities: filesDevtoolsCapabilities(files.capabilities) } : {}),
             })),
             diagnostics: [...this.#entries.values()].flatMap(({ diagnostic }) => (diagnostic ? [diagnostic] : [])),
             dependencies: this.#dependencies,

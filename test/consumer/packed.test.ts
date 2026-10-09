@@ -181,7 +181,7 @@ describe('Packed consumer', () => {
             configKey: 'files',
             compatibility: { nuxt: '^4.6.0 || ^5.0.0-0' },
         })
-        expect(packageJson.dependencies['files-sdk']).toBe('2.6.2')
+        expect(packageJson.dependencies['files-sdk']).toBe('3.0.0')
         expect(packageJson.devDependencies['files-sdk']).toBeUndefined()
         expect(packageJson.peerDependencies['files-sdk']).toBeUndefined()
         expect(packageJson.peerDependenciesMeta['files-sdk']).toBeUndefined()
@@ -309,7 +309,7 @@ describe('Packed consumer', () => {
                         ),
                     ),
                 ) as { path: string; version: string; bare: string | null }
-                expect(installed.version).toBe('2.6.2')
+                expect(installed.version).toBe('3.0.0')
                 expect(installed.bare).toBe(layout === 'workspace' ? '2.6.0' : null)
                 const runtimeExports = await stage('runtime exports', () =>
                     runCommand(

@@ -60,6 +60,8 @@ describe('Nuxt DevFrame development endpoint', async () => {
         expect(response.status, html).toBe(200)
         expect(html).toContain('<title>Files</title>')
         expect(html).toContain('File browser')
+        expect(html).toContain('Capabilities')
+        expect(html).toContain('Queue or webhook connections are not verified')
         expect(html).toContain('src="./app.js"')
         const script = await fetch(url('/__nuxt-files-sdk/app.js'))
         const javascript = await script.text()
@@ -93,7 +95,19 @@ describe('Nuxt DevFrame development endpoint', async () => {
         const initialized = await $fetch<FilesDevtoolsSnapshot>('/__nuxt-files-api/snapshot', {
             headers: { authorization },
         })
-        expect(initialized.storages).toEqual(snapshot.storages.map((storage) => ({ ...storage, initialized: true })))
+        expect(initialized.storages).toEqual(
+            snapshot.storages.map((storage) => ({
+                ...storage,
+                initialized: true,
+                capabilities: expect.objectContaining({
+                    publicUrl: storage.name === 'blob',
+                    resumable: true,
+                    events: false,
+                    signedUrl: { supported: false, disposition: false, expiry: 'none' },
+                    signedUpload: { supported: false, contentType: false, maxSize: false },
+                }),
+            })),
+        )
     })
 
     test('[DEV-005] browses, uploads, downloads, and deletes through the native Files gateway', async () => {
@@ -107,10 +121,14 @@ describe('Nuxt DevFrame development endpoint', async () => {
         const files = createFilesClient({ endpoint, headers: { authorization, origin } })
         await files.upload('docs/hello.txt', 'hello devtools', { contentType: 'text/plain' })
         expect(await files.exists('docs/hello.txt')).toBe(true)
+        expect(await files.head('docs/hello.txt')).toMatchObject({ size: 14, contentType: 'text/plain' })
+        expect((await files.head(['docs/hello.txt'])).results).toHaveLength(1)
         const root = await files.list({ delimiter: '/' })
         expect(root.prefixes).toContain('docs/')
         const listed = await files.list({ prefix: 'docs/', delimiter: '/' })
-        expect(listed.items).toEqual([expect.objectContaining({ key: 'docs/hello.txt', size: 14, type: 'text/plain' })])
+        expect(listed.items).toEqual([
+            expect.objectContaining({ key: 'docs/hello.txt', size: 14, contentType: 'text/plain' }),
+        ])
         expect(await (await files.download('docs/hello.txt')).text()).toBe('hello devtools')
         await files.delete('docs/hello.txt')
         expect(await files.exists('docs/hello.txt')).toBe(false)

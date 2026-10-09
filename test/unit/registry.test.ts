@@ -120,6 +120,7 @@ describe('FilesRegistry', () => {
                     adapter: 'fs',
                     plugins: ['versioning'],
                     initialized: true,
+                    capabilities: registry.get().capabilities,
                 },
             ],
             diagnostics: [],
