@@ -2,7 +2,7 @@ name: CI
 
 on:
     push:
-        branches: [ main ]
+        branches: [main]
     pull_request:
     merge_group:
     workflow_dispatch:
@@ -90,7 +90,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os: [ ubuntu-latest, windows-latest ]
+                os: [ubuntu-latest, windows-latest]
         runs-on: ${{ matrix.os }}
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -132,9 +132,9 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os: [ ubuntu-latest, windows-latest ]
-                package-manager: [ bun, npm, pnpm ]
-                compatibility: [ minimum, latest-supported ]
+                os: [ubuntu-latest, windows-latest]
+                package-manager: [bun, npm, pnpm]
+                compatibility: [minimum, latest-supported]
                 include:
                     - compatibility: minimum
                       nuxt: '4.6.0'
