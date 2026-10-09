@@ -59,6 +59,7 @@ export default defineConfig({
             },
             exports: false,
             format: ['esm'],
+            minify: true,
             platform: 'neutral',
             publint: true,
             sourcemap: false,
