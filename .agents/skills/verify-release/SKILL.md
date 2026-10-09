@@ -9,6 +9,13 @@ Work from the repository root. Read [AGENTS.md](../../../AGENTS.md), root/packag
 
 ## Local checks
 
+- Renovate uses the native Bun manager for the root and fixture locks. SDK updates are
+  dashboard-gated: the reviewer runs `bun run peers:sync --write`, regenerates existing root
+  and affected fixture locks with the pinned Bun, then runs `bun run peers:sync --check` and
+  the minimum/latest consumer matrix in the same PR. Generated optional peers are excluded
+  from independent bot updates; hosted Renovate does not execute this generator. Preserve
+  nightly aliases and fixture TypeScript compatibility independently of the root toolchain.
+
 - Use `bun run test`, never substitute `bun test`; the package script selects Vitest and its isolated projects. If a report used the latter, reproduce with the configured runner before attributing failures to CI.
 - `bun run check` (or `vp run check`) covers Vite+ format/lint, workspace/unused checks, source and test typecheck, all eight test projects, and the package build. Run `bun run benchmark` separately. For a narrow failure, start with the affected `test:*` script in `package.json`, then run the relevant broader checks before claiming completion.
 - Reuse `test/utils/fixture.ts` and `test/utils/generated-types.ts`. Heavy projects share generated output and must remain serial. Stable fixture installs use frozen lockfiles; nightly intentionally resolves separately and may change its lockfile. Inspect any resulting tracked diff rather than including unrelated dependency updates silently.
