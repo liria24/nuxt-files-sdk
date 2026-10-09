@@ -1,6 +1,6 @@
 {
     "name": "nuxt-files-sdk",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "Files SDK integration for Nuxt with DevTools",
     "homepage": "https://nuxt-files-sdk.liria.me",
     "license": "MIT",
