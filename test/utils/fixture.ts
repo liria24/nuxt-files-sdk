@@ -290,7 +290,8 @@ export const closeOwnedProcess = async (
             const origin = [captured.has(pid) && 'captured', options.reported?.has(pid) && 'reported']
                 .filter(Boolean)
                 .join('/')
-            const remaining = Math.min(5000, deadline - Date.now())
+            // A fallback phase must not grant an inaccessible PID a fresh observation budget.
+            const remaining = Math.min(5000, Math.min(deadline, cleanupDeadline) - Date.now())
             if (remaining <= 0)
                 throw new Error(`${String(error)} (${origin}; exit reconciliation budget exhausted)`, { cause: error })
             try {
@@ -328,7 +329,8 @@ export const closeOwnedProcess = async (
                     },
                 )
             }
-            throw new Error(`${String(error)} (${origin}; Windows still reports this PID)`, { cause: error })
+            // Presence is not an exit witness. Re-observe within the original cleanup deadline.
+            return true
         }
     }
     const anyAlive = async (deadline: number): Promise<boolean> => {
@@ -411,9 +413,10 @@ export const closeOwnedProcess = async (
             errors.push('Windows native shutdown IPC channel is unavailable')
         } else child.kill('SIGTERM')
     }
-    const deadline = Date.now() + 20_000
-    while (Date.now() < deadline && (await anyAlive(deadline))) await new Promise((done) => setTimeout(done, 100))
-    if (await anyAlive(deadline)) {
+    const cleanupDeadline = Date.now() + 20_000
+    while (Date.now() < cleanupDeadline && (await anyAlive(cleanupDeadline)))
+        await new Promise((done) => setTimeout(done, 100))
+    if (await anyAlive(cleanupDeadline)) {
         errors.push(
             `Native process shutdown exceeded its cleanup deadline (alive=${lastAlivePid}; root=${child.pid}, exit=${child.exitCode}, signal=${child.signalCode}; reported=${[...(options.reported ?? [])].join(',')}; captured=${[...captured].join(',')})`,
         )

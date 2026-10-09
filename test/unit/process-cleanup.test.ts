@@ -37,6 +37,7 @@ import { closeOwnedProcess } from '../utils/fixture'
 const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
 const initialExec = utility.exec.getMockImplementation()!
 afterEach(() => {
+    vi.useRealTimers()
     Object.defineProperty(process, 'platform', platform)
     vi.restoreAllMocks()
     utility.exec.mockClear()
@@ -77,15 +78,21 @@ test.each([
 test.each(['captured', 'reported'] as const)(
     '[CLI-003] an exited root does not hide an inaccessible %s descendant',
     async (ownership) => {
+        vi.useFakeTimers()
         const child = exitedChild(0, null)
         const probe = vi.spyOn(process, 'kill').mockImplementation(() => {
             throw permissionError()
         })
         utility.descendant = ownership === 'captured'
         utility.reconciliationOutput = JSON.stringify([{ ProcessId: 123456788 }])
-        await expect(
-            closeOwnedProcess(child, ownership === 'reported' ? { reported: new Set([123456788]) } : {}),
-        ).rejects.toThrow('Owned PID 123456788 liveness probe failed: Error: kill EPERM')
+        const closing = closeOwnedProcess(
+            child,
+            ownership === 'reported' ? { reported: new Set([123456788]) } : {},
+        ).catch((error: unknown) => error)
+        await vi.advanceTimersByTimeAsync(20_000)
+        expect(await closing).toMatchObject({
+            message: expect.stringContaining('Owned PID 123456788 liveness probe failed: Error: kill EPERM'),
+        })
         expect(probe).toHaveBeenCalledWith(123456788, 0)
     },
 )
@@ -135,21 +142,66 @@ test.each(['captured', 'reported'] as const)(
 )
 
 test.each(['captured', 'reported'] as const)(
+    '[CLI-003] Windows waits for an inaccessible %s PID to disappear within the cleanup deadline',
+    async (ownership) => {
+        windows()
+        vi.useFakeTimers()
+        utility.descendant = ownership === 'captured'
+        utility.reconciliationOutput = JSON.stringify([{ ProcessId: descendantPid }])
+        const exec = utility.exec.getMockImplementation()!
+        utility.exec.mockImplementation((command, args, options, callback) => {
+            exec(command, args, options, callback)
+            if (args.some((arg) => arg.includes('-Filter'))) utility.reconciliationOutput = '[]'
+        })
+        const probe = vi.spyOn(process, 'kill').mockImplementation(() => {
+            throw permissionError()
+        })
+        const closing = closeOwnedProcess(exitedChild(0, null), ownership === 'reported' ? { reported } : {})
+        await vi.advanceTimersByTimeAsync(100)
+        await closing
+        expect(probe).toHaveBeenCalledTimes(2)
+        expect(reconciliationCalls()).toHaveLength(2)
+        expect(utility.exec.mock.calls.some(([command]) => command === 'taskkill')).toBe(false)
+    },
+)
+
+test.each(['captured', 'reported'] as const)(
     '[CLI-003] Windows preserves a genuine inaccessible %s PID failure',
     async (ownership) => {
         windows()
+        vi.useFakeTimers()
         utility.descendant = ownership === 'captured'
         utility.reconciliationOutput = JSON.stringify([{ ProcessId: descendantPid }])
         vi.spyOn(process, 'kill').mockImplementation(() => {
             throw permissionError()
         })
-        await expect(
-            closeOwnedProcess(exitedChild(0, null), ownership === 'reported' ? { reported } : {}),
-        ).rejects.toThrow('Windows still reports this PID')
-        expect(reconciliationCalls()).toHaveLength(1)
+        const closing = closeOwnedProcess(exitedChild(0, null), ownership === 'reported' ? { reported } : {}).catch(
+            (error: unknown) => error,
+        )
+        await vi.advanceTimersByTimeAsync(20_000)
+        expect(await closing).toMatchObject({
+            message: expect.stringContaining('exit reconciliation budget exhausted'),
+        })
+        expect(reconciliationCalls().length).toBeGreaterThan(1)
         expect(utility.exec.mock.calls.some(([command]) => command === 'taskkill')).toBe(false)
     },
 )
+
+test('[CLI-003] Windows fallback cannot restart an inaccessible PID observation budget', async () => {
+    windows()
+    vi.useFakeTimers()
+    utility.descendant = true
+    const child = exitedChild(null, null)
+    vi.spyOn(child, 'kill').mockReturnValue(true)
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+        throw permissionError()
+    })
+    const closing = closeOwnedProcess(child).catch((error: unknown) => error)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(await closing).toMatchObject({ message: expect.stringContaining('exit reconciliation budget exhausted') })
+    expect(reconciliationCalls()).toHaveLength(0)
+    expect(utility.exec.mock.calls.some(([command]) => command === 'taskkill')).toBe(false)
+})
 
 test.each(['not-json', 'null', '[{"ProcessId":999}]'])(
     '[CLI-003] malformed Windows exit evidence cannot hide a permission failure: %s',
