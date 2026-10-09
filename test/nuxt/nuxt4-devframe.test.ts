@@ -61,7 +61,7 @@ describe('Nuxt DevFrame development endpoint', async () => {
         expect(html).toContain('<title>Files</title>')
         expect(html).toContain('File browser')
         expect(html).toContain('Capabilities')
-        expect(html).toContain('Queue or webhook connections are not verified')
+        expect(html.replace(/\s+/gu, ' ')).toContain('Queue or webhook connections are not verified')
         expect(html).toContain('src="./app.js"')
         const script = await fetch(url('/__nuxt-files-sdk/app.js'))
         const javascript = await script.text()
