@@ -1,7 +1,7 @@
 name: Release
 on:
-    push: { branches: [ main ] }
-    pull_request: { types: [ closed ], branches: [ main ] }
+    push: { branches: [main] }
+    pull_request: { types: [closed], branches: [main] }
     workflow_dispatch:
         inputs:
             npm-tag: { description: 'npm dist-tag override', required: false, default: '' }
