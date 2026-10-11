@@ -40,9 +40,9 @@
         "bundle:size": "bun run build && bun scripts/measure-bundles.mjs --package-root packages/nuxt-files-sdk"
     },
     "devDependencies": {
-        "@nuxt/schema": "^4.6.0",
+        "@nuxt/schema": "^4.6.1",
         "@nuxt/test-utils": "^4.3.3",
-        "files-sdk": "3.0.0",
+        "files-sdk": "3.1.0",
         "knip": "^6.41.0",
         "npm": "12.2.0",
         "pkg-pr-new": "^0.0.91",
@@ -62,5 +62,5 @@
     "engines": {
         "node": "^24.11.0 || >=26.0.0"
     },
-    "packageManager": "bun@1.4.2"
+    "packageManager": "bun@1.4.3"
 }

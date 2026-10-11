@@ -82,7 +82,7 @@ jobs:
                   [[ -n "$run_id" && "$run_id" != null ]]
                   gh run watch "$run_id" --exit-status
                   gh run view "$run_id" --json jobs --jq '.jobs[] | select(.name == "ci-ok") | .conclusion' | grep -qx success
-            - uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
+            - uses: voidzero-dev/setup-vp@68f39c78aaf39be468cabd2afb09c162574c84af # v1.21.2
               with:
                   version-file: package.json
                   node-version: 24
