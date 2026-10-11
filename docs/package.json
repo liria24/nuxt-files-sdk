@@ -14,7 +14,7 @@
         "@comark/nuxt": "^0.7.0",
         "@iconify-json/lucide": "^1.2.142",
         "@iconify-json/simple-icons": "^1.2.99",
-        "@nuxt/fonts": "^0.14.0",
+        "@nuxt/fonts": "^1.0.1",
         "@nuxt/ui": "^4.11.3",
         "@nuxtjs/i18n": "^10.6.0",
         "@nuxtjs/robots": "^6.2.4",
@@ -25,7 +25,7 @@
         "comark": "^0.7.0",
         "comark-content": "0.4.1",
         "h3": "^1.15.11",
-        "nuxt": "^4.6.0",
+        "nuxt": "^4.6.1",
         "nuxt-files-sdk": "workspace:*",
         "nuxt-llms": "https://pkg.pr.new/nuxt-content/nuxt-llms/nuxt-llms@f6a9730",
         "nuxt-og-image": "^6.10.3",
@@ -37,7 +37,7 @@
     "devDependencies": {
         "nuxtseo-layer-devtools": "^5.3.16",
         "typescript6": "npm:typescript@6.0.3",
-        "vue-tsc": "^3.3.12",
+        "vue-tsc": "^3.3.13",
         "wrangler": "^4.149.0"
     }
 }
