@@ -121,6 +121,25 @@ const allocatePort = async (): Promise<number> => {
     return address.port
 }
 
+/** File bootstrap shared with the real-process shutdown regression. */
+export const nuxtCliBootstrap = `import { pathToFileURL } from 'node:url'
+import { writeSync } from 'node:fs'
+const [bin, ...args] = process.argv.slice(2)
+process.argv = [process.execPath, bin, ...args]
+const observe = data => writeSync(2, '[Files CLI bootstrap] ' + JSON.stringify({ pid: process.pid, ...data }) + '\\n')
+process.on('exit', code => observe({ phase: 'exit', code }))
+process.on('message', message => {
+  if (message !== 'files-cli-stop') return
+  observe({ phase: 'stop-received', signal: 'SIGTERM', listeners: process.listenerCount('SIGTERM') })
+  const handled = process.emit('SIGTERM')
+  // This parent control channel must not outlive the native CLI's referenced work.
+  // Keep it open for delivery; native worker handles and shutdown timers still govern exit.
+  process.channel?.unref()
+  observe({ phase: 'signal-emitted', handled })
+})
+await import(pathToFileURL(bin).href)
+`
+
 /** Native CLI shutdown uses its file-bootstrap IPC; shared cleanup verifies the captured tree. */
 const closeOwnedCli = (child: ChildProcess, reported: Set<number>, directory: string) =>
     closeOwnedProcess(child, { cwd: directory, reported, ipcMessage: 'files-cli-stop' })
@@ -401,22 +420,7 @@ export const runPackedNuxtCliSession = async ({
         const base = `http://127.0.0.1:${port}`
         const bootstrap = resolve(directory, '.files-cli-bootstrap.mjs')
         // A file bootstrap keeps --input-type eval flags out of Nitro's worker execArgv.
-        await writeFile(
-            bootstrap,
-            `import { pathToFileURL } from 'node:url'
-const [bin, ...args] = process.argv.slice(2)
-process.argv = [process.execPath, bin, ...args]
-const observe = data => console.info('[Files CLI bootstrap] ' + JSON.stringify({ pid: process.pid, ...data }))
-process.on('exit', code => observe({ phase: 'exit', code }))
-process.on('message', message => {
-  if (message !== 'files-cli-stop') return
-  observe({ phase: 'stop-received', signal: 'SIGTERM', listeners: process.listenerCount('SIGTERM') })
-  const handled = process.emit('SIGTERM')
-  observe({ phase: 'signal-emitted', handled })
-})
-await import(pathToFileURL(bin).href)
-`,
-        )
+        await writeFile(bootstrap, nuxtCliBootstrap)
         // Own the current Node runtime directly so IPC and exit events refer to the bootstrap process.
         child = spawn(
             process.execPath,
@@ -444,6 +448,15 @@ await import(pathToFileURL(bin).href)
         child.once('error', (error) => (spawnError = error))
         child.stdout!.on('data', (chunk) => (log += chunk))
         child.stderr!.on('data', (chunk) => (log += chunk))
+        child.once('exit', (code, signal) => {
+            log += `[Files CLI handle] ${JSON.stringify({ phase: 'exit', pid: child!.pid, code, signal, exitCode: child!.exitCode, signalCode: child!.signalCode })}\n`
+        })
+        child.once('close', (code, signal) => {
+            log += `[Files CLI handle] ${JSON.stringify({ phase: 'close', pid: child!.pid, code, signal })}\n`
+        })
+        child.once('disconnect', () => {
+            log += `[Files CLI handle] ${JSON.stringify({ phase: 'disconnect', pid: child!.pid })}\n`
+        })
         const status = async (): Promise<Record<string, any> | undefined> => {
             if (spawnError) throw spawnError
             if (child!.exitCode !== null || child!.signalCode !== null)
@@ -792,7 +805,12 @@ await import(pathToFileURL(bin).href)
         '[Packed Nuxt CLI lifecycle]\n' +
             log
                 .split('\n')
-                .filter((line) => line.includes('[Files CLI lifecycle]'))
+                .filter(
+                    (line) =>
+                        line.includes('[Files CLI lifecycle]') ||
+                        line.includes('[Files CLI bootstrap]') ||
+                        line.includes('[Files CLI handle]'),
+                )
                 .join('\n'),
     )
     return report
