@@ -8,6 +8,7 @@ import { createMessageConnection, StreamMessageReader, StreamMessageWriter } fro
 
 import { invalidTypeCases } from '../types/invalid/cases'
 import { closeOwnedProcess, repositoryRoot, runCommand } from './fixture'
+import { checkLspExit } from './lsp-exit'
 import { createLspWatchers } from './lsp-watchers'
 
 type TypeCheckOptions = { signal?: AbortSignal }
@@ -216,7 +217,6 @@ export const checkHoverDocumentation = async (
     const watchers = createLspWatchers(
         (changes) => connection.sendNotification('workspace/didChangeWatchedFiles', { changes }),
         (error) => cancelled.reject(error),
-        docsDirectory,
     )
     const registrationTimer = setTimeout(() => registration.resolve(), 5_000)
     connection.onNotification('window/logMessage', (message: { type: number; message: string }) => {
@@ -316,7 +316,6 @@ export const checkHoverDocumentation = async (
         // schedules a snapshot update that can overlap Windows native-watcher teardown.
         expect(await request<null>('shutdown')).toBeNull()
         await notify('exit')
-        child.stdin.end()
         let closeTimer: ReturnType<typeof setTimeout> | undefined
         try {
             const status = await Promise.race([
@@ -329,7 +328,14 @@ export const checkHoverDocumentation = async (
                     )
                 }),
             ])
-            expect(status).toEqual({ code: 0, signal: null })
+            const { version } = JSON.parse(
+                await readFile(resolve(repositoryRoot, 'node_modules/typescript/package.json'), 'utf8'),
+            ) as { version: string }
+            if (checkLspExit(status, stderr, version))
+                // oxlint-disable-next-line no-console
+                console.info(
+                    'TypeScript 7.0.2 LSP closed naturally after shutdown with its known context canceled diagnostic.',
+                )
         } finally {
             clearTimeout(closeTimer)
         }

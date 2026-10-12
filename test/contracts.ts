@@ -12,6 +12,12 @@ export const contracts = [
         job: 'unit',
     },
     {
+        id: 'LSP-002',
+        guarantee: 'Natural LSP exit validation rejects unexpected diagnostics, versions, codes, and signals',
+        source: 'test/unit/lsp-exit.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'CLI-004',
         guarantee: 'Test cancellation drains owned consumer processes before teardown and prevents later stages',
         source: 'test/unit/consumer-cancellation.test.ts',
