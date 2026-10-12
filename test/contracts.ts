@@ -13,6 +13,12 @@ export const contracts = [
         job: 'unit',
     },
     {
+        id: 'CLI-005',
+        guarantee: 'Bootstrap control IPC does not retain an idle root or hide unfinished native worker shutdown',
+        source: 'test/unit/cli-bootstrap.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'ARCHIVE-001',
         guarantee: 'All stable platform and package-manager consumers verify the same immutable packed archive',
         source: 'test/unit/packed-artifact.test.ts',
