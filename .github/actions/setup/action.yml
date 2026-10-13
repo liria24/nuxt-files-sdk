@@ -12,8 +12,8 @@ runs:
         - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
           with:
               path: ${{ runner.temp }}/pm-cache
-              key: downloads-${{ runner.os }}-${{ hashFiles('package.json', 'test/consumer/locks/**') }}
-              restore-keys: downloads-${{ runner.os }}-
+              key: downloads-${{ runner.os }}-${{ env.NUXT_FILES_PACKAGE_MANAGER || 'bun' }}-${{ hashFiles('package.json', 'test/consumer/locks/**') }}
+              restore-keys: downloads-${{ runner.os }}-${{ env.NUXT_FILES_PACKAGE_MANAGER || 'bun' }}-
         - shell: bash
           env:
               npm_config_cache: ${{ runner.temp }}/pm-cache/npm

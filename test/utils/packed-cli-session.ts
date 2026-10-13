@@ -331,6 +331,7 @@ export const runPackedNuxtCliSession = async ({
     const runtimeEnv = nuxtCliEnvironment({ FILES_ROUTE_SECRET: canaries[2], NUXT_APP_SECRET: canaries[3] })
     let child: ChildProcess | undefined
     let port: number | undefined
+    let servingPid: number | undefined
     let log = ''
     let lastHttpFailure = ''
     let report: PackedCliSessionReport | undefined
@@ -736,6 +737,7 @@ export const runPackedNuxtCliSession = async ({
         pids.add(current.pid)
         assertIdentity(current)
         const restarted = await gateway(endpoint, { op: 'list' })
+        servingPid = current.pid
         assert.equal(restarted.status, 200, 'The same public serving URL returns after hard restart')
         assert.deepEqual(
             JSON.parse((await curl()).trim()),
@@ -774,6 +776,29 @@ export const runPackedNuxtCliSession = async ({
                 await stop()
                 assert.equal(child.exitCode, 0, 'The native CLI exits successfully without a signal')
                 assert.equal(child.signalCode, null)
+                if (servingPid !== undefined) {
+                    const exits = log
+                        .split('\n')
+                        .filter((line) => /\[Files CLI lifecycle\] \{/u.test(line))
+                        .map((line) => JSON.parse(line.slice(line.indexOf('{'))))
+                    assert(
+                        exits.some(
+                            (event) => event.phase === 'process-exit' && event.pid === servingPid && event.code === 0,
+                        ),
+                        'The serving fork completes native close and exits with code 0',
+                    )
+                    for (const scope of ['nuxt', 'nitro'])
+                        assert(
+                            exits.some(
+                                (event) =>
+                                    event.pid === servingPid &&
+                                    event.scope === scope &&
+                                    event.phase === 'after' &&
+                                    event.hook === 'close',
+                            ),
+                            `${scope} close hooks complete in the serving fork`,
+                        )
+                }
                 assert.doesNotMatch(
                     log,
                     /did not shut down|Exiting anyway|Could not shut|terminating it/u,
