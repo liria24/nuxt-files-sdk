@@ -47,19 +47,20 @@ export type FilesRoute = Omit<CreateFilesRouterOptions, 'files' | 'authorize'> &
 
 export type StorageSet = StorageConfig | Record<string, StorageConfig>
 /** One environment's Files options, before or after resolution. */
-export interface FilesEnvironmentConfig {
-    storage?: StorageSet
+export interface FilesEnvironmentConfig<Storage = StorageSet> {
+    storage?: Storage
     routes?: readonly FilesRoute[]
 }
-/** User-authored configuration. Environment blocks can override every Files option. */
-export interface FilesConfigInput extends FilesEnvironmentConfig {
+interface FilesConfigContext<Base> extends FilesEnvironmentConfig {
     /** Overrides applied by the development server. */
-    $development?: FilesEnvironmentConfig
-    $production?: FilesEnvironmentConfig
-    $test?: FilesEnvironmentConfig
-    $prerender?: FilesEnvironmentConfig
-    $env?: Record<string, FilesEnvironmentConfig>
+    $development?: FilesEnvironmentConfig<StorageSet | InheritedStorage<Base>>
+    $production?: FilesEnvironmentConfig<StorageSet | InheritedStorage<Base>>
+    $test?: FilesEnvironmentConfig<StorageSet | InheritedStorage<Base>>
+    $prerender?: FilesEnvironmentConfig<StorageSet | InheritedStorage<Base>>
+    $env?: Record<string, FilesEnvironmentConfig<StorageSet | InheritedStorage<Base>>>
 }
+/** User-authored configuration with complete environment entries; defineFilesConfig also infers base overrides. */
+export interface FilesConfigInput extends FilesConfigContext<never> {}
 /** Environment-resolved runtime configuration. */
 export interface FilesConfig extends FilesEnvironmentConfig {
     storage: StorageSet
@@ -89,18 +90,64 @@ type EnvironmentStorage<T> =
     | StorageOf<T extends { $test: infer E } ? E : never>
     | StorageOf<T extends { $prerender: infer E } ? E : never>
     | StorageOf<T extends { $env: infer E } ? E[keyof E] : never>
-type OverrideEntry<Base, Override> = Omit<Base, keyof Override> & Override
-type OverrideStorage<Base, Override> = Override extends { adapter: unknown }
-    ? OverrideEntry<Base, Override>
-    : Override extends object
-      ? {
-            [K in keyof Base | keyof Override]: K extends keyof Override
-                ? OverrideEntry<K extends keyof Base ? Base[K] : {}, Override[K]>
-                : K extends keyof Base
-                  ? Base[K]
-                  : never
-        }
+type PartialConfig<T> = T extends (...args: never[]) => unknown
+    ? T
+    : T extends readonly unknown[]
+      ? T
+      : T extends object
+        ? { [K in keyof T]?: PartialConfig<T[K]> }
+        : T
+type InheritedEntry<Base> = Base extends { adapter: infer A extends StorageAdapter }
+    ? Omit<StorageConfig<A>, 'adapter' | 'config'> & {
+          adapter?: A
+          config?: PartialConfig<Exclude<AdapterOptions<A>, undefined>> | (() => Exclude<AdapterOptions<A>, undefined>)
+      }
+    : never
+type InheritedStorage<Base> = Base extends { adapter: StorageAdapter }
+    ? InheritedEntry<Base>
+    : Base extends Record<string, unknown>
+      ? Record<string, StorageConfig | InheritedEntry<Base[keyof Base]>>
       : never
+
+type MergeOptions<Base, Override> = Override extends (...args: never[]) => unknown
+    ? Override
+    : Override extends readonly unknown[]
+      ? Override
+      : Override extends object
+        ? Base extends (...args: never[]) => unknown
+            ? Override
+            : Base extends readonly unknown[]
+              ? Override
+              : Base extends object
+                ? Omit<Base, keyof Override> & {
+                      [K in keyof Override]: K extends keyof Base ? MergeOptions<Base[K], Override[K]> : Override[K]
+                  }
+                : Override
+        : Override
+type CheckedOverrideEntry<Base, Override> = MergeOptions<
+    Override extends { adapter: infer A }
+        ? A extends ProviderSlug
+            ? Base extends { adapter: A }
+                ? Base
+                : Omit<Base, 'config'>
+            : Omit<Base, 'config'>
+        : Base,
+    Override
+>
+type OverrideEntry<Base, Override> = Omit<Base, keyof Override> & Override
+type OverrideStorage<Base, Override> = Override extends object
+    ? Base extends { adapter: StorageAdapter }
+        ? OverrideEntry<Base, Override>
+        : Override extends { adapter: StorageAdapter }
+          ? OverrideEntry<Base, Override>
+          : {
+                [K in keyof Base | keyof Override]: K extends keyof Override
+                    ? OverrideEntry<K extends keyof Base ? Base[K] : {}, Override[K]>
+                    : K extends keyof Base
+                      ? Base[K]
+                      : never
+            }
+    : never
 
 /** Possible storage shapes after inheriting common options into each environment. */
 export type StorageBranches<T> =
@@ -116,9 +163,17 @@ export type StorageNames<T> =
         : never
 type RouteCheck<T> = FilesRoute &
     ([StorageNames<T>] extends [never] ? { storage?: never } : { storage: StorageNames<T> })
+
+type OverrideCheck<Base, Override> = Base extends { adapter: StorageAdapter }
+    ? EntryCheck<CheckedOverrideEntry<Base, Override>>
+    : Override extends { adapter: StorageAdapter }
+      ? EntryCheck<CheckedOverrideEntry<Base, Override>>
+      : { [K in keyof Override]: EntryCheck<CheckedOverrideEntry<K extends keyof Base ? Base[K] : {}, Override[K]>> }
 type EnvironmentCheck<T, Root> = T extends object
     ? Record<Exclude<keyof T, 'storage' | 'routes'>, never> &
-          (T extends { storage: infer S } ? { storage: S & StorageCheck<S> } : unknown) &
+          (T extends { storage: infer S }
+              ? { storage: S & OverrideCheck<[StorageOf<Root>] extends [never] ? {} : StorageOf<Root>, S> }
+              : unknown) &
           (T extends { routes: unknown } ? { routes: readonly RouteCheck<Root>[] } : unknown)
     : never
 type InputCheck<T> = Record<
@@ -127,13 +182,15 @@ type InputCheck<T> = Record<
 > &
     (T extends { storage: infer S } ? { storage: S & StorageCheck<S> } : unknown) &
     (T extends { routes: unknown } ? { routes: readonly RouteCheck<T>[] } : unknown) & {
-        [K in Extract<keyof T, '$development' | '$production' | '$test' | '$prerender'>]: T[K] &
+        [K in Extract<keyof T, '$development' | '$production' | '$test' | '$prerender'>]?: T[K] &
             EnvironmentCheck<T[K], T>
     } & (T extends { $env: infer E extends Record<string, unknown> }
         ? { $env: { [K in keyof E]: E[K] & EnvironmentCheck<E[K], T> } }
         : unknown)
 
 /** Preserve storage names, adapters, and plugin literals without resolving an environment. */
-export function defineFilesConfig<const C extends object>(config: C & FilesConfigInput & InputCheck<NoInfer<C>>): C {
+export function defineFilesConfig<const C extends object>(
+    config: C & FilesConfigContext<StorageSet> & InputCheck<NoInfer<C>>,
+): NoInfer<C> {
     return config
 }

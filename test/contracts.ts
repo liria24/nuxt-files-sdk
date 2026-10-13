@@ -1,4 +1,21 @@
 export const contracts = [
+    ...[
+        ['TYPE-029', 'Explicit custom factory overrides require complete config regardless of structural identity'],
+        ['TYPE-020', 'Switching adapters requires provider config'],
+        ['TYPE-021', 'Switching adapters discards base provider config'],
+        ['TYPE-022', 'New named storage requires provider config'],
+        ['TYPE-023', 'New named storage requires an adapter'],
+        ['TYPE-024', 'Environment-only storage requires an adapter'],
+        ['TYPE-025', 'A replacement resolver returns complete provider config'],
+        ['TYPE-026', 'A config object cannot inherit fields from a resolver'],
+        ['TYPE-027', 'Inherited environment overrides reject unknown storage options'],
+        ['TYPE-028', 'Inherited environment overrides check option values'],
+    ].map(([id, guarantee]) => ({
+        id: id!,
+        guarantee: guarantee!,
+        source: 'test/types/invalid/cases.ts',
+        job: 'test-nuxt4',
+    })),
     {
         id: 'CLI-004',
         guarantee: 'Test cancellation drains owned consumer processes before teardown and prevents later stages',
@@ -312,6 +329,12 @@ export const contracts = [
         job: 'test-nuxt4',
     },
     {
+        id: 'TYPE-019',
+        guarantee: 'Environment overrides inherit base adapters and config without allowing incomplete new providers',
+        source: 'test/unit/config.test.ts',
+        job: 'typecheck',
+    },
+    {
         id: 'ENV-001',
         guarantee: 'Native environment keys and aliases take precedence over NUXT aliases',
         source: 'test/unit/environment.test.ts',
@@ -332,6 +355,12 @@ export const contracts = [
     {
         id: 'ENV-004',
         guarantee: 'Nested synchronous construction keeps temporary aliases until the outer call returns',
+        source: 'test/unit/environment.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'ENV-005',
+        guarantee: 'S3 endpoints survive alias cleanup as explicit adapter options for delayed AWS resolution',
         source: 'test/unit/environment.test.ts',
         job: 'unit',
     },
