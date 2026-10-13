@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { createTest } from '@nuxt/test-utils/e2e'
+
 export const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 export const fixtureDirectory = (name: string) => resolve(repositoryRoot, 'test/fixtures', name)
 
@@ -174,6 +176,36 @@ export const startFixtureServer = async (
     options: { development?: boolean; readyPath?: string; signal?: AbortSignal } = {},
 ): Promise<{ url: string; close: () => Promise<void>; output: () => string }> => {
     options.signal?.throwIfAborted()
+    const directory = fixtureDirectory(name)
+    const manifest = await readFile(resolve(directory, 'package.json'), 'utf8').then(JSON.parse, () => ({}))
+    if (manifest.dependencies?.nuxt) {
+        const hooks = createTest({
+            rootDir: directory,
+            browser: false,
+            dev: Boolean(options.development),
+            build: Boolean(options.development),
+            env: { NITRO_NO_UNIX_SOCKET: '1' },
+            nuxtConfig: { nitro: { output: { dir: resolve(directory, '.output') } } },
+        })
+        let closing: Promise<void> | undefined
+        const close = () => {
+            options.signal?.removeEventListener('abort', abort)
+            return (closing ??= hooks.afterAll())
+        }
+        const abort = () => {
+            void close().catch(() => {})
+        }
+        try {
+            await hooks.beforeAll()
+            options.signal?.throwIfAborted()
+            options.signal?.addEventListener('abort', abort, { once: true })
+            return { url: hooks.ctx.url!.replace(/\/$/u, ''), close, output: () => hooks.ctx.serverLogs.join('\n') }
+        } catch (error) {
+            await close()
+            throw error
+        }
+    }
+    if (options.development) throw new Error('Development servers require a Nuxt fixture')
     const reservation = createServer()
     await new Promise<void>((ready, reject) => {
         reservation.once('error', reject)
@@ -183,18 +215,12 @@ export const startFixtureServer = async (
     if (!address || typeof address === 'string') throw new Error('No fixture port allocated')
     const port = address.port
     await new Promise<void>((closed) => reservation.close(() => closed()))
-    const child = spawn(
-        'node',
-        options.development
-            ? ['node_modules/nuxt/bin/nuxt.mjs', 'dev', '--no-fork', '--port', String(port), '--host', '127.0.0.1']
-            : ['.output/server/index.mjs'],
-        {
-            cwd: fixtureDirectory(name),
-            env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', NITRO_NO_UNIX_SOCKET: '1' },
-            detached: process.platform !== 'win32',
-            stdio: ['ignore', 'pipe', 'pipe'],
-        },
-    )
+    const child = spawn('node', ['.output/server/index.mjs'], {
+        cwd: fixtureDirectory(name),
+        env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', NITRO_NO_UNIX_SOCKET: '1' },
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', 'pipe', 'pipe'],
+    })
     let output = ''
     let spawnError: Error | undefined
     child.on('error', (error) => (spawnError = error))
@@ -212,7 +238,7 @@ export const startFixtureServer = async (
     options.signal?.addEventListener('abort', abort, { once: true })
     if (options.signal?.aborted) abort()
     try {
-        for (let attempt = 0; attempt < (options.development ? 300 : 100); attempt += 1) {
+        for (let attempt = 0; attempt < 100; attempt += 1) {
             options.signal?.throwIfAborted()
             if (spawnError) throw spawnError
             if (child.exitCode !== null || child.signalCode !== null)
@@ -266,8 +292,23 @@ const ownedPidAlive = (pid: number): boolean => {
 /** Terminate only this handle and its captured owned tree/group, within bounded waits. */
 export const closeOwnedProcess = async (
     child: ChildProcess,
-    options: { cwd?: string; reported?: ReadonlySet<number>; ipcMessage?: string } = {},
+    options: {
+        cwd?: string
+        reported?: ReadonlySet<number>
+        ipcMessage?: string
+        onProgress?: (event: object) => void
+    } = {},
 ): Promise<void> => {
+    const started = performance.now()
+    const observe = (phase: string, data: object = {}) =>
+        options.onProgress?.({
+            phase,
+            atMs: Number(process.hrtime.bigint() / 1_000_000n),
+            ms: performance.now() - started,
+            ...data,
+        })
+    observe('cleanup-start', { pid: child.pid })
+    child.once('exit', (code, signal) => observe('root-exit', { pid: child.pid, code, signal }))
     const cwd = options.cwd ?? repositoryRoot
     const owned = new Set(options.reported)
     const captured = new Set<number>()
@@ -390,8 +431,10 @@ export const closeOwnedProcess = async (
     } catch (error) {
         errors.push(`Owned-process enumeration failed: ${String(error)}`)
     }
+    observe('tree-captured', { pids: [...captured] })
     if (!closed()) {
         if (options.ipcMessage && child.connected) {
+            observe('stop-send')
             await new Promise<void>((done) => {
                 const timeout = setTimeout(() => {
                     errors.push('Native shutdown IPC send timed out')
@@ -401,6 +444,7 @@ export const closeOwnedProcess = async (
                     child.send(options.ipcMessage!, (error) => {
                         clearTimeout(timeout)
                         if (error) errors.push(`Native shutdown IPC failed: ${error.message}`)
+                        observe('stop-sent', { error: error?.message })
                         done()
                     })
                 } catch (error) {
@@ -417,6 +461,7 @@ export const closeOwnedProcess = async (
     while (Date.now() < cleanupDeadline && (await anyAlive(cleanupDeadline)))
         await new Promise((done) => setTimeout(done, 100))
     if (await anyAlive(cleanupDeadline)) {
+        observe('force-start', { alive: lastAlivePid })
         errors.push(
             `Native process shutdown exceeded its cleanup deadline (alive=${lastAlivePid}; root=${child.pid}, exit=${child.exitCode}, signal=${child.signalCode}; reported=${[...(options.reported ?? [])].join(',')}; captured=${[...captured].join(',')})`,
         )
@@ -456,6 +501,7 @@ export const closeOwnedProcess = async (
     while (Date.now() < forcedDeadline && (await anyAlive(forcedDeadline)))
         await new Promise((done) => setTimeout(done, 100))
     if (await anyAlive(forcedDeadline)) errors.push('Captured owned processes survived bounded cleanup')
+    observe('cleanup-complete', { errors })
     if (errors.length) throw new Error(errors.join('\n'))
 }
 

@@ -9,7 +9,9 @@ const project = (name: string, include: string[]) => ({
             NUXT_APP_SECRET: 'fixture-only-root-secret-for-files-gateway-2026',
             FILES_API_SECRET: 'fixture-only-explicit-nitro-gateway-secret',
         },
-        ...(name === 'unit' || name === 'consumer' ? {} : { globalSetup: ['./test/utils/global-setup.ts'] }),
+        ...(['unit', 'artifact', 'consumer', 'cli'].includes(name)
+            ? {}
+            : { globalSetup: ['./test/utils/global-setup.ts'] }),
         fileParallelism: false,
         hookTimeout: 300_000,
         testTimeout: 300_000,
@@ -83,6 +85,8 @@ export default defineConfig({
             project('nuxt5', ['test/nuxt/nuxt5*.test.ts']),
             project('nitro-v2', ['test/nitro/v2.test.ts', 'test/nitro/dev-close.test.ts']),
             project('nitro-v3', ['test/nitro/v3.test.ts']),
+            project('artifact', ['test/consumer/artifact.test.ts']),
+            project('cli', ['test/consumer/cli.test.ts']),
             project('consumer', ['test/consumer/packed.test.ts']),
             project('bundle', ['test/bundle/bundle.test.ts']),
         ],

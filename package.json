@@ -31,13 +31,16 @@
         "test:nuxt5": "vp test run --project nuxt5",
         "test:nitro2": "vp test run --project nitro-v2",
         "test:nitro3": "vp test run --project nitro-v3",
-        "test:consumer": "vp test run --project consumer",
+        "test:consumer": "vp test run --project artifact --project consumer --project cli",
         "test:size": "vp test run --project bundle",
         "benchmark": "bun test/benchmark.ts",
         "benchmark:integration": "bun test/benchmark-integration.ts",
         "docs:prepare": "bun run build && bun run --cwd=docs prepare:types",
         "test:vite-server": "vp test run --project vite-server",
-        "bundle:size": "bun run build && bun scripts/measure-bundles.mjs --package-root packages/nuxt-files-sdk"
+        "bundle:size": "bun run build && bun scripts/measure-bundles.mjs --package-root packages/nuxt-files-sdk",
+        "test:compatibility": "vp test run --project consumer",
+        "test:cli": "vp test run --project cli",
+        "test:package": "vp test run --project artifact"
     },
     "devDependencies": {
         "@nuxt/schema": "^4.6.1",
@@ -46,6 +49,7 @@
         "knip": "^6.41.0",
         "npm": "12.2.0",
         "pkg-pr-new": "^0.0.91",
+        "pnpm": "10.25.0",
         "sherif": "^1.13.0",
         "taze": "^21.3.0",
         "typescript": "^7.0.2",

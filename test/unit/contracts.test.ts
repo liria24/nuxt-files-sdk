@@ -65,15 +65,17 @@ test('[REL-002] mandatory jobs and the release artifact fail closed', async () =
     expect(consumer.strategy?.['fail-fast']).toBe(false)
     expect(consumer.strategy?.matrix.os).toEqual(['ubuntu-latest', 'windows-latest'])
     expect(consumer.strategy?.matrix['package-manager']).toEqual(['bun', 'npm', 'pnpm'])
-    expect(consumer.strategy?.matrix.compatibility).toEqual(['minimum', 'latest-supported'])
-    expect(consumer.strategy?.matrix.include).toEqual([
+    expect(consumer.strategy?.matrix.compatibility).toBeUndefined()
+    const bounds = ci.jobs['test-compatibility-bounds']!
+    expect(bounds['runs-on']).toBe('ubuntu-latest')
+    expect(bounds.strategy?.matrix.compatibility).toEqual(['minimum', 'latest-supported'])
+    expect(bounds.strategy?.matrix.include).toEqual([
         { compatibility: 'minimum', nuxt: '4.6.0', nitro2: '2.13.0' },
         { compatibility: 'latest-supported', nuxt: '^4.6.0', nitro2: '^2.13.0' },
     ])
     expect(consumer.env).toEqual({
         NUXT_FILES_PACKAGE_MANAGER: '${{ matrix.package-manager }}',
-        NUXT_FILES_NUXT_VERSION: '${{ matrix.nuxt }}',
-        NUXT_FILES_NITRO2_VERSION: '${{ matrix.nitro2 }}',
+        NUXT_FILES_CONSUMER_SMOKE: '1',
     })
     const upload = ci.jobs.build?.steps?.find(({ uses }) => uses?.startsWith('actions/upload-artifact@'))
     const download = consumer.steps?.find(({ uses }) => uses?.startsWith('actions/download-artifact@'))
@@ -92,7 +94,25 @@ test('[REL-002] mandatory jobs and the release artifact fail closed', async () =
     expect(consumerCommands).not.toMatch(/(?:npm pack|bun pm pack|bun run build)/u)
     const verification = consumer.steps?.find(({ run }) => run?.includes('verify-packed-artifact.ts'))
     expect(verification?.env?.NUXT_FILES_TARBALL).toBe('${{ runner.temp }}/files-artifact/nuxt-files-sdk.tgz')
-    expect(verification?.run).toBe('bun scripts/verify-packed-artifact.ts && bun run test:consumer')
+    expect(verification?.run).toBe('bun scripts/verify-packed-artifact.ts && bun run test:compatibility')
+    expect(ci.jobs['test-package']?.['runs-on']).toBe('ubuntu-latest')
+    expect(ci.jobs['test-cli-lifecycle']?.strategy?.matrix.os).toEqual(['ubuntu-latest', 'windows-latest'])
+    expect(ci.jobs['test-cli-lifecycle']?.env?.NUXT_FILES_PACKAGE_MANAGER).toBe('pnpm')
+    for (const name of ['test-package', 'test-compatibility-bounds', 'test-cli-lifecycle']) {
+        const job = ci.jobs[name]!
+        expect(job.needs, name).toBe('build')
+        expect(job.steps?.find(({ uses }) => uses?.startsWith('actions/download-artifact@'))?.with?.name, name).toBe(
+            upload?.with?.name,
+        )
+        const artifactVerification = job.steps?.find(({ run }) => run?.includes('verify-packed-artifact.ts'))
+        expect(artifactVerification?.env?.NUXT_FILES_TARBALL, name).toBe(
+            '${{ runner.temp }}/files-artifact/nuxt-files-sdk.tgz',
+        )
+    }
+    const setup = await readFile(resolve(repositoryRoot, '.github/actions/setup/action.yml'), 'utf8')
+    expect(setup).toContain('cache: true')
+    expect(setup).toContain('node-version-file: .node-version')
+    expect(setup).not.toContain('node_modules')
     expect(gate.steps?.map(({ run }) => run).join('\n')).toContain('all(.[]; .result == "success")')
     for (const path of [
         'actions/setup/action.yml',
