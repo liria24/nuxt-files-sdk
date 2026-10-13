@@ -2,8 +2,10 @@ import { defineFilesConfig } from 'nuxt-files-sdk/config'
 
 import { versioning } from '#files-sdk/versioning'
 
+const { storage } = await import('./storage')
+
 export default defineFilesConfig({
-    storage: { adapter: 'fs', config: { root: '.data/files' }, plugins: [versioning()] },
+    storage: { ...storage, plugins: [versioning()] },
     routes: [
         {
             path: '/gateway',
