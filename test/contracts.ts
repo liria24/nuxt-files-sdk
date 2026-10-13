@@ -1,5 +1,23 @@
 export const contracts = [
     {
+        id: 'CLI-006',
+        guarantee: 'Finite installation and verification budgets cancel and drain their owned work independently',
+        source: 'test/unit/consumer-budget.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'LSP-001',
+        guarantee: 'Client-owned LSP watches report real changes and release their registrations',
+        source: 'test/unit/lsp-watchers.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'LSP-002',
+        guarantee: 'Natural LSP exit validation rejects unexpected diagnostics, versions, codes, and signals',
+        source: 'test/unit/lsp-exit.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'CLI-004',
         guarantee: 'Test cancellation drains owned consumer processes before teardown and prevents later stages',
         source: 'test/unit/consumer-cancellation.test.ts',
