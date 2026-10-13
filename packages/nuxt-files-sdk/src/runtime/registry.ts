@@ -9,7 +9,7 @@ import {
     type ProviderSlug,
 } from 'files-sdk'
 
-import type { FilesConfig, FilesConfigInput, StorageBranches, StorageConfig, StorageNames } from '../config'
+import type { FilesConfig, StorageBranches, StorageConfig, StorageNames } from '../config'
 import { filesDevtoolsCapabilities } from '../devtools/capabilities'
 import type { FilesDevtoolsDiagnosticCode } from '../devtools/diagnostics'
 import type { DependencyDiagnostic } from '../integration/diagnostics'
@@ -41,14 +41,14 @@ type NamedSet<C> = Exclude<StorageBranches<C>, { adapter: unknown }>
 type NamedEntry<C, Name extends PropertyKey> =
     NamedSet<C> extends infer S ? (S extends object ? (Name extends keyof S ? S[Name] : never) : never) : never
 /** Map each configured storage name to its native Files client and plugin extensions. */
-export type StorageRegistry<C extends FilesConfigInput> = {
+export type StorageRegistry<C extends object> = {
     [Name in StorageNames<C>]: FilesForStorage<
         Extract<NamedEntry<C, Name>, { adapter: ProviderSlug | ((...args: never[]) => Adapter) }>
     >
 }
 
 /** Files client returned by an unnamed single-storage configuration. */
-export type SingleStorage<C extends FilesConfigInput> = FilesForStorage<SingleEntry<C>>
+export type SingleStorage<C extends object> = FilesForStorage<SingleEntry<C>>
 
 /** Hooks emitted by the Nuxt/Nitro bridge after the storage's native hooks. */
 export interface FilesRuntimeHooks {
@@ -216,7 +216,7 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
             }
             const value =
                 selected.adapter === 's3'
-                    ? withS3NuxtCredentials(input)
+                    ? withS3NuxtOptions(input)
                     : selected.adapter === 'bun-s3'
                       ? withBunS3NuxtOptions(input)
                       : input
@@ -260,9 +260,15 @@ export class FilesRegistry<const C extends FilesConfig = FilesConfig> {
     }
 }
 
-/** Pass NUXT_ credentials explicitly because the AWS SDK resolves its chain after construction. */
-const withS3NuxtCredentials = (input: unknown): unknown => {
-    if (!input || typeof input !== 'object' || 'credentials' in input) return input
+/** Capture options the AWS SDK otherwise resolves after temporary NUXT_ aliases are removed. */
+const withS3NuxtOptions = (input: unknown): unknown => {
+    if (!input || typeof input !== 'object') return input
+    const endpoint = process.env.AWS_ENDPOINT_URL_S3 ?? process.env.AWS_ENDPOINT_URL
+    const options =
+        (!('endpoint' in input) || input.endpoint === undefined) && endpoint !== undefined
+            ? { ...input, endpoint }
+            : input
+    if ('credentials' in options) return options
     if (
         [
             'AWS_ACCESS_KEY_ID',
@@ -273,12 +279,12 @@ const withS3NuxtCredentials = (input: unknown): unknown => {
             'AWS_CONTAINER_CREDENTIALS_FULL_URI',
         ].some((key) => process.env[key] !== undefined)
     )
-        return input
+        return options
     const accessKeyId = process.env.NUXT_AWS_ACCESS_KEY_ID
     const secretAccessKey = process.env.NUXT_AWS_SECRET_ACCESS_KEY
-    if (!accessKeyId || !secretAccessKey) return input
+    if (!accessKeyId || !secretAccessKey) return options
     return {
-        ...input,
+        ...options,
         credentials: {
             accessKeyId,
             secretAccessKey,

@@ -9,6 +9,43 @@ import { withConsumerSession } from '../utils/consumer-session'
 import { closeOwnedProcess, runCommand, startFixtureServer } from '../utils/fixture'
 import { checkHoverDocumentation } from '../utils/generated-types'
 
+test('[CLI-004] installation budget cancellation drains its real owned process', async (context) => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'files-install-budget-'))
+    const report = resolve(directory, 'pid.txt')
+    const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+    const finished = vi.fn<TestContext['onTestFinished']>()
+    const work = withConsumerSession(
+        { signal: context.signal, onTestFinished: finished },
+        'bounded install',
+        async ({ signal, stage }) => {
+            await stage('install', () =>
+                runCommand(
+                    process.execPath,
+                    [
+                        '-e',
+                        `require('node:fs').writeFileSync(process.argv[1], String(process.pid)); setInterval(() => {}, 1000)`,
+                        report,
+                    ],
+                    { cwd: directory, signal },
+                ),
+            )
+        },
+        { installation: 500, verification: 500 },
+    )
+    const outcome = work.catch((error: unknown) => error)
+    try {
+        expect(String(await outcome)).toContain('installation exceeded 500ms')
+        const pid = Number(await readFile(report, 'utf8'))
+        expect(alive(pid)).toBe(false)
+        expect(alive(unrelated.pid!)).toBe(true)
+        await expect(finished.mock.calls[0]![0](context)).rejects.toThrow('installation exceeded 500ms')
+    } finally {
+        await outcome
+        await closeOwnedProcess(unrelated)
+        await rm(directory, { recursive: true, force: true })
+    }
+})
+
 const alive = (pid: number) => {
     try {
         process.kill(pid, 0)

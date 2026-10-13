@@ -28,6 +28,7 @@ export interface NitroIntegration {
         alias?: Record<string, string>
         virtual?: Record<string, string>
         externals?: { inline?: unknown[] }
+        rollupConfig?: { plugins?: unknown[] }
     }
     unimport?: {
         injectImports(code: string, id?: string): Promise<{ code: string }>
@@ -311,6 +312,9 @@ export const setupNitroFilesIntegration = async (
     const pluginPath = resolve(directory, nitro.options.dev ? 'plugin.dev.mjs' : 'plugin.mjs')
     const resolvedPath = resolve(directory, nitro.options.dev ? 'resolved.dev.mjs' : 'resolved.mjs')
     const selectedPath = resolve(directory, nitro.options.dev ? 'selected.dev.ts' : 'selected.ts')
+    ;((nitro.options.rollupConfig ??= {}).plugins ??= []).push(
+        selectedSourcePlugin({ selected: selectedPath, source: prepared.source, configPath }),
+    )
     const routePaths = routes.map((_, index) =>
         resolve(directory, `gateway-${index}${nitro.options.dev ? '.dev' : ''}.mjs`).replaceAll('\\', '/'),
     )
@@ -394,7 +398,7 @@ export default async (event) => {
     return true
 }
 
-/** Preserve TypeScript compilation when Nuxt places its build directory inside node_modules. */
+/** Compile selected TypeScript outside node_modules and resolve its imports from the original config. */
 export const selectedSourcePlugin = (options: { selected: string; source: string; configPath: string }) => {
     const selected = options.selected.replaceAll('\\', '/')
     const id = `nuxt-files-sdk:${basename(selected)}`
@@ -438,9 +442,7 @@ export const wireNuxtNitroOptions = (
 ): void => {
     // The public schema deliberately does not embed Nitro's native option types.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const config = value as Pick<NitroIntegration['options'], 'alias' | 'externals'> & {
-        rollupConfig?: { plugins?: unknown[] }
-    }
+    const config = value as Pick<NitroIntegration['options'], 'alias' | 'externals' | 'rollupConfig'>
     config.alias = registerSdkAliases(
         { ...config.alias, 'nuxt-files-sdk/runtime': options.runtime, '#nuxt-files-sdk/registry': options.registry },
         options.sdk,

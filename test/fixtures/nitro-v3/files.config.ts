@@ -4,11 +4,12 @@ import { memory } from '#files-sdk/memory'
 import { versioning } from '#files-sdk/versioning'
 
 const custom = () => memory()
+const { storage } = await import('./storage')
 
 export default defineFilesConfig({
     storage: {
-        archive: { adapter: 'fs', config: { root: '.data/default' }, plugins: () => [versioning()] },
-        blob: { adapter: 'fs', config: { root: '.data/files' } },
+        archive: { ...storage.archive, plugins: () => [versioning()] },
+        blob: storage.blob,
         custom: { adapter: custom },
     },
     routes: [

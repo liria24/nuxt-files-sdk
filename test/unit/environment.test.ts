@@ -105,6 +105,74 @@ describe('NUXT_ environment bridge', () => {
         expect(nativeOptions).not.toHaveProperty('credentials')
     })
 
+    test.each([
+        { nuxtService: 'https://nuxt-s3.test', expected: 'https://nuxt-s3.test' },
+        { nuxtService: 'https://nuxt-s3.test', explicit: undefined, expected: 'https://nuxt-s3.test' },
+        { nuxtGlobal: 'https://nuxt-global.test', expected: 'https://nuxt-global.test' },
+        {
+            nuxtService: 'https://nuxt-s3.test',
+            nuxtGlobal: 'https://nuxt-global.test',
+            expected: 'https://nuxt-s3.test',
+        },
+        {
+            nuxtService: 'https://nuxt-s3.test',
+            nativeGlobal: 'https://native-global.test',
+            expected: 'https://native-global.test',
+        },
+        {
+            nuxtGlobal: 'https://nuxt-global.test',
+            nativeService: 'https://native-s3.test',
+            expected: 'https://native-s3.test',
+        },
+        {
+            nativeService: 'https://native-s3.test',
+            nativeGlobal: 'https://native-global.test',
+            expected: 'https://native-s3.test',
+        },
+        { nuxtService: 'https://nuxt-s3.test', explicit: 'https://explicit.test', expected: 'https://explicit.test' },
+        {
+            nativeService: 'https://native-s3.test',
+            explicit: 'https://explicit.test',
+            expected: 'https://explicit.test',
+        },
+    ])('[ENV-001][ENV-003][ENV-005] captures the S3 endpoint for delayed reads: $expected', async (values) => {
+        const { nuxtService, nuxtGlobal, nativeService, nativeGlobal, explicit, expected } = values as {
+            nuxtService?: string
+            nuxtGlobal?: string
+            nativeService?: string
+            nativeGlobal?: string
+            explicit?: string
+            expected: string
+        }
+        vi.stubEnv('NUXT_AWS_ENDPOINT_URL_S3', nuxtService)
+        vi.stubEnv('NUXT_AWS_ENDPOINT_URL', nuxtGlobal)
+        vi.stubEnv('AWS_ENDPOINT_URL_S3', nativeService)
+        vi.stubEnv('AWS_ENDPOINT_URL', nativeGlobal)
+        const input = Object.freeze({
+            bucket: 'fixture',
+            region: 'us-east-1',
+            credentials: { accessKeyId: 'fixture-access', secretAccessKey: 'fixture-secret' },
+            ...('explicit' in values ? { endpoint: explicit } : {}),
+        })
+        let delayedRead!: () => Promise<unknown>
+        new FilesRegistry(
+            { storage: { adapter: 's3', config: () => input } },
+            {
+                environment: { s3: variables },
+                factories: {
+                    s3: (config) => {
+                        delayedRead = async () => config
+                        return memory()
+                    },
+                },
+            },
+        ).get()
+        expect(process.env.AWS_ENDPOINT_URL_S3).toBe(nativeService)
+        expect(process.env.AWS_ENDPOINT_URL).toBe(nativeGlobal)
+        expect(await delayedRead()).toEqual({ ...input, endpoint: expected })
+        expect(input.endpoint).toBe(explicit)
+    })
+
     test('maps Bun S3 chain aliases to options without changing process.env', () => {
         vi.stubEnv('NUXT_S3_ACCESS_KEY_ID', 'nuxt-access')
         vi.stubEnv('NUXT_S3_SECRET_ACCESS_KEY', 'nuxt-secret')

@@ -8,6 +8,8 @@ import { createMessageConnection, StreamMessageReader, StreamMessageWriter } fro
 
 import { invalidTypeCases } from '../types/invalid/cases'
 import { closeOwnedProcess, repositoryRoot, runCommand } from './fixture'
+import { checkLspExit } from './lsp-exit'
+import { createLspWatchers } from './lsp-watchers'
 
 type TypeCheckOptions = { signal?: AbortSignal }
 
@@ -202,8 +204,8 @@ export const checkHoverDocumentation = async (
     const cancelled = Promise.withResolvers<never>()
     const abort = () => cancelled.reject(options.signal?.reason ?? new Error('TypeScript hover validation cancelled'))
     options.signal?.addEventListener('abort', abort, { once: true })
-    const closed = Promise.withResolvers<void>()
-    child.once('close', () => closed.resolve())
+    const closed = Promise.withResolvers<{ code: number | null; signal: NodeJS.Signals | null }>()
+    child.once('close', (code, signal) => closed.resolve({ code, signal }))
     let stderr = ''
     const messages: string[] = []
     child.stderr.on('data', (chunk) => (stderr += chunk))
@@ -212,14 +214,27 @@ export const checkHoverDocumentation = async (
         new StreamMessageWriter(child.stdin),
     )
     const registration = Promise.withResolvers<void>()
+    const watchers = createLspWatchers(
+        (changes) => connection.sendNotification('workspace/didChangeWatchedFiles', { changes }),
+        (error) => cancelled.reject(error),
+    )
     const registrationTimer = setTimeout(() => registration.resolve(), 5_000)
     connection.onNotification('window/logMessage', (message: { type: number; message: string }) => {
         messages.push(`${message.type}: ${message.message.slice(0, 2000)}`)
         if (messages.length > 20) messages.shift()
     })
     connection.onError(([error]) => messages.push(`JSON-RPC: ${error.message}`))
-    connection.onRequest((method) => {
-        if (method === 'client/registerCapability') registration.resolve()
+    connection.onRequest((method, params) => {
+        if (method === 'client/registerCapability') {
+            if (!params || !('registrations' in params) || !Array.isArray(params.registrations))
+                throw new Error('Invalid LSP capability registration')
+            watchers.register(params.registrations)
+            registration.resolve()
+        } else if (method === 'client/unregisterCapability') {
+            if (!params || !('unregisterations' in params) || !Array.isArray(params.unregisterations))
+                throw new Error('Invalid LSP capability unregistration')
+            for (const item of params.unregisterations as { id: string }[]) watchers.unregister(item.id)
+        }
         return null
     })
     child.on('error', () => connection.dispose())
@@ -259,7 +274,10 @@ export const checkHoverDocumentation = async (
         await request('initialize', {
             processId: process.pid,
             rootUri: pathToFileURL(docsDirectory).href,
-            capabilities: { textDocument: { hover: { contentFormat: ['markdown', 'plaintext'] } } },
+            capabilities: {
+                textDocument: { hover: { contentFormat: ['markdown', 'plaintext'] } },
+                workspace: { didChangeWatchedFiles: { dynamicRegistration: true } },
+            },
             initializationOptions: { disablePushDiagnostics: true },
         })
         await notify('initialized', {})
@@ -300,7 +318,7 @@ export const checkHoverDocumentation = async (
         await notify('exit')
         let closeTimer: ReturnType<typeof setTimeout> | undefined
         try {
-            await Promise.race([
+            const status = await Promise.race([
                 closed.promise,
                 cancelled.promise,
                 new Promise<never>((_, reject) => {
@@ -310,6 +328,14 @@ export const checkHoverDocumentation = async (
                     )
                 }),
             ])
+            const { version } = JSON.parse(
+                await readFile(resolve(repositoryRoot, 'node_modules/typescript/package.json'), 'utf8'),
+            ) as { version: string }
+            if (checkLspExit(status, stderr, version))
+                // oxlint-disable-next-line no-console
+                console.info(
+                    'TypeScript 7.0.2 LSP closed naturally after shutdown with its known context canceled diagnostic.',
+                )
         } finally {
             clearTimeout(closeTimer)
         }
@@ -319,6 +345,7 @@ export const checkHoverDocumentation = async (
     } finally {
         options.signal?.removeEventListener('abort', abort)
         clearTimeout(registrationTimer)
+        watchers.close()
         try {
             // Windows's public Node shim owns a native compiler child; capture it before terminating the shim.
             if (!naturallyClosed) await closeOwnedProcess(child, { cwd: docsDirectory })

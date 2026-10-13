@@ -13,7 +13,7 @@ export const nitroSuite = (
     expected: Record<string, unknown>,
 ): void => {
     describe(`Nitro ${name === 'nitro-v2' ? 'v2' : 'v3'}`, () => {
-        test('[NITRO-001][TYPE-006][GATEWAY-005] generates, typechecks, builds, and runs the standalone integration', async () => {
+        test('[NITRO-001][TYPE-006][GATEWAY-005] generates, typechecks, builds, and runs config with a relative dynamic import', async () => {
             await runFixture(name, name === 'nitro-v3' ? ['build', 'typecheck'] : undefined)
             const directory = fixtureDirectory(name)
             const generatedDirectory = resolve(

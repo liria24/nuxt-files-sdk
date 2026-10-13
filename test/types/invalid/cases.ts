@@ -1,4 +1,57 @@
 export const invalidTypeCases = [
+    ...[
+        [
+            'TYPE-029',
+            'custom factory switch cannot inherit config by structural identity',
+            "storage: { adapter: (options: { root: string }) => { throw new Error(options.root) }, config: { root: '.' } }, $development: { storage: { adapter: (options: { root: string }) => { throw new Error(options.root) } } }",
+        ],
+        [
+            'TYPE-020',
+            'adapter switch still needs config',
+            "storage: { adapter: 'memory' }, $development: { storage: { adapter: 'fs' } }",
+        ],
+        [
+            'TYPE-021',
+            'adapter switch cannot inherit config',
+            "storage: { adapter: 'r2', config: { bucket: 'base' } }, $development: { storage: { adapter: 's3' } }",
+        ],
+        [
+            'TYPE-022',
+            'new storage still needs config',
+            "storage: { archive: { adapter: 'fs', config: { root: '.' } } }, $development: { storage: { debug: { adapter: 'fs' } } }",
+        ],
+        [
+            'TYPE-023',
+            'new storage cannot inherit adapter',
+            "storage: { archive: { adapter: 'memory' } }, $development: { storage: { debug: { prefix: 'dev' } } }",
+        ],
+        ['TYPE-024', 'environment-only storage still needs adapter', "$development: { storage: { prefix: 'dev' } }"],
+        [
+            'TYPE-025',
+            'resolver replacement still needs complete config',
+            "storage: { adapter: 'fs', config: { root: '.' } }, $development: { storage: { config: () => ({ urlBaseUrl: '/' }) } }",
+        ],
+        [
+            'TYPE-026',
+            'object cannot inherit config from resolver',
+            "storage: { adapter: 'fs', config: () => ({ root: '.' }) }, $development: { storage: { config: { urlBaseUrl: '/' } } }",
+        ],
+        [
+            'TYPE-027',
+            'partial override rejects unknown options',
+            "storage: { adapter: 'fs', config: { root: '.' } }, $development: { storage: { prefx: 'dev' } }",
+        ],
+        [
+            'TYPE-028',
+            'partial override checks option values',
+            "storage: { adapter: 'fs', config: { root: '.' } }, $env: { staging: { storage: { prefix: 123 } } }",
+        ],
+    ].map(([id, name, config]) => ({
+        id: id!,
+        name: name!,
+        diagnostic: /error TS\d+:/u,
+        source: `import { defineFilesConfig } from 'nuxt-files-sdk/config'\ndefineFilesConfig({ ${config} })\n`,
+    })),
     {
         id: 'TYPE-002',
         name: 'unknown storage name',

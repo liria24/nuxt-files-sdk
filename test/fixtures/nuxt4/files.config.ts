@@ -15,7 +15,7 @@ export default defineFilesConfig({
         },
     },
     $development: {
-        storage: { blob: { adapter: 'fs', config: { root: '.', urlBaseUrl: 'NUXT_FILES_DEV_ONLY' } } },
+        storage: { blob: { config: { urlBaseUrl: 'NUXT_FILES_DEV_ONLY' } } },
     },
     $production: { storage: { archive: { adapter: 'fs', config: { root: '.data/production-archive' } } } },
     $prerender: { storage: { archive: { adapter: 'memory' } } },

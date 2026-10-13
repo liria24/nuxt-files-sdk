@@ -6,7 +6,7 @@ import type { RustfsAdapter } from 'files-sdk/rustfs'
 import { versioning } from 'files-sdk/versioning'
 import { describe, expect, expectTypeOf, test } from 'vite-plus/test'
 
-import { defineFilesConfig } from '../../packages/nuxt-files-sdk/src/config'
+import { defineFilesConfig, type FilesConfigInput, type StorageConfig } from '../../packages/nuxt-files-sdk/src/config'
 import {
     FilesRegistry,
     type SingleStorage,
@@ -14,6 +14,46 @@ import {
 } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 describe('configuration types', () => {
+    test('[TYPE-019] preserves annotated inputs and rejects incomplete unbound environments', () => {
+        const config: FilesConfigInput = { $development: { storage: { adapter: 'fs', config: { root: '.' } } } }
+        expect(defineFilesConfig(config)).toBe(config)
+        // @ts-expect-error no known base config can fulfill this environment's required options
+        const invalid: FilesConfigInput = { $development: { storage: { adapter: 'fs' } } }
+        void invalid
+        const storage: StorageConfig<'fs'> = { adapter: 'fs', config: { root: '.' } }
+        const single = defineFilesConfig({ storage, $development: { storage: { prefix: 'dev' } } })
+        const namedStorage: Record<'archive', StorageConfig<'fs'>> = { archive: storage }
+        const named = defineFilesConfig({
+            storage: namedStorage,
+            $development: { storage: { archive: { prefix: 'dev' } } },
+        })
+        expect(single.$development.storage.prefix).toBe('dev')
+        expect(named.$development.storage.archive.prefix).toBe('dev')
+    })
+    test('[TYPE-019] inherits the base adapter for partial environment overrides', () => {
+        const single = defineFilesConfig({
+            storage: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] },
+            $development: { storage: { prefix: 'dev' } },
+            $production: { storage: { adapter: 'fs', config: { urlBaseUrl: 'https://example.test' } } },
+            $test: { storage: { config: { root: 'test' } } },
+            $prerender: { storage: { readonly: true } },
+            $env: { preview: { storage: { prefix: 'preview' } } },
+        })
+        expectTypeOf<SingleStorage<typeof single>['adapter']>().toEqualTypeOf<FsAdapter>()
+        expectTypeOf<SingleStorage<typeof single>>().toHaveProperty('versions')
+        const named = defineFilesConfig({
+            storage: { archive: { adapter: 'fs', config: { root: '.' }, plugins: [versioning()] } },
+            $development: { storage: { archive: { prefix: 'dev' }, debug: { adapter: 'memory' } } },
+            $env: { preview: { storage: { archive: { config: { urlBaseUrl: 'https://example.test' } } } } },
+            routes: [{ path: '/files', storage: 'archive' }],
+        })
+        expectTypeOf<StorageRegistry<typeof named>['archive']['adapter']>().toEqualTypeOf<FsAdapter>()
+        expectTypeOf<StorageRegistry<typeof named>['archive']>().toHaveProperty('versions')
+        expectTypeOf<StorageRegistry<typeof named>['debug']['adapter']>().toEqualTypeOf<MemoryAdapter>()
+        expect(single.$development.storage.prefix).toBe('dev')
+        expect(named.$development.storage.archive.prefix).toBe('dev')
+    })
+
     test('[TYPE-001][TYPE-013] unions adapters and retains base plugins across every environment', () => {
         const single = defineFilesConfig({
             storage: { adapter: 'r2', config: { bucket: 'files' }, plugins: [versioning()] },
