@@ -100,7 +100,7 @@ export const installConsumer = async (directory: string, options: Options = {}):
         process.stdout.write(
             output
                 .split('\n')
-                .filter((line) => /timing (?:idealTree|reify|command:)|http fetch/u.test(line))
+                .filter((line) => /timing (?:idealTree\b|reify\b|command:)|http fetch/u.test(line))
                 .join('\n') + '\n',
         )
     if (update) {

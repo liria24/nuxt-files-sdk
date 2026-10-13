@@ -182,6 +182,7 @@ export const startFixtureServer = async (
         const hooks = createTest({
             rootDir: directory,
             browser: false,
+            dev: false,
             build: false,
             env: { NITRO_NO_UNIX_SOCKET: '1' },
             nuxtConfig: { nitro: { output: { dir: resolve(directory, '.output') } } },
@@ -235,7 +236,7 @@ export const startFixtureServer = async (
     let closing: Promise<void> | undefined
     const close = () => {
         options.signal?.removeEventListener('abort', abort)
-        return (closing ??= closeProcess(child))
+        return (closing ??= closeOwnedProcess(child))
     }
     const abort = () => {
         void close().catch(() => {})
@@ -509,8 +510,6 @@ export const closeOwnedProcess = async (
     observe('cleanup-complete', { errors })
     if (errors.length) throw new Error(errors.join('\n'))
 }
-
-const closeProcess = (child: ChildProcess): Promise<void> => closeOwnedProcess(child)
 
 export const packPackage = async (): Promise<{ directory: string; tarball: string }> => {
     const directory = join(tmpdir(), `nuxt-files-sdk-${crypto.randomUUID()}`)

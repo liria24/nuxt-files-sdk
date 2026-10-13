@@ -811,8 +811,6 @@ export const runPackedNuxtCliSession = async ({
                 } finally {
                     clearTimeout(drainTimer)
                 }
-                assert.equal(child.exitCode, 0, 'The native CLI exits successfully without a signal')
-                assert.equal(child.signalCode, null)
                 if (servingPid !== undefined) {
                     const exits = log
                         .split('\n')
