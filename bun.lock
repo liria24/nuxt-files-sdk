@@ -11,7 +11,7 @@
         "knip": "^6.41.0",
         "npm": "12.2.0",
         "pkg-pr-new": "^0.0.91",
-        "pnpm": "10.25.0",
+        "pnpm": "10.34.7",
         "sherif": "^1.13.0",
         "taze": "^21.3.0",
         "typescript": "^7.0.2",
@@ -2211,7 +2211,7 @@
 
     "pngjs": ["pngjs@7.0.0", "", {}, "sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow=="],
 
-    "pnpm": ["pnpm@10.25.0", "", { "bin": { "pnpm": "bin/pnpm.cjs", "pnpx": "bin/pnpx.cjs" } }, "sha512-XoJjkCevN8+DIGG8xtY5whljRIjg8rrr54UCink957Ul/80/f/V09emGBlTgmP6FK6isXdXO/hdn0joCCpL1AQ=="],
+    "pnpm": ["pnpm@10.34.7", "", { "bin": { "pnpm": "bin/pnpm.cjs", "pnpx": "bin/pnpx.cjs" } }, "sha512-upirxYVTmTM3W1lx9LxtbHOhtLftxKh559EC/lQj0eAjCdZ8YKEfBJVQk6luUhrZw7E4zdZUylvlY/N4s65IvQ=="],
 
     "pnpm-workspace-yaml": ["pnpm-workspace-yaml@1.9.1", "", { "dependencies": { "yaml": "^2.9.0" } }, "sha512-Xj/T2X6DNAWbtk/9UQ0/TJRswltiHZevmcMjqoL7WrpJi67lu3qaslU4+I+zJ8wtwqmuvAE0KkB8rbv2ZdogBg=="],
 

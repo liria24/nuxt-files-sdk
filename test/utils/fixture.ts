@@ -178,12 +178,11 @@ export const startFixtureServer = async (
     options.signal?.throwIfAborted()
     const directory = fixtureDirectory(name)
     const manifest = await readFile(resolve(directory, 'package.json'), 'utf8').then(JSON.parse, () => ({}))
-    if (manifest.dependencies?.nuxt) {
+    if (manifest.dependencies?.nuxt && !options.development && !options.readyPath) {
         const hooks = createTest({
             rootDir: directory,
             browser: false,
-            dev: Boolean(options.development),
-            build: Boolean(options.development),
+            build: false,
             env: { NITRO_NO_UNIX_SOCKET: '1' },
             nuxtConfig: { nitro: { output: { dir: resolve(directory, '.output') } } },
         })
@@ -199,13 +198,13 @@ export const startFixtureServer = async (
             await hooks.beforeAll()
             options.signal?.throwIfAborted()
             options.signal?.addEventListener('abort', abort, { once: true })
-            return { url: hooks.ctx.url!.replace(/\/$/u, ''), close, output: () => hooks.ctx.serverLogs.join('\n') }
+            const url = hooks.ctx.url!.replace(/\/$/u, '')
+            return { url, close, output: () => hooks.ctx.serverLogs.join('\n') }
         } catch (error) {
             await close()
             throw error
         }
     }
-    if (options.development) throw new Error('Development servers require a Nuxt fixture')
     const reservation = createServer()
     await new Promise<void>((ready, reject) => {
         reservation.once('error', reject)
@@ -215,12 +214,18 @@ export const startFixtureServer = async (
     if (!address || typeof address === 'string') throw new Error('No fixture port allocated')
     const port = address.port
     await new Promise<void>((closed) => reservation.close(() => closed()))
-    const child = spawn('node', ['.output/server/index.mjs'], {
-        cwd: fixtureDirectory(name),
-        env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', NITRO_NO_UNIX_SOCKET: '1' },
-        detached: process.platform !== 'win32',
-        stdio: ['ignore', 'pipe', 'pipe'],
-    })
+    const child = spawn(
+        'node',
+        options.development
+            ? ['node_modules/nuxt/bin/nuxt.mjs', 'dev', '--no-fork', '--port', String(port), '--host', '127.0.0.1']
+            : ['.output/server/index.mjs'],
+        {
+            cwd: fixtureDirectory(name),
+            env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', NITRO_NO_UNIX_SOCKET: '1' },
+            detached: process.platform !== 'win32',
+            stdio: ['ignore', 'pipe', 'pipe'],
+        },
+    )
     let output = ''
     let spawnError: Error | undefined
     child.on('error', (error) => (spawnError = error))
@@ -238,7 +243,7 @@ export const startFixtureServer = async (
     options.signal?.addEventListener('abort', abort, { once: true })
     if (options.signal?.aborted) abort()
     try {
-        for (let attempt = 0; attempt < 100; attempt += 1) {
+        for (let attempt = 0; attempt < (options.development ? 300 : 100); attempt += 1) {
             options.signal?.throwIfAborted()
             if (spawnError) throw spawnError
             if (child.exitCode !== null || child.signalCode !== null)

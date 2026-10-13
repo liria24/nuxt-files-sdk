@@ -95,10 +95,13 @@ test('[REL-002] mandatory jobs and the release artifact fail closed', async () =
     const verification = consumer.steps?.find(({ run }) => run?.includes('verify-packed-artifact.ts'))
     expect(verification?.env?.NUXT_FILES_TARBALL).toBe('${{ runner.temp }}/files-artifact/nuxt-files-sdk.tgz')
     expect(verification?.run).toBe('bun scripts/verify-packed-artifact.ts && bun run test:compatibility')
-    expect(ci.jobs['test-package']?.['runs-on']).toBe('ubuntu-latest')
-    expect(ci.jobs['test-cli-lifecycle']?.strategy?.matrix.os).toEqual(['ubuntu-latest', 'windows-latest'])
-    expect(ci.jobs['test-cli-lifecycle']?.env?.NUXT_FILES_PACKAGE_MANAGER).toBe('pnpm')
-    for (const name of ['test-package', 'test-compatibility-bounds', 'test-cli-lifecycle']) {
+    expect(ci.jobs).not.toHaveProperty('test-package')
+    expect(ci.jobs).not.toHaveProperty('test-cli-lifecycle')
+    expect(ci.jobs['test-nuxt4']?.strategy?.matrix.os).toEqual(['ubuntu-latest', 'windows-latest'])
+    expect(ci.jobs['test-nuxt4']?.env?.NUXT_FILES_PACKAGE_MANAGER).toBe('pnpm')
+    const archiveCheck = ci.jobs.build?.steps?.find(({ run }) => run?.includes('test:package'))
+    expect(archiveCheck?.env?.NUXT_FILES_TARBALL).toBe('${{ runner.temp }}/files-artifact/nuxt-files-sdk.tgz')
+    for (const name of ['test-compatibility-bounds', 'test-nuxt4']) {
         const job = ci.jobs[name]!
         expect(job.needs, name).toBe('build')
         expect(job.steps?.find(({ uses }) => uses?.startsWith('actions/download-artifact@'))?.with?.name, name).toBe(

@@ -64,13 +64,13 @@ export const contracts = [
         guarantee:
             'An isolated exact archive survives real CLI startup, repair, dependency addition, restart and termination',
         source: 'test/consumer/cli.test.ts',
-        job: 'test-cli-lifecycle',
+        job: 'test-nuxt4',
     },
     {
         id: 'GATEWAY-006',
         guarantee: 'Native RequestEvent, auth and SDK endpoint binding stay intact across HTTP and CLI transport',
         source: 'test/consumer/cli.test.ts',
-        job: 'test-cli-lifecycle',
+        job: 'test-nuxt4',
     },
     {
         id: 'SECRET-001',
@@ -114,7 +114,7 @@ export const contracts = [
     {
         id: 'UPDATE-002',
         guarantee: 'Real development gateway refuses stale authorization and recovers from invalid edits',
-        source: 'test/nuxt/nuxt4-updates.test.ts',
+        source: 'test/consumer/cli.test.ts',
         job: 'test-nuxt4',
     },
     {
@@ -550,7 +550,7 @@ export const contracts = [
         id: 'SEC-003',
         guarantee: 'The packed artifact contains no dummy secret',
         source: 'test/consumer/artifact.test.ts',
-        job: 'test-package',
+        job: 'build',
     },
     {
         id: 'SEC-004',
@@ -569,19 +569,19 @@ export const contracts = [
         id: 'PKG-001',
         guarantee: 'Required JavaScript and declaration entrypoints are packed',
         source: 'test/consumer/artifact.test.ts',
-        job: 'test-package',
+        job: 'build',
     },
     {
         id: 'PKG-002',
         guarantee: 'The tarball contains only distribution files and public package metadata',
         source: 'test/consumer/artifact.test.ts',
-        job: 'test-package',
+        job: 'build',
     },
     {
         id: 'PKG-003',
         guarantee: 'Exports and required peer dependency boundaries are explicit',
         source: 'test/consumer/artifact.test.ts',
-        job: 'test-package',
+        job: 'build',
     },
     {
         id: 'PKG-004',
@@ -594,7 +594,7 @@ export const contracts = [
         id: 'PKG-005',
         guarantee: 'publint and ATTW validate the actual tarball',
         source: 'test/consumer/artifact.test.ts',
-        job: 'test-package',
+        job: 'build',
     },
     {
         id: 'DOCS-001',
@@ -613,7 +613,7 @@ export const contracts = [
         id: 'REL-001',
         guarantee: 'Consumer verification leaves the release tarball SHA-256 unchanged',
         source: 'test/consumer/artifact.test.ts',
-        job: 'test-package',
+        job: 'build',
     },
     {
         id: 'REL-002',

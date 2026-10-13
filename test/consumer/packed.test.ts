@@ -30,8 +30,12 @@ let packed: Awaited<ReturnType<typeof packPackage>>
 let digest: string
 const secret = 'NUXT_FILES_TEST_SECRET_123456'
 const smoke = process.env.NUXT_FILES_CONSUMER_SMOKE === '1'
-const consumerFixtures = packageManager === 'bun' && !smoke ? ['nuxt4', 'nitro-v2', 'nitro-v3'] : ['nuxt4']
-if (packageManager === 'pnpm') consumerFixtures.push('workspace')
+const consumerFixtures =
+    packageManager === 'pnpm'
+        ? ['workspace']
+        : packageManager === 'bun' && !smoke
+          ? ['nuxt4', 'nitro-v2', 'nitro-v3']
+          : ['nuxt4']
 describe('Packed consumer', () => {
     beforeAll(async () => {
         process.env.NUXT_AWS_SECRET_ACCESS_KEY = secret
@@ -62,19 +66,16 @@ describe('Packed consumer', () => {
                         devDependencies: Record<string, string>
                     }
                     expect(consumerPackage.dependencies['files-sdk']).toBeUndefined()
-                    let frameworkDependencies: Record<string, string> | undefined
-                    if (packageManager === 'pnpm') {
+                    if (layout === 'workspace') {
                         await writeFile(resolve(consumer, '.npmrc'), 'hoist=false\nshamefully-hoist=false\n')
                         // Strict non-hoisting also exposes Nuxt's undeclared c12/unplugin imports.
                         // Keep these framework dependencies explicit, including for workspace Layers.
-                        frameworkDependencies = Object.fromEntries(
+                        const frameworkDependencies = Object.fromEntries(
                             ['c12', 'unplugin', '@types/node'].map((dependency) => [
                                 dependency,
                                 consumerPackage.devDependencies[dependency]!,
                             ]),
                         )
-                    }
-                    if (layout === 'workspace') {
                         await writeFile(
                             resolve(parent, 'package.json'),
                             JSON.stringify({
