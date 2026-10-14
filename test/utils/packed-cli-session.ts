@@ -11,7 +11,10 @@ import { nuxtLifecycleModule } from './nuxt-lifecycle'
 
 interface SessionOptions {
     consumer: string
-    install: (directory: string, options?: { signal?: AbortSignal; timeout?: number }) => Promise<string>
+    install: (
+        directory: string,
+        options?: { signal?: AbortSignal; timeout?: number; frozen?: boolean },
+    ) => Promise<string>
     runScript: (
         directory: string,
         script: string,
@@ -126,7 +129,7 @@ export const nuxtCliBootstrap = `import { pathToFileURL } from 'node:url'
 import { writeSync } from 'node:fs'
 const [bin, ...args] = process.argv.slice(2)
 process.argv = [process.execPath, bin, ...args]
-const observe = data => writeSync(2, '[Files CLI bootstrap] ' + JSON.stringify({ pid: process.pid, ...data }) + '\\n')
+const observe = data => writeSync(2, '[Files CLI bootstrap] ' + JSON.stringify({ atMs: Number(process.hrtime.bigint() / 1000000n), pid: process.pid, ...data }) + '\\n')
 process.on('exit', code => observe({ phase: 'exit', code }))
 process.on('message', message => {
   if (message !== 'files-cli-stop') return
@@ -139,10 +142,6 @@ process.on('message', message => {
 })
 await import(pathToFileURL(bin).href)
 `
-
-/** Native CLI shutdown uses its file-bootstrap IPC; shared cleanup verifies the captured tree. */
-const closeOwnedCli = (child: ChildProcess, reported: Set<number>, directory: string) =>
-    closeOwnedProcess(child, { cwd: directory, reported, ipcMessage: 'files-cli-stop' })
 
 const scanSecrets = async (directory: string, secrets: string[], installedRoot?: string): Promise<void> => {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -323,7 +322,10 @@ export const runPackedNuxtCliSession = async ({
     const preparedEnv = nuxtCliEnvironment({ FILES_ROUTE_SECRET: canaries[0], NUXT_APP_SECRET: canaries[1] })
     const runtimeEnv = nuxtCliEnvironment({ FILES_ROUTE_SECRET: canaries[2], NUXT_APP_SECRET: canaries[3] })
     let child: ChildProcess | undefined
+    let cliClosed: Promise<{ code: number | null; signal: NodeJS.Signals | null }> | undefined
+    let stopSentAt: number | undefined
     let port: number | undefined
+    let servingPid: number | undefined
     let log = ''
     let lastHttpFailure = ''
     let report: PackedCliSessionReport | undefined
@@ -334,7 +336,15 @@ export const runPackedNuxtCliSession = async ({
     let shutdown: Promise<void> | undefined
     const stop = () => {
         if (!child) return Promise.resolve()
-        return (shutdown ??= closeOwnedCli(child, pids, directory))
+        return (shutdown ??= closeOwnedProcess(child, {
+            cwd: directory,
+            reported: pids,
+            ipcMessage: 'files-cli-stop',
+            onProgress: (event) => {
+                if ('phase' in event && event.phase === 'stop-sent') stopSentAt = performance.now()
+                log += `[Files CLI cleanup] ${JSON.stringify(event)}\n`
+            },
+        }))
     }
     const abortSession = () => {
         deadline.abort()
@@ -449,10 +459,13 @@ export const runPackedNuxtCliSession = async ({
         child.stdout!.on('data', (chunk) => (log += chunk))
         child.stderr!.on('data', (chunk) => (log += chunk))
         child.once('exit', (code, signal) => {
-            log += `[Files CLI handle] ${JSON.stringify({ phase: 'exit', pid: child!.pid, code, signal, exitCode: child!.exitCode, signalCode: child!.signalCode })}\n`
+            log += `[Files CLI handle] ${JSON.stringify({ ms: performance.now(), phase: 'exit', pid: child!.pid, code, signal, exitCode: child!.exitCode, signalCode: child!.signalCode })}\n`
         })
-        child.once('close', (code, signal) => {
-            log += `[Files CLI handle] ${JSON.stringify({ phase: 'close', pid: child!.pid, code, signal })}\n`
+        cliClosed = new Promise((done) => {
+            child!.once('close', (code, signal) => {
+                log += `[Files CLI handle] ${JSON.stringify({ phase: 'close', pid: child!.pid, code, signal })}\n`
+                done({ code, signal })
+            })
         })
         child.once('disconnect', () => {
             log += `[Files CLI handle] ${JSON.stringify({ phase: 'disconnect', pid: child!.pid })}\n`
@@ -632,6 +645,25 @@ export const runPackedNuxtCliSession = async ({
         await writeFile(resolve(directory, 'policy.ts'), authorization('bob'))
         await awaitGateway('local policy refresh', 'bob', true)
         assert.equal((await gateway(endpoint, { op: 'list' }, 'alice')).status, 401)
+        await writeFile(resolve(directory, 'policy.ts'), 'export const authorize = false\n')
+        assert.equal(
+            (await gateway(endpoint, { op: 'list' }, 'bob')).status,
+            503,
+            'An invalid edit immediately rejects the old worker authorization',
+        )
+        await new Promise((done) => setTimeout(done, 1000))
+        assert.notEqual((await gateway(endpoint, { op: 'list' }, 'bob')).status, 200)
+        await writeFile(resolve(directory, 'policy.ts'), authorization('bob'))
+        await awaitGateway('invalid authorization repair', 'bob', true)
+        await writeFile(
+            resolve(directory, 'policy.ts'),
+            "export const authorize = () => { throw new Error('Denied after update') }\n",
+        )
+        await sessionPoll('throwing authorization stays an HTTP 500', async () =>
+            (await gateway(endpoint, { op: 'list' }, 'bob')).status === 500 ? true : undefined,
+        )
+        await writeFile(resolve(directory, 'policy.ts'), authorization('bob'))
+        await awaitGateway('throwing authorization repair', 'bob', true)
         const syntaxOffset = log.length
         await writeFile(resolve(directory, 'policy.ts'), 'export const authorize = (\n')
         await awaitGateway('syntax error fails closed', 'bob', false)
@@ -685,7 +717,9 @@ export const runPackedNuxtCliSession = async ({
         const metadataBefore = (await exists(metadataPath)) ? await readFile(metadataPath, 'utf8') : undefined
         manifest.dependencies['files-cli-late-number'] = 'file:.late-dependency'
         await writeFile(resolve(directory, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
-        const installation = await withEnvironment(runtimeEnv, () => install(directory, commandOptions()))
+        const installation = await withEnvironment(runtimeEnv, () =>
+            install(directory, { ...commandOptions(), frozen: false }),
+        )
         assert(
             canaries.every((secret) => !installation.includes(secret)),
             'Dependency install log contains no secret',
@@ -725,6 +759,7 @@ export const runPackedNuxtCliSession = async ({
         pids.add(current.pid)
         assertIdentity(current)
         const restarted = await gateway(endpoint, { op: 'list' })
+        servingPid = current.pid
         assert.equal(restarted.status, 200, 'The same public serving URL returns after hard restart')
         assert.deepEqual(
             JSON.parse((await curl()).trim()),
@@ -761,6 +796,49 @@ export const runPackedNuxtCliSession = async ({
         if (child) {
             try {
                 await stop()
+                let drainTimer: ReturnType<typeof setTimeout> | undefined
+                try {
+                    const closed = await Promise.race([
+                        cliClosed,
+                        new Promise<never>((_, reject) => {
+                            drainTimer = setTimeout(
+                                () => reject(new Error('CLI streams did not close within the native cleanup deadline')),
+                                Math.max(0, 20_000 - (performance.now() - (stopSentAt ?? performance.now()))),
+                            )
+                        }),
+                    ])
+                    assert.deepEqual(closed, { code: 0, signal: null })
+                } finally {
+                    clearTimeout(drainTimer)
+                }
+                if (servingPid !== undefined) {
+                    const exits = log
+                        .split('\n')
+                        .filter((line) => /\[Files CLI lifecycle\] \{/u.test(line))
+                        .map((line) => JSON.parse(line.slice(line.indexOf('{'))))
+                    assert(
+                        exits.some(
+                            (event) => event.phase === 'process-exit' && event.pid === servingPid && event.code === 0,
+                        ),
+                        'The serving fork completes native close and exits with code 0',
+                    )
+                    for (const scope of ['nuxt', 'nitro'])
+                        assert(
+                            exits.some(
+                                (event) =>
+                                    event.pid === servingPid &&
+                                    event.scope === scope &&
+                                    event.phase === 'after' &&
+                                    event.hook === 'close',
+                            ),
+                            `${scope} close hooks complete in the serving fork`,
+                        )
+                }
+                assert.doesNotMatch(
+                    log,
+                    /did not shut down|Exiting anyway|Could not shut|terminating it/u,
+                    'Upstream forced shutdown is not a natural exit',
+                )
             } catch (error) {
                 failures.push(`CLI cleanup: ${String(error)}`)
             }
@@ -800,8 +878,7 @@ export const runPackedNuxtCliSession = async ({
         throw new Error(redact(`${failures.join('\n')}\nLast HTTP failure: ${lastHttpFailure}\nCLI output:\n${log}`))
     assert(report)
     onProgress?.('Owned processes, listener and lock cleaned; archive digest unchanged')
-    // oxlint-disable-next-line no-console
-    console.info(
+    process.stdout.write(
         '[Packed Nuxt CLI lifecycle]\n' +
             log
                 .split('\n')
@@ -809,9 +886,11 @@ export const runPackedNuxtCliSession = async ({
                     (line) =>
                         line.includes('[Files CLI lifecycle]') ||
                         line.includes('[Files CLI bootstrap]') ||
-                        line.includes('[Files CLI handle]'),
+                        line.includes('[Files CLI handle]') ||
+                        line.includes('[Files CLI cleanup]'),
                 )
-                .join('\n'),
+                .join('\n') +
+            '\n',
     )
     return report
 }

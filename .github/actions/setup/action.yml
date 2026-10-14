@@ -6,7 +6,20 @@ runs:
         - uses: voidzero-dev/setup-vp@68f39c78aaf39be468cabd2afb09c162574c84af # v1.21.2
           with:
               version-file: package.json
-              node-version: 24
+              cache: true
+              node-version-file: .node-version
               run-install: false
+        - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+          with:
+              path: ${{ runner.temp }}/pm-cache
+              key: downloads-${{ runner.os }}-${{ env.NUXT_FILES_PACKAGE_MANAGER || 'bun' }}-${{ hashFiles('package.json', 'test/consumer/locks/**') }}
+              restore-keys: downloads-${{ runner.os }}-${{ env.NUXT_FILES_PACKAGE_MANAGER || 'bun' }}-
+        - shell: bash
+          env:
+              npm_config_cache: ${{ runner.temp }}/pm-cache/npm
+              npm_config_store_dir: ${{ runner.temp }}/pm-cache/pnpm
+          run: |
+              echo "npm_config_cache=$npm_config_cache" >> "$GITHUB_ENV"
+              echo "npm_config_store_dir=$npm_config_store_dir" >> "$GITHUB_ENV"
         - shell: bash
           run: vp install --frozen-lockfile
