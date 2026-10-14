@@ -125,7 +125,7 @@
             "dependencyDashboardApproval": true,
             "groupName": "Files SDK and generated optional peers",
             "prBodyNotes": [
-                "After approving, run bun run peers:sync --write with the updated SDK, regenerate root and affected fixture locks, then bun run peers:sync --check and the minimum/latest consumer matrix. Hosted Renovate does not run this generator."
+                "After approving, install the updated SDK and run bun run deps:sync, then the minimum/latest consumer matrix. Hosted Renovate does not run this generator."
             ]
         },
         {
