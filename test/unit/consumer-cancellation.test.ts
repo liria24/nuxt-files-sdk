@@ -149,34 +149,43 @@ test('[CLI-004] cancellation during server readiness closes the owned process be
     }
 })
 
-test('[CLI-004] cancelled LSP request closes its witnessed owned process before removal', async () => {
-    const directory = await mkdtemp(resolve(tmpdir(), 'files-hover-cancellation-'))
-    const controller = new AbortController()
-    let owned: ReturnType<typeof spawn> | undefined
-    let observedAlive = false
-    const work = checkHoverDocumentation(directory, {
-        signal: controller.signal,
-        onStart(child) {
-            owned = child
-            child.once('spawn', () => {
-                observedAlive = alive(child.pid!)
-                controller.abort(new Error('hover deadline'))
+test.each(['spawn', 'data'] as const)(
+    '[CLI-004] LSP cancellation on %s closes its witnessed owned process before removal',
+    async (phase) => {
+        const directory = await mkdtemp(resolve(tmpdir(), 'files-hover-cancellation-'))
+        const controller = new AbortController()
+        let owned: ReturnType<typeof spawn> | undefined
+        let observedAlive = false
+        const work = checkHoverDocumentation(directory, {
+            signal: controller.signal,
+            onStart(child) {
+                owned = child
+                const cancel = () => {
+                    observedAlive = alive(child.pid!)
+                    controller.abort(new Error('hover deadline'))
+                }
+                if (phase === 'spawn') child.once('spawn', cancel)
+                else child.stdout!.once('data', cancel)
+            },
+        })
+        try {
+            const failure = await work.catch((error: unknown) => {
+                if (error instanceof AggregateError) throw error
+                return error
             })
-        },
-    })
-    try {
-        await expect(work).rejects.toThrow('hover deadline')
-        expect(owned?.pid).toBeGreaterThan(0)
-        expect(observedAlive).toBe(true)
-        expect(alive(owned!.pid!)).toBe(false)
-        expect(owned!.exitCode !== null || owned!.signalCode !== null).toBe(true)
-        await rm(directory, { recursive: true, force: true })
-    } finally {
-        controller.abort()
-        await work.catch(() => {})
-        await rm(directory, { recursive: true, force: true })
-    }
-})
+            expect(failure).toMatchObject({ message: 'hover deadline' })
+            expect(owned?.pid).toBeGreaterThan(0)
+            expect(observedAlive).toBe(true)
+            expect(alive(owned!.pid!)).toBe(false)
+            expect(owned!.exitCode !== null || owned!.signalCode !== null).toBe(true)
+            await rm(directory, { recursive: true, force: true })
+        } finally {
+            controller.abort()
+            await work.catch(() => {})
+            await rm(directory, { recursive: true, force: true })
+        }
+    },
+)
 
 test('[CLI-004] resource handoff retains its finally and the drain awaits delayed cleanup', async (testContext) => {
     const controller = new AbortController()

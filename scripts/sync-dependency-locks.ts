@@ -28,7 +28,7 @@ const run = (args: string[], cwd: string) => {
     if (result.status !== 0) process.exit(result.status ?? 1)
 }
 
-/** Committed bun.lock directories under test/. Packed consumer installs do not keep a lock. */
+/** Linked integration fixtures; packed consumers have separate package-manager locks. */
 const lockDirectories = (directory: string): string[] =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
         if (entry.name === 'node_modules' || entry.name.startsWith('.')) return []
@@ -82,7 +82,7 @@ if (import.meta.main) {
     // The root lock covers the docs workspace. Fixture locks are separate file: installs.
     run(['install', '--lockfile-only', '--ignore-scripts'], root)
     const manifest: PackageManifest = JSON.parse(readFileSync(packageManifestPath, 'utf8'))
-    for (const directory of lockDirectories(join(root, 'test')).toSorted()) {
+    for (const directory of lockDirectories(join(root, 'test/fixtures')).toSorted()) {
         const lockPath = join(directory, 'bun.lock')
         refreshFilePackageSnapshot(lockPath, manifest)
         const outdated = outdatedDependencies(lockPath, manifest)
