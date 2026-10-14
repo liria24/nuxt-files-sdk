@@ -27,6 +27,29 @@ const command = async (args: string[], directory: string, options: Options) =>
         { cwd: directory, ...options },
     )
 
+export const bindConsumerLock = (
+    lock: string,
+    manager: typeof packageManager,
+    archive: { filename: string; version: string; integrity: string },
+): string => {
+    lock = lock.replaceAll('nuxt-files-sdk.tgz', archive.filename)
+    if (manager === 'npm') {
+        const parsed = JSON.parse(lock)
+        const owned = parsed.packages['node_modules/nuxt-files-sdk']
+        owned.version = archive.version
+        owned.integrity = archive.integrity
+        return JSON.stringify(parsed, null, 2) + '\n'
+    }
+    if (manager === 'pnpm') {
+        const parsed = parse(lock)
+        const key = Object.keys(parsed.packages).find((entry) => entry.startsWith('nuxt-files-sdk@file:'))!
+        parsed.packages[key].version = archive.version
+        parsed.packages[key].resolution.integrity = archive.integrity
+        return stringify(parsed)
+    }
+    return lock.replace(/("nuxt-files-sdk": \[.*?, )"sha512-[^"]+"/u, `$1"${archive.integrity}"`)
+}
+
 export const installConsumer = async (directory: string, options: Options = {}): Promise<string> => {
     const manifestPath = resolve(directory, 'package.json')
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
@@ -63,24 +86,20 @@ export const installConsumer = async (directory: string, options: Options = {}):
             : 'nitro-v3'
     const template = resolve(repositoryRoot, 'test/consumer/locks', name, lockfile)
     if (frozen) {
+        const artifact = JSON.parse(
+            await runCommand('tar', ['-xOf', localArchive, 'package/package.json'], { cwd: directory, ...options }),
+        )
+        assert.equal(artifact.name, 'nuxt-files-sdk')
         const integrity =
             'sha512-' +
             createHash('sha512')
                 .update(await readFile(localArchive))
                 .digest('base64')
-        let lock = (await readFile(template, 'utf8')).replaceAll('nuxt-files-sdk.tgz', basename(localArchive))
-        if (packageManager === 'npm') {
-            const parsed = JSON.parse(lock)
-            parsed.packages['node_modules/nuxt-files-sdk'].integrity = integrity
-            lock = JSON.stringify(parsed, null, 2) + '\n'
-        } else if (packageManager === 'pnpm') {
-            const parsed = parse(lock)
-            const key = Object.keys(parsed.packages).find((entry) => entry.startsWith('nuxt-files-sdk@file:'))!
-            parsed.packages[key].resolution.integrity = integrity
-            lock = stringify(parsed)
-        } else {
-            lock = lock.replace(/("nuxt-files-sdk": \[.*?, )"sha512-[^"]+"/u, `$1"${integrity}"`)
-        }
+        const lock = bindConsumerLock(await readFile(template, 'utf8'), packageManager, {
+            filename: basename(localArchive),
+            version: artifact.version,
+            integrity,
+        })
         await writeFile(resolve(destination, lockfile), lock)
     }
     const args =

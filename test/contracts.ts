@@ -610,6 +610,12 @@ export const contracts = [
         job: 'test-nuxt4',
     },
     {
+        id: 'PKG-006',
+        guarantee: 'Owned archive version, path and integrity rebind without changing frozen registry resolutions',
+        source: 'test/unit/consumer-lock.test.ts',
+        job: 'unit',
+    },
+    {
         id: 'REL-001',
         guarantee: 'Consumer verification leaves the release tarball SHA-256 unchanged',
         source: 'test/consumer/artifact.test.ts',
