@@ -30,7 +30,7 @@
                 "server/{api,routes,plugins,middleware}/**/*.ts!",
                 "server/error.ts!"
             ],
-            "ignoreDependencies": ["@iconify-json/lucide", "@iconify-json/simple-icons", "nuxtseo-layer-devtools"],
+            "ignoreDependencies": ["@iconify-json/lucide", "@iconify-json/simple-icons", "nuxtseo-devtools-host"],
             "project": ["app/**/*.{ts,vue,css}!", "server/**/*.ts!", "shared/**/*.ts!", "*.ts"]
         }
     }
