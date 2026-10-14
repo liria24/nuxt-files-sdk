@@ -138,13 +138,13 @@ describe('Packed consumer', () => {
                                     const packageUrl = import.meta.resolve('nuxt-files-sdk/package.json');
                                     const manifest = JSON.parse(readFileSync(new URL(packageUrl), 'utf8'));
                                     const { satisfies } = await import(pathToFileURL(createRequire(packageUrl).resolve('verkit')));
-                                    const { resolveOwnedSdk } = await import(new URL('./dist/integration/resolve.js', packageUrl)); const sdk = resolveOwnedSdk(); console.log(JSON.stringify({ path: sdk.manifestPath, version: sdk.manifest.version, compatible: satisfies(sdk.manifest.version, manifest.dependencies['files-sdk']), bare: ${layout === 'workspace' ? 'resolveOwnedSdk(import.meta.url).manifest.version' : 'null'} }))`,
+                                    const { resolveOwnedSdk } = await import(new URL('./dist/integration/resolve.js', packageUrl)); const sdk = resolveOwnedSdk(); console.log(JSON.stringify({ path: sdk.manifestPath, version: sdk.manifest.version, range: manifest.dependencies['files-sdk'], compatible: satisfies(sdk.manifest.version, manifest.dependencies['files-sdk']), bare: ${layout === 'workspace' ? 'resolveOwnedSdk(import.meta.url).manifest.version' : 'null'} }))`,
                                 ],
                                 { cwd: consumer, signal },
                             ),
                         ),
                     ) as { path: string; version: string; compatible: boolean; bare: string | null }
-                    expect(installed.compatible).toBe(true)
+                    expect(installed.compatible, JSON.stringify(installed)).toBe(true)
                     expect(installed.bare).toBe(layout === 'workspace' ? '2.6.0' : null)
                     const runtimeExports = await stage('runtime exports', () =>
                         runCommand(
