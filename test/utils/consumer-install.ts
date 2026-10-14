@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 
 import { parse, stringify } from 'yaml'
 
@@ -31,9 +31,15 @@ export const installConsumer = async (directory: string, options: Options = {}):
     const manifestPath = resolve(directory, 'package.json')
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
     const archive = resolve(directory, manifest.dependencies['nuxt-files-sdk'].slice(5))
-    const localArchive = resolve(directory, 'nuxt-files-sdk.tgz')
+    const checksum = createHash('sha256')
+        .update(await readFile(archive))
+        .digest('hex')
+    const localArchive = resolve(
+        directory,
+        packageManager === 'bun' ? `nuxt-files-sdk-${checksum}.tgz` : 'nuxt-files-sdk.tgz',
+    )
     if (archive !== localArchive) await copyFile(archive, localArchive)
-    manifest.dependencies['nuxt-files-sdk'] = 'file:nuxt-files-sdk.tgz'
+    manifest.dependencies['nuxt-files-sdk'] = `file:${basename(localArchive)}`
     await writeFile(manifestPath, JSON.stringify(manifest, null, 4) + '\n')
     const lockfile =
         packageManager === 'bun' ? 'bun.lock' : packageManager === 'npm' ? 'package-lock.json' : 'pnpm-lock.yaml'
@@ -62,7 +68,7 @@ export const installConsumer = async (directory: string, options: Options = {}):
             createHash('sha512')
                 .update(await readFile(localArchive))
                 .digest('base64')
-        let lock = await readFile(template, 'utf8')
+        let lock = (await readFile(template, 'utf8')).replaceAll('nuxt-files-sdk.tgz', basename(localArchive))
         if (packageManager === 'npm') {
             const parsed = JSON.parse(lock)
             parsed.packages['node_modules/nuxt-files-sdk'].integrity = integrity
@@ -105,7 +111,8 @@ export const installConsumer = async (directory: string, options: Options = {}):
         )
     if (update && options.frozen !== false) {
         await mkdir(dirname(template), { recursive: true })
-        await copyFile(resolve(destination, lockfile), template)
+        const lock = await readFile(resolve(destination, lockfile), 'utf8')
+        await writeFile(template, lock.replaceAll(basename(localArchive), 'nuxt-files-sdk.tgz'))
     }
     return output
 }

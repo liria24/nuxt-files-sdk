@@ -14,6 +14,7 @@ import {
     outputPaths,
     packPackage,
     readOutput,
+    repositoryRoot,
     runCommand,
     startFixtureServer,
     unusedPlugins,
@@ -28,6 +29,7 @@ import {
 
 let packed: Awaited<ReturnType<typeof packPackage>>
 let digest: string
+let sdkRange: string
 const secret = 'NUXT_FILES_TEST_SECRET_123456'
 const smoke = process.env.NUXT_FILES_CONSUMER_SMOKE === '1'
 const consumerFixtures =
@@ -40,6 +42,8 @@ describe('Packed consumer', () => {
     beforeAll(async () => {
         process.env.NUXT_AWS_SECRET_ACCESS_KEY = secret
         packed = await packPackage()
+        sdkRange = JSON.parse(await readFile(resolve(repositoryRoot, 'packages/nuxt-files-sdk/package.json'), 'utf8'))
+            .dependencies['files-sdk']
         digest = createHash('sha256')
             .update(await readFile(packed.tarball))
             .digest('hex')
@@ -134,11 +138,14 @@ describe('Packed consumer', () => {
                                 [
                                     '--input-type=module',
                                     '-e',
-                                    `import { createRequire } from 'node:module'; import { readFileSync } from 'node:fs'; import { pathToFileURL } from 'node:url';
+                                    `import assert from 'node:assert/strict'; import { createRequire } from 'node:module'; import { readFileSync } from 'node:fs'; import { pathToFileURL } from 'node:url';
                                     const packageUrl = import.meta.resolve('nuxt-files-sdk/package.json');
                                     const manifest = JSON.parse(readFileSync(new URL(packageUrl), 'utf8'));
                                     const { satisfies } = await import(pathToFileURL(createRequire(packageUrl).resolve('verkit')));
-                                    const { resolveOwnedSdk } = await import(new URL('./dist/integration/resolve.js', packageUrl)); const sdk = resolveOwnedSdk(); console.log(JSON.stringify({ path: sdk.manifestPath, version: sdk.manifest.version, range: manifest.dependencies['files-sdk'], compatible: satisfies(sdk.manifest.version, manifest.dependencies['files-sdk']), bare: ${layout === 'workspace' ? 'resolveOwnedSdk(import.meta.url).manifest.version' : 'null'} }))`,
+                                    const { resolveOwnedSdk } = await import(new URL('./dist/integration/resolve.js', packageUrl)); const sdk = resolveOwnedSdk();
+                                    assert.equal(manifest.dependencies['files-sdk'], process.argv[1], JSON.stringify({ path: sdk.manifestPath, version: sdk.manifest.version, range: manifest.dependencies['files-sdk'] }));
+                                    console.log(JSON.stringify({ path: sdk.manifestPath, version: sdk.manifest.version, range: manifest.dependencies['files-sdk'], compatible: satisfies(sdk.manifest.version, process.argv[1]), bare: ${layout === 'workspace' ? 'resolveOwnedSdk(import.meta.url).manifest.version' : 'null'} }))`,
+                                    sdkRange,
                                 ],
                                 { cwd: consumer, signal },
                             ),
