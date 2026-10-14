@@ -9,6 +9,7 @@
     "scripts": {
         "build": "vp -C packages/nuxt-files-sdk pack",
         "check": "bun run format:check && bun run lint && bun run workspace:check && bun run unused && bun run typecheck && bun run test && bun run docs:build",
+        "deps:sync": "bun scripts/sync-dependency-locks.ts",
         "deps:update": "taze",
         "peers:sync": "bun scripts/sync-optional-peers.ts",
         "dev": "bun run build && bun --cwd=docs dev",
