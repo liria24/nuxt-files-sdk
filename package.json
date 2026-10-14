@@ -9,6 +9,7 @@
     "scripts": {
         "build": "vp -C packages/nuxt-files-sdk pack",
         "check": "bun run format:check && bun run lint && bun run workspace:check && bun run unused && bun run typecheck && bun run test && bun run docs:build",
+        "deps:sync": "bun scripts/sync-dependency-locks.ts",
         "deps:update": "taze",
         "peers:sync": "bun scripts/sync-optional-peers.ts",
         "dev": "bun run build && bun --cwd=docs dev",
@@ -45,7 +46,7 @@
     "devDependencies": {
         "@nuxt/schema": "^4.6.1",
         "@nuxt/test-utils": "^4.3.3",
-        "files-sdk": "3.1.0",
+        "files-sdk": "^3.1.1",
         "knip": "^6.41.0",
         "npm": "12.2.0",
         "pkg-pr-new": "^0.0.91",
@@ -55,13 +56,13 @@
         "typescript": "^7.0.2",
         "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
         "vite-plus": "1.1.0",
-        "vitest": "5.0.3",
+        "vitest": "5.0.4",
         "vscode-jsonrpc": "^9.0.3",
         "yaml": "^2.9.1"
     },
     "overrides": {
         "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
-        "vitest": "5.0.3"
+        "vitest": "5.0.4"
     },
     "engines": {
         "node": "^24.11.0 || >=26.0.0"

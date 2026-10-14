@@ -10,6 +10,5 @@ export default defineConfig({
     ignorePaths: ['**/node_modules/**'],
     ignoreOtherWorkspaces: true,
     depFields: { overrides: false },
-    // Vite+ owns its runner/core versions; upgrade the pinned set together.
     exclude: ['typescript@7', 'h3@2'],
 })

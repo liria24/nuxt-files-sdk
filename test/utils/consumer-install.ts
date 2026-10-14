@@ -103,7 +103,7 @@ export const installConsumer = async (directory: string, options: Options = {}):
                 .filter((line) => /timing (?:idealTree\b|reify\b|command:)|http fetch/u.test(line))
                 .join('\n') + '\n',
         )
-    if (update) {
+    if (update && options.frozen !== false) {
         await mkdir(dirname(template), { recursive: true })
         await copyFile(resolve(destination, lockfile), template)
     }

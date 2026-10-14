@@ -10,3 +10,4 @@ dist
 *.tgz
 .data
 packages/nuxt-files-sdk/README.md
+.env

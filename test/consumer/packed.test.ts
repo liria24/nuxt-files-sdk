@@ -134,13 +134,17 @@ describe('Packed consumer', () => {
                                 [
                                     '--input-type=module',
                                     '-e',
-                                    `const { resolveOwnedSdk } = await import(new URL('./dist/integration/resolve.js', import.meta.resolve('nuxt-files-sdk/package.json'))); const sdk = resolveOwnedSdk(); console.log(JSON.stringify({ path: sdk.manifestPath, version: sdk.manifest.version, bare: ${layout === 'workspace' ? 'resolveOwnedSdk(import.meta.url).manifest.version' : 'null'} }))`,
+                                    `import { createRequire } from 'node:module'; import { readFileSync } from 'node:fs'; import { pathToFileURL } from 'node:url';
+                                    const packageUrl = import.meta.resolve('nuxt-files-sdk/package.json');
+                                    const manifest = JSON.parse(readFileSync(new URL(packageUrl), 'utf8'));
+                                    const { satisfies } = await import(pathToFileURL(createRequire(packageUrl).resolve('verkit')));
+                                    const { resolveOwnedSdk } = await import(new URL('./dist/integration/resolve.js', packageUrl)); const sdk = resolveOwnedSdk(); console.log(JSON.stringify({ path: sdk.manifestPath, version: sdk.manifest.version, compatible: satisfies(sdk.manifest.version, manifest.dependencies['files-sdk']), bare: ${layout === 'workspace' ? 'resolveOwnedSdk(import.meta.url).manifest.version' : 'null'} }))`,
                                 ],
                                 { cwd: consumer, signal },
                             ),
                         ),
-                    ) as { path: string; version: string; bare: string | null }
-                    expect(installed.version).toBe('3.1.0')
+                    ) as { path: string; version: string; compatible: boolean; bare: string | null }
+                    expect(installed.compatible).toBe(true)
                     expect(installed.bare).toBe(layout === 'workspace' ? '2.6.0' : null)
                     const runtimeExports = await stage('runtime exports', () =>
                         runCommand(

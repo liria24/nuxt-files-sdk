@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 import { afterAll, beforeAll, describe, expect, test } from 'vite-plus/test'
 
-import { packPackage, readOutput, runCommand } from '../utils/fixture'
+import { packPackage, readOutput, repositoryRoot, runCommand } from '../utils/fixture'
 
 let packed: Awaited<ReturnType<typeof packPackage>>
 let contents: string[]
@@ -77,7 +77,10 @@ describe('Packed artifact', () => {
             configKey: 'files',
             compatibility: { nuxt: '^4.6.0 || ^5.0.0-0' },
         })
-        expect(packageJson.dependencies['files-sdk']).toBe('3.1.0')
+        const declared = JSON.parse(
+            await readFile(resolve(repositoryRoot, 'packages/nuxt-files-sdk/package.json'), 'utf8'),
+        )
+        expect(packageJson.dependencies['files-sdk']).toBe(declared.dependencies['files-sdk'])
         expect(packageJson.devDependencies['files-sdk']).toBeUndefined()
         expect(packageJson.peerDependencies['files-sdk']).toBeUndefined()
         expect(packageJson.peerDependenciesMeta['files-sdk']).toBeUndefined()
