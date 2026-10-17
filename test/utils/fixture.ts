@@ -2,7 +2,7 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { cp, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { basename, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { createTest } from '@nuxt/test-utils/e2e'
@@ -25,7 +25,7 @@ export const unusedPlugins = [
 export const runCommand = (
     command: string,
     args: string[],
-    options: { cwd?: string; env?: NodeJS.ProcessEnv; shell?: boolean; timeout?: number; signal?: AbortSignal } = {},
+    options: { cwd?: string; env?: NodeJS.ProcessEnv; timeout?: number; signal?: AbortSignal } = {},
 ): Promise<string> =>
     new Promise((resolveOutput, reject) => {
         if (options.signal?.aborted) {
@@ -36,7 +36,6 @@ export const runCommand = (
         const child = spawn(command, args, {
             cwd,
             env: { ...process.env, ...options.env },
-            shell: options.shell,
             detached: process.platform !== 'win32',
             stdio: ['ignore', 'pipe', 'pipe'],
         })
@@ -122,8 +121,10 @@ export const runFixture = async (
     }
 }
 
-export const readOutput = async (directory: string, runtimeOnly = false): Promise<string> => {
-    const contents: string[] = []
+const visitOutput = async (
+    directory: string,
+    visitEntry: (path: string, isDirectory: boolean) => void | Promise<void>,
+): Promise<void> => {
     const visited = new Set<string>()
     const visit = async (path: string): Promise<void> => {
         const canonical = await realpath(path)
@@ -133,30 +134,37 @@ export const readOutput = async (directory: string, runtimeOnly = false): Promis
             const child = resolve(path, entry.name)
             // Windows package managers emit directory junctions in deployment outputs.
             const metadata = entry.isSymbolicLink() ? await stat(child) : entry
+            if (metadata.isDirectory() || metadata.isFile()) await visitEntry(child, metadata.isDirectory())
             if (metadata.isDirectory()) await visit(child)
-            else if (metadata.isFile() && (!runtimeOnly || /\.(?:js|mjs|cjs|html|css)$/u.test(child)))
-                contents.push(await readFile(child, 'utf8'))
         }
     }
     await visit(directory)
+}
+
+export const readOutput = async (directory: string, runtimeOnly = false): Promise<string> => {
+    const contents: string[] = []
+    await visitOutput(directory, async (path, isDirectory) => {
+        if (!isDirectory && (!runtimeOnly || /\.(?:js|mjs|cjs|html|css)$/u.test(path)))
+            contents.push(await readFile(path, 'utf8'))
+    })
     return contents.join('\n')
 }
 
 export const directorySize = async (directory: string): Promise<number> => {
     let bytes = 0
-    const visit = async (path: string): Promise<void> => {
-        for (const entry of await readdir(path, { withFileTypes: true })) {
-            const child = resolve(path, entry.name)
-            if (entry.isDirectory()) await visit(child)
-            else bytes += (await stat(child)).size
-        }
-    }
-    await visit(directory)
+    await visitOutput(directory, async (path, isDirectory) => {
+        if (!isDirectory) bytes += (await stat(path)).size
+    })
     return bytes
 }
 
-export const outputPaths = async (directory: string): Promise<string[]> =>
-    (await readdir(directory, { recursive: true })).map((path) => path.replaceAll('\\', '/'))
+export const outputPaths = async (directory: string): Promise<string[]> => {
+    const paths: string[] = []
+    await visitOutput(directory, (path) => {
+        paths.push(relative(directory, path).replaceAll('\\', '/'))
+    })
+    return paths
+}
 
 /** Nuxt 4.6 may put generated framework files in its native node_modules cache. */
 export const nuxtBuildDirectory = async (directory: string): Promise<string> => {

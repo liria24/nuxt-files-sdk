@@ -33,6 +33,7 @@ vi.mock('@nuxt/kit', () => ({
 }))
 
 import { setupNuxtFilesIntegration } from '../../packages/nuxt-files-sdk/src/integration/nuxt'
+import { developmentConfigCurrent } from '../../packages/nuxt-files-sdk/src/runtime/development'
 
 const directories: string[] = []
 const closers: (() => unknown)[] = []
@@ -76,12 +77,63 @@ const setup = async (source: string, major = 2, development = false, nitroAlias:
                     : callback,
             )
         },
+        callHook: vi.fn<(name: string) => Promise<void>>().mockResolvedValue(undefined),
     } as unknown as Nuxt
     const active = await setupNuxtFilesIntegration(nuxt, { configPath })
     const close = hooks.get('close')
     if (close) closers.push(close)
     return { active, nuxt, hooks, configPath }
 }
+
+test('Nuxt tracks computed source helpers, retries repaired helpers, and keeps the original Gateway hashes', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'files-nuxt-dynamic-'))
+    directories.push(directory)
+    const policyPath = resolve(directory, 'policy.mjs')
+    const permissionsPath = resolve(directory, 'permissions.json')
+    const laterPath = resolve(directory, 'later.mjs')
+    await writeFile(permissionsPath, '{ "allowed": true }')
+    const policySource =
+        "const file = './permissions.json'; const permissions = await import(file); export const authorize = () => permissions.default.allowed"
+    await writeFile(policyPath, policySource)
+    const { nuxt } = await setup(
+        `const path = '#policy'; const policy = await import(path); export default { storage: { adapter: 'memory' }, routes: [{ path: '/files', authorize: policy.authorize }] }`,
+        2,
+        true,
+        { '#policy': policyPath },
+    )
+    const handler = await kit.templates.get('nuxt-files-sdk/gateway-0.dev.mjs')!.getContents()
+    const hashes = JSON.parse(/const inputHashes = (.+)/u.exec(handler)![1]!) as Record<string, string>
+    expect(Object.keys(hashes)).toContain(policyPath)
+    expect(Object.keys(hashes)).toContain(permissionsPath)
+    await writeFile(permissionsPath, '{ "allowed": false }')
+    expect(developmentConfigCurrent(hashes)).toBe(false)
+    await vi.waitFor(() => expect(nuxt.callHook).toHaveBeenCalledExactlyOnceWith('restart'))
+    await writeFile(laterPath, "throw new Error('repair the Nuxt helper')")
+    await writeFile(policyPath, "const path = './later.mjs'; await import(path); " + policySource)
+    await vi.waitFor(() => expect(kit.warn).toHaveBeenCalledWith('repair the Nuxt helper'))
+    expect(nuxt.callHook).toHaveBeenCalledTimes(1)
+    await writeFile(laterPath, 'export const repaired = true')
+    await vi.waitFor(() => expect(nuxt.callHook).toHaveBeenCalledTimes(2))
+    expect(await kit.templates.get('nuxt-files-sdk/gateway-0.dev.mjs')!.getContents()).toBe(handler)
+})
+
+test('Nuxt rejects dynamically imported source that changes during preparation', async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), 'files-nuxt-dynamic-race-'))
+    directories.push(directory)
+    const policyPath = resolve(directory, 'policy.mjs')
+    await writeFile(
+        policyPath,
+        "import { writeFile } from 'node:fs/promises'; await writeFile(new URL(import.meta.url), 'export const updated = true'); export const prefix = 'old'",
+    )
+    await expect(
+        setup(
+            `const path = '#policy'; const policy = await import(path); export default { storage: { adapter: 'memory', prefix: policy.prefix } }`,
+            2,
+            true,
+            { '#policy': policyPath },
+        ),
+    ).rejects.toThrow('[nuxt-files-sdk:config-changed]')
+})
 
 test('Nuxt generates one shared lazy registry graph without Nitro startup initialization', async () => {
     const { active, nuxt, hooks } = await setup(`export default defineFilesConfig({

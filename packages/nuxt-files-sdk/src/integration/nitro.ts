@@ -57,7 +57,6 @@ export interface NitroIntegration {
 export interface NitroFilesIntegrationOptions {
     configPath: string
     environments: readonly string[]
-    restart?: () => void | Promise<void>
 }
 
 const AWS_CORE_DEPENDENCIES = [
@@ -162,14 +161,25 @@ export const setupNitroFilesIntegration = async (
     const configPath = options.configPath.replaceAll('\\', '/')
     const graph = configSources(configPath, nitro.options.alias)
     const inputHashes = Object.fromEntries(graph.files.map((path) => [path, fileHash(path)]))
-    let prepared
-    try {
-        prepared = await prepareFilesConfig({
+    let watcher: ReturnType<typeof watchFiles> | undefined
+    const prepare = () =>
+        prepareFilesConfig({
             configPath,
             environments: options.environments,
             alias: nitro.options.alias,
             injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
+            onSource: (filename) => {
+                const path = resolve(filename)
+                if (watcher) watcher.add([path])
+                else {
+                    if (!graph.files.includes(path)) graph.files.push(path)
+                    if (!Object.hasOwn(inputHashes, path)) inputHashes[path] = fileHash(path)
+                }
+            },
         })
+    let prepared
+    try {
+        prepared = await prepare()
     } catch (error) {
         // Supplement a real import failure while preserving the original native exception.
         try {
@@ -189,7 +199,6 @@ export const setupNitroFilesIntegration = async (
             '[nuxt-files-sdk:config-changed] Files configuration changed during preparation. Retry preparation.',
         )
     }
-    let watcher: ReturnType<typeof watchFiles> | undefined
     if (nitro.options.dev) {
         const roots = new Set([
             nitro.options.rootDir,
@@ -215,13 +224,8 @@ export const setupNitroFilesIntegration = async (
             async () => {
                 watcher?.add(configSources(configPath, nitro.options.alias).files)
                 // Keep the current watcher alive while invalid config is being repaired.
-                await prepareFilesConfig({
-                    configPath,
-                    environments: options.environments,
-                    alias: nitro.options.alias,
-                    injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
-                })
-                await (options.restart ? options.restart() : nitro.hooks.callHook?.('restart'))
+                await prepare()
+                await nitro.hooks.callHook?.('restart')
             },
             (error) => nitro.logger?.warn(error instanceof Error ? error.message : String(error)),
         )

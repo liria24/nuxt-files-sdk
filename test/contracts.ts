@@ -175,7 +175,7 @@ export const contracts = [
     {
         id: 'CFG-003',
         guarantee: 'Provider initialization failures never switch adapters',
-        source: 'test/unit/registry.test.ts',
+        source: 'test/unit/no-fallback.test.ts',
         job: 'unit',
     },
     {
@@ -259,25 +259,25 @@ export const contracts = [
     {
         id: 'TYPE-002',
         guarantee: 'Unknown storage names fail compilation with an argument type error',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-003',
         guarantee: 'Unknown adapter names fail compilation',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-004',
         guarantee: 'The removed development storage key fails compilation',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-005',
         guarantee: 'Mistyped environment keys fail compilation',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
@@ -289,37 +289,37 @@ export const contracts = [
     {
         id: 'TYPE-007',
         guarantee: 'The removed default selector fails compilation',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-008',
         guarantee: 'Invalid environment storage shapes fail compilation',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-009',
         guarantee: 'Providers with required options require config',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-010',
         guarantee: 'Provider-specific options are rejected outside config',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-011',
         guarantee: 'Async provider config resolvers fail compilation',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-012',
         guarantee: 'Multiple storages require a name at every access',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
@@ -421,7 +421,7 @@ export const contracts = [
     {
         id: 'ERR-002',
         guarantee: 'Native FilesError identity and code survive initialization failures',
-        source: 'test/unit/registry.test.ts',
+        source: 'test/unit/no-fallback.test.ts',
         job: 'unit',
     },
     {
@@ -703,13 +703,13 @@ export const contracts = [
     {
         id: 'TYPE-015',
         guarantee: 'Named storage gateways require a storage name',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
     {
         id: 'TYPE-016',
         guarantee: 'Named storage gateways reject unknown storage names',
-        source: 'test/nuxt/nuxt4-generated-types.test.ts',
+        source: 'test/types/invalid/cases.ts',
         job: 'test-nuxt4',
     },
 ]

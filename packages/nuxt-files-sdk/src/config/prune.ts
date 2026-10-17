@@ -33,6 +33,7 @@ export const pruneFilesConfigSource = (source: string, configPath: string, envir
             .find((node) => node.id.type === 'Identifier' && node.id.name === name)
         if (declaration?.init) root = unwrap(declaration.init)
     }
+    if (root.type === 'CallExpression') root = unwrap(root.arguments[0] ?? root)
     if (root.type !== 'ObjectExpression') {
         throw new Error('[nuxt-files-sdk:invalid-config] The default Files config must be a static object literal.')
     }

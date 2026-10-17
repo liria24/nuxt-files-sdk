@@ -16,7 +16,7 @@ test('[CFG-008] rejects unknown storage names before provider construction', () 
     expect(factory).not.toHaveBeenCalled()
 })
 
-test('[CFG-006][ERR-002] failed provider construction makes no HTTP or alternate-provider attempt', () => {
+test('[CFG-003][CFG-006][ERR-002] failed provider construction makes no HTTP or alternate-provider attempt', () => {
     const failure = new FilesError('Provider', 'Missing provider configuration')
     const failing = vi.fn<() => never>(() => {
         throw failure
@@ -29,7 +29,13 @@ test('[CFG-006][ERR-002] failed provider construction makes no HTTP or alternate
         },
         { factories: { s3: failing, fs: fallback } },
     )
-    expect(() => registry.get()).toThrow(failure)
+    let thrown: unknown
+    try {
+        registry.get()
+    } catch (error) {
+        thrown = error
+    }
+    expect(thrown).toBe(failure)
     expect(failing).toHaveBeenCalledOnce()
     expect(fallback).not.toHaveBeenCalled()
     expect(fetchSpy).not.toHaveBeenCalled()
@@ -51,8 +57,8 @@ test('[CFG-007][ERR-002] native operation failures never switch storage or wrap 
         { factories: { s3: selected, fs: fallback } },
     )
     const resolved = registry.get('blob')
-    vi.spyOn(resolved, 'upload').mockRejectedValue(failure)
     await expect(resolved.upload('contract.txt', 'data')).rejects.toBe(failure)
+    expect(adapter.upload).toHaveBeenCalledOnce()
     expect(selected).toHaveBeenCalledOnce()
     expect(fallback).not.toHaveBeenCalled()
 })

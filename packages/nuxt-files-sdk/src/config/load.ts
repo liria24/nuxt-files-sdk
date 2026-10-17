@@ -14,6 +14,7 @@ export interface FilesConfigLoaderOptions {
     alias?: Record<string, string> | undefined
     injectImports?: ((code: string, id?: string) => Promise<{ code: string }>) | undefined
     source?: string
+    onSource?: ((filename: string) => void) | undefined
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -34,6 +35,7 @@ export const loadFilesConfig = async ({
     alias,
     injectImports,
     source,
+    onSource,
 }: FilesConfigLoaderOptions): Promise<FilesConfig | undefined> => {
     const { loadConfig } = await import('c12')
     // A normal import cannot honor source aliases/injection or fresh referenced files.
@@ -45,6 +47,7 @@ export const loadFilesConfig = async ({
             'nuxt-files-sdk/config': fileURLToPath(new URL('../config.js', import.meta.url)),
         },
         nativeRoots: [sdk.root],
+        onSource,
     })
     const { config, layers } = await loadConfig<Record<string, unknown>>({
         cwd: dirname(configPath),

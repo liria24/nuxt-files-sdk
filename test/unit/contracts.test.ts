@@ -37,7 +37,7 @@ test('[META-001] every registered contract is referenced by a test and maps to a
     const referenced = new Set(sources.join('\n').match(/[A-Z]+-\d{3}/gu))
     expect(contracts.map(({ id }) => id).toSorted()).toEqual([...referenced].toSorted())
     for (const { id, source, job } of contracts) {
-        expect(await readFile(resolve(repositoryRoot, source), 'utf8'), id).not.toBe('')
+        expect((await readFile(resolve(repositoryRoot, source), 'utf8')).match(/[A-Z]+-\d{3}/gu), source).toContain(id)
         expect(ci.jobs, id).toHaveProperty(job)
         expect(ci.jobs['ci-ok']?.needs, id).toContain(job)
     }

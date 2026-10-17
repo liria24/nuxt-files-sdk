@@ -70,6 +70,7 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     }
     const graph = configSources(configPath, preparationAliases())
     const inputHashes = Object.fromEntries(graph.files.map((path) => [path, fileHash(path)]))
+    let watcher: ReturnType<typeof watchFiles> | undefined
     const environments = nuxt.options.nitro.static
         ? ['production', 'prerender']
         : [nuxt.options.envName || (nuxt.options.dev ? 'development' : 'production')]
@@ -79,6 +80,14 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
             environments,
             alias: preparationAliases(),
             injectImports: injectConfigImports,
+            onSource: (filename) => {
+                const path = resolve(filename)
+                if (watcher) watcher.add([path])
+                else {
+                    if (!graph.files.includes(path)) graph.files.push(path)
+                    if (!Object.hasOwn(inputHashes, path)) inputHashes[path] = fileHash(path)
+                }
+            },
         })
     let prepared
     try {
@@ -106,7 +115,6 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
         )
     }
 
-    let watcher: ReturnType<typeof watchFiles> | undefined
     if (nuxt.options.dev) {
         const roots = new Set([nuxt.options.rootDir, nuxt.options.workspaceDir, ...graph.files.map(dirname)])
         watcher = watchFiles(

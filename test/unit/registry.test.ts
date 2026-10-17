@@ -42,24 +42,6 @@ describe('FilesRegistry', () => {
         }
     })
 
-    test('[CFG-003][ERR-002] preserves factory errors without switching providers', () => {
-        const failure = new FilesError('Provider', 'Missing provider configuration')
-        const registry = new FilesRegistry(
-            defineFilesConfig({
-                storage: { adapter: 's3', config: { bucket: 'missing' } },
-            }),
-            {
-                factories: {
-                    s3: () => {
-                        throw failure
-                    },
-                    fs,
-                },
-            },
-        )
-        expect(() => registry.get()).toThrow(failure)
-    })
-
     test('[CFG-004] preserves plugins and hooks on resolved storage', async () => {
         const onAction = vi.fn<(event: unknown) => void>()
         const files = new FilesRegistry(

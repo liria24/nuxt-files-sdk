@@ -10,6 +10,7 @@ import { pruneFilesConfigSource } from '../../packages/nuxt-files-sdk/src/config
 import { normalizeFilesConfig } from '../../packages/nuxt-files-sdk/src/runtime/normalize'
 
 const directories: string[] = []
+const customAdapter = () => ({})
 afterAll(() => Promise.all(directories.map((directory) => rm(directory, { recursive: true, force: true }))))
 const load = async (source: string, environments: string[]) => {
     const directory = await mkdtemp(resolve(tmpdir(), 'files-env-'))
@@ -75,6 +76,21 @@ test('provider switches discard old config; common options inherit and arrays re
             plugins: [oldPlugin],
         },
     )
+})
+
+test('provider option fields named adapter do not replace nested config', () => {
+    const storage = { adapter: customAdapter, config: { adapter: 'before', config: { keep: true } } }
+    expect(mergeFilesConfig({ storage: { config: { adapter: 'after' } } }, { storage }).storage).toEqual({
+        adapter: customAdapter,
+        config: { adapter: 'after', config: { keep: true } },
+    })
+})
+
+test.each(['config', 'adapter'])('provider switches still replace config in a storage named %s', (name) => {
+    const base = { storage: { [name]: { adapter: 'r2', config: { bucket: 'old' }, prefix: 'keep' } } }
+    expect(mergeFilesConfig({ storage: { [name]: { adapter: 'fs', config: { root: '.' } } } }, base).storage).toEqual({
+        [name]: { adapter: 'fs', config: { root: '.' }, prefix: 'keep' },
+    })
 })
 
 test('[CFG-011] named environments override one storage and add environment-only names', async () => {
@@ -155,4 +171,17 @@ test('generated config source rejects parser errors', () => {
     expect(() => pruneFilesConfigSource('export default { storage:', 'files.config.ts', [])).toThrow(
         '[nuxt-files-sdk:invalid-config]',
     )
+})
+
+test.each([
+    'export default defineFilesConfig(config)',
+    'const files = defineFilesConfig(config); export default files',
+    'const files = config; export default defineFilesConfig(files)',
+    'const files = config; export default files',
+])('prunes static configuration through helper and identifier wrappers: %s', (declaration) => {
+    const literal = "{ storage: { adapter: 'memory' }, $development: { storage: { prefix: 'inactive' } } }"
+    const source = declaration.replace('config', literal)
+    const selected = pruneFilesConfigSource(source, 'files.config.ts', ['production'])
+    expect(selected).toContain("adapter: 'memory'")
+    expect(selected).not.toContain('inactive')
 })

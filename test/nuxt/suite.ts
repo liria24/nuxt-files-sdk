@@ -16,7 +16,7 @@ export const nuxtRuntimeSuite = async (name: string, expected: Record<string, un
             browser: false,
         })
 
-        test('[CFG-001][NUXT-001] loads the module, root config, Nitro plugin, and configured storage', async () => {
+        test('[CFG-001][NUXT-001] loads the module, root config, shared registry, and configured storage', async () => {
             await expect($fetch('/api/files')).resolves.toEqual(expected)
         })
 

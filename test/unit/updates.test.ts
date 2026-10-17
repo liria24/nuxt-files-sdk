@@ -1,8 +1,14 @@
+import { watchFile } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 import { expect, test, vi } from 'vite-plus/test'
+
+vi.mock('node:fs', async (original) => {
+    const fs = await original<typeof import('node:fs')>()
+    return { ...fs, watchFile: vi.fn<typeof fs.watchFile>(fs.watchFile) }
+})
 
 import { gatewayRoutes } from '../../packages/nuxt-files-sdk/src/config/prepare'
 import { configSources } from '../../packages/nuxt-files-sdk/src/integration/imports'
@@ -59,5 +65,21 @@ test('[UPDATE-001] tracks Layer aliases and referenced config, suppresses unchan
     } finally {
         watcher?.close()
         await rm(root, { recursive: true, force: true })
+    }
+})
+
+test('[UPDATE-001] closed watchers do not register helpers discovered by an unfinished preparation', () => {
+    const watcher = watchFiles(
+        [],
+        async () => {},
+        () => {},
+    )
+    try {
+        watcher.close()
+        vi.mocked(watchFile).mockClear()
+        watcher.add([resolve('late-configuration.ts')])
+        expect(watchFile).not.toHaveBeenCalled()
+    } finally {
+        watcher.close()
     }
 })

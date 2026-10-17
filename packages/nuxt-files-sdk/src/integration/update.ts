@@ -28,6 +28,7 @@ export const watchFiles = (paths: string[], changed: () => Promise<void>, failed
         }
     }
     const add = (files: string[]) => {
+        if (closed) return
         for (const path of files) {
             if (listeners.has(path)) continue
             let hash = fileHash(path)

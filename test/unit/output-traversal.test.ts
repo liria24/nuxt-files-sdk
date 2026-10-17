@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 import { expect, test } from 'vite-plus/test'
 
-import { readOutput } from '../utils/fixture'
+import { directorySize, outputPaths, readOutput } from '../utils/fixture'
 
 test('deployment scans follow directory junctions without losing linked runtime files or looping', async () => {
     const directory = await mkdtemp(resolve(tmpdir(), 'files-output-'))
@@ -23,6 +23,14 @@ test('deployment scans follow directory junctions without losing linked runtime 
         expect(runtime).toContain('entry-marker')
         expect(runtime).toContain('linked-runtime-marker')
         expect(runtime).not.toContain('types-marker')
+        expect(await directorySize(output)).toBe(Buffer.byteLength('entry-markerlinked-runtime-markertypes-marker'))
+        expect((await outputPaths(output)).toSorted()).toEqual([
+            'dependency',
+            'dependency/cycle',
+            'dependency/runtime.mjs',
+            'dependency/types.d.ts',
+            'entry.mjs',
+        ])
     } finally {
         await rm(directory, { recursive: true, force: true })
     }

@@ -12,6 +12,7 @@ import {
     setupNitroFilesIntegration,
     type NitroIntegration,
 } from '../../packages/nuxt-files-sdk/src/integration/nitro'
+import { developmentConfigCurrent } from '../../packages/nuxt-files-sdk/src/runtime/development'
 
 const temporaryDirectories: string[] = []
 type TestHook = (name: 'types:extend' | 'close', callback: Parameters<NitroIntegration['hooks']['hook']>[1]) => void
@@ -298,5 +299,57 @@ describe('provider generation', () => {
         expect(environment.r2?.flat()).toContain('R2_ACCESS_KEY_ID')
         expect(environment.r2?.flat()).not.toContain('NUXT_R2_ACCESS_KEY_ID')
         expect(productionSource).not.toContain('files-sdk/providers')
+    })
+
+    test('standalone development tracks computed imports and captured require through native restarts', async () => {
+        const directory = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-restart-'))
+        temporaryDirectories.push(directory)
+        const configPath = resolve(directory, 'files.config.mjs')
+        const policyPath = resolve(directory, 'policy.mjs')
+        const permissionsPath = resolve(directory, 'permissions.cjs')
+        const permissionsDataPath = resolve(directory, 'permissions.json')
+        const laterPath = resolve(directory, 'later.mjs')
+        await writeFile(permissionsDataPath, '{ "allowed": true }')
+        await writeFile(
+            permissionsPath,
+            "const path = './permissions.json'; const captured = require; module.exports = captured(path)",
+        )
+        const policySource =
+            "const captured = require; const permissions = captured('./permissions.cjs'); export const authorize = () => permissions.allowed"
+        await writeFile(policyPath, policySource)
+        await writeFile(
+            configPath,
+            "const path = './policy.mjs'; const policy = await import(path); export default { storage: { adapter: 'memory' }, routes: [{ path: '/files', authorize: policy.authorize }] }",
+        )
+        const hook = vi.fn<TestHook>()
+        const restart = vi.fn<(name: 'restart') => Promise<void>>().mockResolvedValue(undefined)
+        const warn = vi.fn<(message: string) => void>()
+        const nitro: NitroIntegration = {
+            options: { rootDir: directory, buildDir: directory, dev: true, plugins: [] },
+            hooks: { hook, callHook: restart },
+            logger: { warn },
+        }
+        try {
+            await setupNitroFilesIntegration(nitro, { configPath, environments: ['development'] })
+            const handlerPath = nitro.options.handlers![0]!.handler
+            const handler = await readFile(handlerPath, 'utf8')
+            const hashes = JSON.parse(/const inputHashes = (.+)/u.exec(handler)![1]!) as Record<string, string>
+            expect(Object.keys(hashes)).toEqual(
+                expect.arrayContaining([policyPath, permissionsPath, permissionsDataPath]),
+            )
+            await writeFile(permissionsDataPath, '{ "allowed": false }')
+            expect(developmentConfigCurrent(hashes)).toBe(false)
+            await vi.waitFor(() => expect(restart).toHaveBeenCalledExactlyOnceWith('restart'))
+            await writeFile(laterPath, "throw new Error('repair this helper')")
+            await writeFile(policyPath, "const path = './later.mjs'; await import(path); " + policySource)
+            await vi.waitFor(() => expect(warn).toHaveBeenCalledWith('repair this helper'))
+            expect(restart).toHaveBeenCalledTimes(1)
+            await writeFile(laterPath, 'export const repaired = true')
+            await vi.waitFor(() => expect(restart).toHaveBeenCalledTimes(2))
+            await hook.mock.calls.find(([name]) => name === 'types:extend')?.[1]({})
+            expect(await readFile(handlerPath, 'utf8')).toBe(handler)
+        } finally {
+            await hook.mock.calls.find(([name]) => name === 'close')?.[1]({})
+        }
     })
 })

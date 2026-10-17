@@ -34,6 +34,7 @@ interface SourceTypes {
 interface ConfigEvaluatorOptions {
     alias: Record<string, string>
     nativeRoots: string[]
+    onSource?: ((filename: string) => void) | undefined
 }
 
 const normalize = (path: string) => {
@@ -42,7 +43,7 @@ const normalize = (path: string) => {
 }
 
 /** Create one fresh source graph per c12 load, retaining Jiti's resolver and compiler. */
-export const createFilesConfigEvaluator = async ({ alias, nativeRoots }: ConfigEvaluatorOptions) => {
+export const createFilesConfigEvaluator = async ({ alias, nativeRoots, onSource }: ConfigEvaluatorOptions) => {
     const { createJiti } = await import('jiti')
     const cache: ModuleCache = Object.create(null)
     const virtualModules: Record<string, unknown> = Object.create(null)
@@ -61,7 +62,6 @@ export const createFilesConfigEvaluator = async ({ alias, nativeRoots }: ConfigE
         Object.keys(alias).some((key) => id === key || id.startsWith(`${key}/`))
     const sourceFile = (id: string, filename: string) =>
         sourceSpecifier(id) &&
-        /^\.[cm]?[jt]sx?$/u.test(extname(filename)) &&
         !roots.some((root) => normalize(filename) === root || normalize(filename).startsWith(`${root}/`))
 
     const callBridge = (types: SourceTypes, method: string, args: SourceNode[]) =>
@@ -168,6 +168,7 @@ export const createFilesConfigEvaluator = async ({ alias, nativeRoots }: ConfigE
         // Synchronous requires and circular imports retain its partial-export behavior.
         if (cache[filename]) return cache[filename].exports
         try {
+            onSource?.(filename)
             const result = instance(filename).evalModule(source ?? readFileSync(filename, 'utf8'), {
                 filename,
                 async,
@@ -204,6 +205,10 @@ export const createFilesConfigEvaluator = async ({ alias, nativeRoots }: ConfigE
         if (!url.startsWith('file:')) return jiti.import(id)
         const filename = fileURLToPath(url)
         if (!sourceFile(id, filename)) return jiti.import(id)
+        if (!/^\.[cm]?[jt]sx?$/u.test(extname(filename))) {
+            onSource?.(filename)
+            return jiti.import(id)
+        }
         const circular = reaches(filename, origin)
         const edges = dependencies.get(origin) ?? new Set<string>()
         edges.add(filename)
@@ -215,7 +220,12 @@ export const createFilesConfigEvaluator = async ({ alias, nativeRoots }: ConfigE
     function requireFrom(id: string, origin: string): unknown {
         const jiti = instance(origin)
         const filename = jiti.resolve(id)
-        return sourceFile(id, filename) ? evaluate(filename, false) : jiti(id)
+        if (!sourceFile(id, filename)) return jiti(id)
+        if (!/^\.[cm]?[jt]sx?$/u.test(extname(filename))) {
+            onSource?.(filename)
+            return jiti(id)
+        }
+        return evaluate(filename, false)
     }
 
     function requireFor(origin: string): Jiti {
