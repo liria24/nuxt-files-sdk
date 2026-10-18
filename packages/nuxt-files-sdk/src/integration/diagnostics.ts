@@ -103,3 +103,23 @@ export const dependencySession = (root: string): Set<string> => {
     }
     return state
 }
+
+const unconfiguredSessions = new Set<string>()
+
+/** Keep an unchanged missing-storage warning quiet across development rebuilds. */
+export const reportStorageConfiguration = (
+    configPath: string,
+    unconfigured: boolean,
+    development: boolean,
+    warn: (message: string) => void,
+): void => {
+    if (!unconfigured) {
+        unconfiguredSessions.delete(configPath)
+        return
+    }
+    if (development && unconfiguredSessions.has(configPath)) return
+    if (development) unconfiguredSessions.add(configPath)
+    warn(
+        `[nuxt-files-sdk:not-configured] No storage is configured. Set storage in ${configPath} with defineFilesConfig({ storage: { adapter: 'fs', config: { root: '.data/files' } } }). Files integration is inactive until storage is configured.`,
+    )
+}

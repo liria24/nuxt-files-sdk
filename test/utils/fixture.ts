@@ -181,10 +181,16 @@ export const nuxtBuildDirectory = async (directory: string): Promise<string> => 
 
 export const startFixtureServer = async (
     name: string,
-    options: { development?: boolean; readyPath?: string; signal?: AbortSignal } = {},
+    options: {
+        development?: boolean
+        readyPath?: string
+        signal?: AbortSignal
+        directory?: string
+        developmentCommand?: string[]
+    } = {},
 ): Promise<{ url: string; close: () => Promise<void>; output: () => string }> => {
     options.signal?.throwIfAborted()
-    const directory = fixtureDirectory(name)
+    const directory = options.directory ?? fixtureDirectory(name)
     const manifest = await readFile(resolve(directory, 'package.json'), 'utf8').then(JSON.parse, () => ({}))
     if (manifest.dependencies?.nuxt && !options.development && !options.readyPath) {
         const hooks = createTest({
@@ -226,10 +232,16 @@ export const startFixtureServer = async (
     const child = spawn(
         'node',
         options.development
-            ? ['node_modules/nuxt/bin/nuxt.mjs', 'dev', '--no-fork', '--port', String(port), '--host', '127.0.0.1']
+            ? [
+                  ...(options.developmentCommand ?? ['node_modules/nuxt/bin/nuxt.mjs', 'dev', '--no-fork']),
+                  '--port',
+                  String(port),
+                  '--host',
+                  '127.0.0.1',
+              ]
             : ['.output/server/index.mjs'],
         {
-            cwd: fixtureDirectory(name),
+            cwd: directory,
             env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', NITRO_NO_UNIX_SOCKET: '1' },
             detached: process.platform !== 'win32',
             stdio: ['ignore', 'pipe', 'pipe'],
