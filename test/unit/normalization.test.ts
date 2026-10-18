@@ -7,7 +7,7 @@ import * as runtime from '../../packages/nuxt-files-sdk/src/runtime'
 import { FilesRegistry } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 describe('normalized configuration', () => {
-    test('[CFG-013] preparation and runtime reject the same invalid structure', () => {
+    test('[CFG-013] provider selection and runtime reject the same invalid storage structure', () => {
         for (const config of [
             null,
             [],

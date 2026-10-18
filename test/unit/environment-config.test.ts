@@ -115,10 +115,10 @@ test('[CFG-011] named environments override one storage and add environment-only
     await expect(
         load(`export default { $env: { staging: { storage: { adapter: 'memory' } } } }`, ['production']),
     ).resolves.toBeUndefined()
-    await expect(load(`export default {}`, ['production'])).rejects.toThrow('At least one storage')
+    await expect(load(`export default {}`, ['production'])).resolves.toBeUndefined()
     await expect(
         load(`export default { storage: {}, $test: { storage: { adapter: 'memory' } } }`, ['production']),
-    ).rejects.toThrow('At least one storage')
+    ).resolves.toBeUndefined()
 })
 
 test('direct and named overrides merge before the next environment, matching generated runtime resolution', async () => {

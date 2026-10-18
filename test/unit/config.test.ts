@@ -14,6 +14,17 @@ import {
 } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 describe('configuration types', () => {
+    test('[TYPE-030] accepts unconfigured storage in base and environment inputs', () => {
+        expect(defineFilesConfig({})).toEqual({})
+        expect(defineFilesConfig({ storage: {} }).storage).toEqual({})
+        expect(defineFilesConfig({ storage: null }).storage).toBeNull()
+        const config = defineFilesConfig({ storage: { adapter: 'memory' }, $development: { storage: null } })
+        expect(config.$development.storage).toBeNull()
+        const input: FilesConfigInput = { storage: null, $env: { staging: { storage: null } } }
+        expect(defineFilesConfig(input)).toBe(input)
+        const configured = defineFilesConfig({ storage: null, $production: { storage: { adapter: 'memory' } } })
+        expectTypeOf<SingleStorage<typeof configured>['adapter']>().toEqualTypeOf<MemoryAdapter>()
+    })
     test('[TYPE-019] preserves annotated inputs and rejects incomplete unbound environments', () => {
         const config: FilesConfigInput = { $development: { storage: { adapter: 'fs', config: { root: '.' } } } }
         expect(defineFilesConfig(config)).toBe(config)

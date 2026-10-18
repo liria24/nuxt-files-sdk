@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises'
-
 import type { ProviderSlug } from 'files-sdk'
 import { getProvider, listEnvVars } from 'files-sdk/providers'
 
@@ -71,9 +69,13 @@ export const providerCode = (adapters: ProviderSlug[]): { imports: string; facto
 })
 
 export const prepareFilesConfig = async (options: FilesConfigLoaderOptions) => {
-    const { loadFilesConfig } = await import('./load')
+    const { loadFilesConfig, readFilesConfigSource } = await import('./load')
     const { pruneFilesConfigSource } = await import('./prune')
-    const original = await readFile(options.configPath, 'utf8')
+    const original = await readFilesConfigSource(options.configPath)
+    if (original === undefined) {
+        options.onUnconfigured?.()
+        return undefined
+    }
     const source = options.injectImports ? (await options.injectImports(original, options.configPath)).code : original
     const config = await loadFilesConfig({ ...options, source, injectImports: undefined })
     if (!config) return undefined

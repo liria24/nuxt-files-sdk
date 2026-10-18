@@ -38,15 +38,6 @@ export default defineNuxtModule<ModuleOptions>({
                 const { setupNuxtFilesIntegration } = await import('./integration/nuxt')
                 const configPath = resolve(nuxt.options.rootDir, options.config)
                 const active = await setupNuxtFilesIntegration(nuxt, { configPath })
-                if (!active) return
-                const capabilities = filesBuilderCapabilities(
-                    resolveServerVariant<'nuxt' | 'nitro2' | 'nitro3'>({
-                        nuxt: 'nuxt',
-                        nitro2: 'nitro2',
-                        nitro3: 'nitro3',
-                    }),
-                )
-
                 addServerImports([
                     {
                         name: 'defineFilesConfig',
@@ -56,14 +47,23 @@ export default defineNuxtModule<ModuleOptions>({
                             '/',
                         ),
                     },
-                    { name: 'useServerFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: true },
-                    { name: 'syncFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: true },
-                    { name: 'transferFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: true },
+                    { name: 'useServerFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: active },
+                    { name: 'syncFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: active },
+                    { name: 'transferFiles', from: 'nuxt-files-sdk/runtime', dtsDisabled: active },
                 ])
                 addImports({ name: 'defineFilesConfig', from: 'nuxt-files-sdk/config' })
                 for (const name of ['useFiles', 'useFile', 'useList', 'useSearch']) {
                     addImports({ name, from: '#files-sdk/vue' })
                 }
+
+                if (!active) return
+                const capabilities = filesBuilderCapabilities(
+                    resolveServerVariant<'nuxt' | 'nitro2' | 'nitro3'>({
+                        nuxt: 'nuxt',
+                        nitro2: 'nitro2',
+                        nitro3: 'nitro3',
+                    }),
+                )
 
                 if (shouldEnableFilesDevtools(nuxt.options.dev, options.devtools, nuxt.options.devtools)) {
                     if (!capabilities.devtools) {

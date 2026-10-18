@@ -15,10 +15,24 @@ export interface FilesConfigLoaderOptions {
     injectImports?: ((code: string, id?: string) => Promise<{ code: string }>) | undefined
     source?: string
     onSource?: ((filename: string) => void) | undefined
+    onUnconfigured?: (() => void) | undefined
+}
+
+/** Only a missing entry file is optional; imported files and other I/O failures remain errors. */
+export const readFilesConfigSource = async (configPath: string): Promise<string | undefined> => {
+    try {
+        return await readFile(configPath, 'utf8')
+    } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined
+        throw error
+    }
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
     value !== null && typeof value === 'object' && !Array.isArray(value)
+
+const isUnconfiguredStorage = (storage: unknown): boolean =>
+    storage == null || (isObject(storage) && Object.keys(storage).length === 0)
 
 const hasEnvironmentStorage = (config: Record<string, unknown>): boolean =>
     [
@@ -27,7 +41,7 @@ const hasEnvironmentStorage = (config: Record<string, unknown>): boolean =>
         config.$test,
         config.$prerender,
         ...(isObject(config.$env) ? Object.values(config.$env) : []),
-    ].some((branch) => isObject(branch) && branch.storage !== undefined)
+    ].some((branch) => isObject(branch) && !isUnconfiguredStorage(branch.storage))
 
 export const loadFilesConfig = async ({
     configPath,
@@ -36,7 +50,13 @@ export const loadFilesConfig = async ({
     injectImports,
     source,
     onSource,
+    onUnconfigured,
 }: FilesConfigLoaderOptions): Promise<FilesConfig | undefined> => {
+    source ??= await readFilesConfigSource(configPath)
+    if (source === undefined) {
+        onUnconfigured?.()
+        return undefined
+    }
     const { loadConfig } = await import('c12')
     // A normal import cannot honor source aliases/injection or fresh referenced files.
     // Force source evaluation once; never retry an authored failure with another loader.
@@ -68,6 +88,10 @@ export const loadFilesConfig = async ({
     })
     if (config.storage === undefined && layers?.some(({ config: layer }) => layer && hasEnvironmentStorage(layer)))
         return undefined
+    if (isObject(config) && isUnconfiguredStorage(config.storage)) {
+        onUnconfigured?.()
+        return undefined
+    }
     normalizeFilesConfig(config)
     // Storage is validated above; route validation follows during preparation.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion

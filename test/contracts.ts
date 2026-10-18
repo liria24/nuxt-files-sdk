@@ -1,5 +1,29 @@
 export const contracts = [
     ...[
+        ['CFG-015', 'test/nuxt/nuxt4-unconfigured.test.ts', 'test-nuxt4'],
+        ['CFG-016', 'test/nitro/unconfigured.test.ts', 'test-nitro2'],
+        ['CFG-017', 'test/nitro/v3-unconfigured.test.ts', 'test-nitro3'],
+    ].map(([id, source, job]) => ({
+        id: id!,
+        guarantee:
+            'Unconfigured native prepare/build/dev remain usable and recover across storage creation and deletion',
+        source: source!,
+        job: job!,
+    })),
+    {
+        id: 'CFG-014',
+        guarantee:
+            'Missing or empty storage is inactive with bounded warnings while real configuration errors remain failures',
+        source: 'test/unit/unconfigured.test.ts',
+        job: 'unit',
+    },
+    {
+        id: 'TYPE-030',
+        guarantee: 'Public configuration accepts empty and null storage without weakening configured storage inference',
+        source: 'test/unit/config.test.ts',
+        job: 'typecheck',
+    },
+    ...[
         ['TYPE-029', 'Explicit custom factory overrides require complete config regardless of structural identity'],
         ['TYPE-020', 'Switching adapters requires provider config'],
         ['TYPE-021', 'Switching adapters discards base provider config'],
@@ -635,7 +659,7 @@ export const contracts = [
     },
     {
         id: 'CFG-013',
-        guarantee: 'Preparation and runtime share structural configuration validation',
+        guarantee: 'Provider selection and runtime share structural storage validation after the unconfigured guard',
         source: 'test/unit/normalization.test.ts',
         job: 'unit',
     },

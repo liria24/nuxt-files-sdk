@@ -48,7 +48,7 @@ export type FilesRoute = Omit<CreateFilesRouterOptions, 'files' | 'authorize'> &
 export type StorageSet = StorageConfig | Record<string, StorageConfig>
 /** One environment's Files options, before or after resolution. */
 export interface FilesEnvironmentConfig<Storage = StorageSet> {
-    storage?: Storage
+    storage?: Storage | null
     routes?: readonly FilesRoute[]
 }
 interface FilesConfigContext<Base> extends FilesEnvironmentConfig {
@@ -78,11 +78,13 @@ type EntryCheck<T> = T extends { adapter: infer A extends StorageAdapter }
         ? Record<Exclude<keyof T, keyof StorageConfig<A>>, never>
         : StorageConfig<A>
     : never
-type StorageCheck<T> = T extends { adapter: unknown }
-    ? EntryCheck<T>
-    : T extends Record<string, unknown>
-      ? { [K in keyof T]: EntryCheck<T[K]> }
-      : never
+type StorageCheck<T> = T extends null | undefined
+    ? T
+    : T extends { adapter: unknown }
+      ? EntryCheck<T>
+      : T extends Record<string, unknown>
+        ? { [K in keyof T]: EntryCheck<T[K]> }
+        : never
 type StorageOf<T> = T extends { storage: infer S } ? S : never
 type EnvironmentStorage<T> =
     | StorageOf<T extends { $development: infer E } ? E : never>
@@ -164,11 +166,13 @@ export type StorageNames<T> =
 type RouteCheck<T> = FilesRoute &
     ([StorageNames<T>] extends [never] ? { storage?: never } : { storage: StorageNames<T> })
 
-type OverrideCheck<Base, Override> = Base extends { adapter: StorageAdapter }
-    ? EntryCheck<CheckedOverrideEntry<Base, Override>>
-    : Override extends { adapter: StorageAdapter }
+type OverrideCheck<Base, Override> = Override extends null | undefined
+    ? Override
+    : Base extends { adapter: StorageAdapter }
       ? EntryCheck<CheckedOverrideEntry<Base, Override>>
-      : { [K in keyof Override]: EntryCheck<CheckedOverrideEntry<K extends keyof Base ? Base[K] : {}, Override[K]>> }
+      : Override extends { adapter: StorageAdapter }
+        ? EntryCheck<CheckedOverrideEntry<Base, Override>>
+        : { [K in keyof Override]: EntryCheck<CheckedOverrideEntry<K extends keyof Base ? Base[K] : {}, Override[K]>> }
 type EnvironmentCheck<T, Root> = T extends object
     ? Record<Exclude<keyof T, 'storage' | 'routes'>, never> &
           (T extends { storage: infer S }
