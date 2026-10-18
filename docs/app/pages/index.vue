@@ -7,19 +7,23 @@ const { docs } = useAppConfig()
 const { copied, copy } = useClipboard()
 
 type packageManager = 'npm' | 'pnpm' | 'bun' | 'yarn'
-const packageManagers: Record<packageManager, { label: string; icon: string; install: string }> = {
-    npm: { label: 'npm', icon: 'simple-icons:npm', install: 'npm i' },
-    pnpm: { label: 'pnpm', icon: 'simple-icons:pnpm', install: 'pnpm add' },
-    bun: { label: 'Bun', icon: 'simple-icons:bun', install: 'bun add' },
-    yarn: { label: 'yarn', icon: 'simple-icons:yarn', install: 'yarn add' },
+const packageManagers: Record<packageManager, { label: string; icon: string; install: string; run: string }> = {
+    npm: { label: 'npm', icon: 'simple-icons:npm', install: 'npm i', run: 'npx nuxt' },
+    pnpm: { label: 'pnpm', icon: 'simple-icons:pnpm', install: 'pnpm add', run: 'pnpm dlx nuxt' },
+    bun: { label: 'Bun', icon: 'simple-icons:bun', install: 'bun add', run: 'bunx nuxt' },
+    yarn: { label: 'yarn', icon: 'simple-icons:yarn', install: 'yarn add', run: 'yarn dlx nuxt' },
 }
 const selectPM = useCookie<packageManager>('package-manager', {
     default: () => 'npm',
     readonly: import.meta.server ? undefined : false,
 })
-const displayCommand = computed(
-    () => `${(packageManagers[selectPM.value] ?? packageManagers.npm).install} nuxt-files-sdk`,
-)
+const selectedExample = ref('nuxt4')
+const displayCommand = computed(() => {
+    const manager = packageManagers[selectPM.value] ?? packageManagers.npm
+    return selectedExample.value.startsWith('nuxt')
+        ? `${manager.run} module add files-sdk`
+        : `${manager.install} nuxt-files-sdk`
+})
 
 const siteUrl = useRuntimeConfig().public.siteUrl.replace(/\/$/u, '')
 
@@ -204,7 +208,6 @@ export default defineHandler(async () => {
     },
 ]
 
-const selectedExample = ref('nuxt4')
 const selectedFile = ref<PreviewFile>(examples[0]!.files[1]!)
 watch(selectedExample, (value) => {
     const fileId = selectedFile.value?.id ?? 'files-config'
@@ -250,6 +253,7 @@ useSeoMeta({
                     <div class="absolute inset-x-0 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
                         <UButton
                             v-for="(pm, key) in packageManagers"
+                            :aria-label="`Use ${pm.label}`"
                             :icon="pm.icon"
                             variant="link"
                             color="neutral"
