@@ -4,7 +4,7 @@ import { useClipboard } from '@vueuse/core'
 import { highlightText } from 'rangi'
 
 const { docs } = useAppConfig()
-const { copied, copy } = useClipboard()
+const { copied, copy } = useClipboard({ legacy: true })
 
 type packageManager = 'npm' | 'pnpm' | 'bun' | 'yarn'
 const packageManagers: Record<packageManager, { label: string; icon: string; install: string; run: string }> = {
