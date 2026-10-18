@@ -47,13 +47,18 @@ afterEach(async () => {
     kit.startTask.mockClear()
 })
 
-const setup = async (source: string, major = 2, development = false, nitroAlias: Record<string, string> = {}) => {
+const setup = async (
+    source: string | undefined,
+    major = 2,
+    development = false,
+    nitroAlias: Record<string, string> = {},
+) => {
     const root = await mkdtemp(resolve(tmpdir(), 'nuxt-files-sdk-nuxt-generation-'))
     directories.push(root)
     kit.directory = resolve(root, '.nuxt')
     kit.major = major
     const configPath = resolve(root, 'files.config.ts')
-    await writeFile(configPath, source)
+    if (source !== undefined) await writeFile(configPath, source)
     const hooks = new Map<string, (...args: any[]) => unknown>()
     const nuxt = {
         options: {
@@ -84,6 +89,17 @@ const setup = async (source: string, major = 2, development = false, nitroAlias:
     if (close) closers.push(close)
     return { active, nuxt, hooks, configPath }
 }
+
+test.each([undefined, '', 'export default {}', 'export default { storage: null }'])(
+    'Nuxt skips unconfigured generation: %s',
+    async (source) => {
+        const { active } = await setup(source)
+        expect(active).toBe(false)
+        expect(kit.warn).toHaveBeenCalledOnce()
+        expect(kit.templates.size).toBe(0)
+        expect(kit.handlers).toEqual([])
+    },
+)
 
 test('Nuxt tracks computed source helpers, retries repaired helpers, and keeps the original Gateway hashes', async () => {
     const directory = await mkdtemp(resolve(tmpdir(), 'files-nuxt-dynamic-'))

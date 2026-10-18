@@ -4,6 +4,7 @@ dist
 .nitro
 .contract-invalid
 .contract-examples
+.contract-unconfigured
 .output
 .wrangler
 .dev.vars

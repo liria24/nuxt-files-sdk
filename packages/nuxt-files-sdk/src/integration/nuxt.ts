@@ -9,7 +9,7 @@ import { prepareFilesConfig } from '../config/prepare'
 import { fileHash } from '../runtime/development'
 import { filesBuilderCapabilities, requireFilesGateway } from './capabilities'
 import { deploymentTarget, storageDependencies } from './dependencies'
-import { dependencySession, diagnoseDependencies } from './diagnostics'
+import { dependencySession, diagnoseDependencies, reportStorageConfiguration } from './diagnostics'
 import { configSources, subpathDependencies } from './imports'
 import { optionalAwsSdkDependencies, storageTypes, wireNuxtNitroAwsOptions, wireNuxtNitroOptions } from './nitro'
 import { stopNitroDevReloadOnClose } from './nitro-dev-close'
@@ -74,12 +74,16 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
     const environments = nuxt.options.nitro.static
         ? ['production', 'prerender']
         : [nuxt.options.envName || (nuxt.options.dev ? 'development' : 'production')]
-    const prepare = () =>
-        prepareFilesConfig({
+    const prepare = async () => {
+        let unconfigured = false
+        const result = await prepareFilesConfig({
             configPath,
             environments,
             alias: preparationAliases(),
             injectImports: injectConfigImports,
+            onUnconfigured: () => {
+                unconfigured = true
+            },
             onSource: (filename) => {
                 const path = resolve(filename)
                 if (watcher) watcher.add([path])
@@ -89,6 +93,9 @@ export const setupNuxtFilesIntegration = async (nuxt: Nuxt, options: NuxtFilesIn
                 }
             },
         })
+        reportStorageConfiguration(configPath, unconfigured, nuxt.options.dev, (message) => logger.warn(message))
+        return result
+    }
     let prepared
     try {
         prepared = await withFilesTask(terminal, 'Preparing Files configuration', prepare)

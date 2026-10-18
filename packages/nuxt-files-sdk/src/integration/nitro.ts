@@ -8,7 +8,12 @@ import { getProvider } from 'files-sdk/providers'
 import { prepareFilesConfig } from '../config/prepare'
 import { fileHash } from '../runtime/development'
 import { deploymentTarget, storageDependencies } from './dependencies'
-import { dependencySession, diagnoseDependencies, reportDependencyIssues } from './diagnostics'
+import {
+    dependencySession,
+    diagnoseDependencies,
+    reportDependencyIssues,
+    reportStorageConfiguration,
+} from './diagnostics'
 import { configSources, subpathDependencies } from './imports'
 import { registerSdkAliases, resolveOwnedSdk, resolvePackage, sdkTypePaths } from './resolve'
 import { watchFiles, writeChanged as writeFile } from './update'
@@ -162,12 +167,16 @@ export const setupNitroFilesIntegration = async (
     const graph = configSources(configPath, nitro.options.alias)
     const inputHashes = Object.fromEntries(graph.files.map((path) => [path, fileHash(path)]))
     let watcher: ReturnType<typeof watchFiles> | undefined
-    const prepare = () =>
-        prepareFilesConfig({
+    const prepare = async () => {
+        let unconfigured = false
+        const result = await prepareFilesConfig({
             configPath,
             environments: options.environments,
             alias: nitro.options.alias,
             injectImports: nitro.unimport?.injectImports.bind(nitro.unimport),
+            onUnconfigured: () => {
+                unconfigured = true
+            },
             onSource: (filename) => {
                 const path = resolve(filename)
                 if (watcher) watcher.add([path])
@@ -177,6 +186,11 @@ export const setupNitroFilesIntegration = async (
                 }
             },
         })
+        reportStorageConfiguration(configPath, unconfigured, Boolean(nitro.options.dev), (message) =>
+            nitro.logger?.warn(message),
+        )
+        return result
+    }
     let prepared
     try {
         prepared = await prepare()
