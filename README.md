@@ -18,15 +18,12 @@ Docs: <a href="https://nuxt-files-sdk.liria.me">https://nuxt-files-sdk.liria.me<
 </p>
 
 ```bash
-npm i nuxt-files-sdk
+npx nuxt module add files-sdk
 ```
 
-```ts
-// nuxt.config.ts
-export default defineNuxtConfig({
-    modules: ['nuxt-files-sdk'],
-})
+The command installs and registers the Nuxt module. Then configure storage:
 
+```ts
 // files.config.ts
 export default defineFilesConfig({
     storage: {
