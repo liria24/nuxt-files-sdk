@@ -8,12 +8,12 @@
         "build": "nuxt build"
     },
     "dependencies": {
-        "nuxt": "npm:nuxt-nightly@5.0.0-2610051428-355ed95",
+        "nuxt": "npm:nuxt-nightly@5.0.0-2610252024-a461c63",
         "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
     },
     "devDependencies": {
         "typescript": "^6.0.3",
-        "vue-tsc": "^3.2.0"
+        "vue-tsc": "^3.3.13"
     },
     "overrides": {
         "@nuxt/devtools": "4.0.0-alpha.19"

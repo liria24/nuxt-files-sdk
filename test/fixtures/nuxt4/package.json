@@ -6,14 +6,14 @@
         "build": "nuxt build"
     },
     "dependencies": {
-        "nuxt": "^4.6.0",
+        "nuxt": "^4.6.2",
         "nuxt-files-sdk": "file:../../../packages/nuxt-files-sdk"
     },
     "devDependencies": {
-        "@types/node": "^26.6.3",
+        "@types/node": "^26.6.5",
         "c12": "^3.3.4",
         "typescript": "^6.0.3",
-        "unplugin": "^3.3.0",
-        "vue-tsc": "^3.2.0"
+        "unplugin": "^3.5.0",
+        "vue-tsc": "^3.3.13"
     }
 }
