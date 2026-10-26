@@ -44,28 +44,28 @@
         "test:package": "vp test run --project artifact"
     },
     "devDependencies": {
-        "@nuxt/schema": "^4.6.1",
-        "@nuxt/test-utils": "^4.3.3",
-        "files-sdk": "^3.1.1",
-        "knip": "^6.41.0",
-        "npm": "12.2.0",
+        "@nuxt/schema": "^4.6.2",
+        "@nuxt/test-utils": "^4.3.4",
+        "files-sdk": "^3.1.2",
+        "knip": "^6.43.0",
+        "npm": "12.2.1",
         "pkg-pr-new": "^0.0.91",
-        "pnpm": "10.34.7",
+        "pnpm": "10.34.9",
         "sherif": "^1.13.0",
         "taze": "^21.3.0",
         "typescript": "^7.0.2",
-        "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
-        "vite-plus": "1.1.0",
-        "vitest": "5.0.4",
+        "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+        "vite-plus": "1.4.0",
+        "vitest": "5.0.5",
         "vscode-jsonrpc": "^9.0.3",
         "yaml": "^2.9.1"
     },
     "overrides": {
-        "vite": "npm:@voidzero-dev/vite-plus-core@1.1.0",
-        "vitest": "5.0.4"
+        "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+        "vitest": "5.0.5"
     },
     "engines": {
         "node": "^24.11.0 || >=26.0.0"
     },
-    "packageManager": "bun@1.4.3"
+    "packageManager": "bun@1.4.4"
 }

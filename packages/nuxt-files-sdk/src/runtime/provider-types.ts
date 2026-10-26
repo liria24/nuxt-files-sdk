@@ -31,6 +31,7 @@ export interface ProviderFactories {
     ovhcloud: typeof import('files-sdk/ovhcloud').ovhcloud
     pocketbase: typeof import('files-sdk/pocketbase').pocketbase
     r2: typeof import('files-sdk/r2').r2
+    railway: typeof import('files-sdk/railway').railway
     rustfs: typeof import('files-sdk/rustfs').rustfs
     s3: typeof import('files-sdk/s3').s3
     's3-fetch': typeof import('files-sdk/s3-fetch').s3Fetch

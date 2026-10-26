@@ -14,7 +14,7 @@
     "updateNotScheduled": true,
     "ignoreScripts": true,
     "constraints": {
-        "bun": "1.4.2"
+        "bun": "1.4.4"
     },
     "lockFileMaintenance": {
         "enabled": false
@@ -94,14 +94,14 @@
         {
             "description": "Preserve the existing prerelease series",
             "matchDepNames": ["c12"],
-            "matchCurrentValue": "4.0.0-rc.2",
+            "matchCurrentValue": "4.0.0-rc.3",
             "allowedVersions": "/^4\\.0\\.\\d+-rc(?:[.\\d-]|$)/",
             "dependencyDashboardApproval": true
         },
         {
             "description": "Preserve the existing prerelease series",
             "matchDepNames": ["@nuxt/devtools-kit"],
-            "matchCurrentValue": "4.0.0-beta.4",
+            "matchCurrentValue": "4.0.0-beta.7",
             "allowedVersions": "/^4\\.0\\.\\d+-beta(?:[.\\d-]|$)/",
             "dependencyDashboardApproval": true
         },
@@ -161,6 +161,7 @@
                 "convex",
                 "disk",
                 "dropbox",
+                "effect",
                 "fastify",
                 "firebase-admin",
                 "google-auth-library",

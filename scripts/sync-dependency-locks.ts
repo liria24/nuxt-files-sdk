@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -87,7 +88,12 @@ if (import.meta.main) {
         refreshFilePackageSnapshot(lockPath, manifest)
         const outdated = outdatedDependencies(lockPath, manifest)
         if (outdated.length > 0) {
-            run(['update', ...outdated, '--lockfile-only', '--ignore-scripts', '--no-save'], directory)
+            run(['update', ...outdated, '--lockfile-only', '--ignore-scripts'], directory)
+            assert.deepEqual(
+                outdatedDependencies(lockPath, manifest),
+                [],
+                `Unresolved dependency updates in ${lockPath}`,
+            )
         }
     }
     run(['scripts/sync-optional-peers.ts', '--check'], root)
