@@ -12,32 +12,32 @@
     },
     "dependencies": {
         "@comark/nuxt": "^0.7.0",
-        "@iconify-json/lucide": "^1.2.143",
+        "@iconify-json/lucide": "^1.2.147",
         "@iconify-json/simple-icons": "^1.2.100",
-        "@nuxt/fonts": "^1.0.1",
-        "@nuxt/ui": "^4.11.3",
+        "@nuxt/fonts": "^1.2.0",
+        "@nuxt/ui": "^4.12.0",
         "@nuxtjs/i18n": "^10.6.0",
         "@nuxtjs/robots": "^7.0.2",
         "@nuxtjs/sitemap": "^9.1.0",
-        "@takumi-rs/core": "^2.15.2",
-        "@takumi-rs/wasm": "^2.15.2",
+        "@takumi-rs/core": "^2.18.1",
+        "@takumi-rs/wasm": "^2.18.1",
         "@vueuse/core": "^15.0.0",
         "comark": "^0.7.0",
         "comark-content": "0.4.1",
         "h3": "^1.15.11",
-        "nuxt": "^4.6.1",
+        "nuxt": "^4.6.2",
         "nuxt-files-sdk": "workspace:*",
         "nuxt-llms": "https://pkg.pr.new/nuxt-content/nuxt-llms/nuxt-llms@f6a9730",
-        "nuxt-og-image": "^7.0.6",
+        "nuxt-og-image": "^7.0.7",
         "rangi": "^2.2.0",
         "tailwindcss": "^4.3.3",
         "ufo": "^1.6.4",
-        "unstorage": "^1.17.5"
+        "unstorage": "^1.17.6"
     },
     "devDependencies": {
-        "nuxtseo-devtools-host": "^1.0.1",
+        "nuxtseo-devtools-host": "^1.0.2",
         "typescript6": "npm:typescript@6.0.3",
         "vue-tsc": "^3.3.13",
-        "wrangler": "^4.150.0"
+        "wrangler": "^4.152.0"
     }
 }

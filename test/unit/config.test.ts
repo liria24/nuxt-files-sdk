@@ -1,12 +1,15 @@
+import type { ProviderSlug } from 'files-sdk'
 import { fs } from 'files-sdk/fs'
 import type { FsAdapter } from 'files-sdk/fs'
 import type { MemoryAdapter } from 'files-sdk/memory'
 import type { R2Adapter } from 'files-sdk/r2'
+import type { RailwayAdapter } from 'files-sdk/railway'
 import type { RustfsAdapter } from 'files-sdk/rustfs'
 import { versioning } from 'files-sdk/versioning'
 import { describe, expect, expectTypeOf, test } from 'vite-plus/test'
 
 import { defineFilesConfig, type FilesConfigInput, type StorageConfig } from '../../packages/nuxt-files-sdk/src/config'
+import type { ProviderFactories } from '../../packages/nuxt-files-sdk/src/runtime/provider-types'
 import {
     FilesRegistry,
     type SingleStorage,
@@ -14,6 +17,12 @@ import {
 } from '../../packages/nuxt-files-sdk/src/runtime/registry'
 
 describe('configuration types', () => {
+    test('[TYPE-001] covers every native provider and preserves Railway adapter types', () => {
+        expectTypeOf<keyof ProviderFactories>().toEqualTypeOf<ProviderSlug>()
+        const config = defineFilesConfig({ storage: { adapter: 'railway', config: { bucket: 'files' } } })
+        expectTypeOf<SingleStorage<typeof config>['adapter']>().toEqualTypeOf<RailwayAdapter>()
+        expect(config.storage.adapter).toBe('railway')
+    })
     test('[TYPE-030] accepts unconfigured storage in base and environment inputs', () => {
         expect(defineFilesConfig({})).toEqual({})
         expect(defineFilesConfig({ storage: {} }).storage).toEqual({})
