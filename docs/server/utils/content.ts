@@ -3,10 +3,11 @@ import security from '@comark/nuxt/plugins/security'
 import toc from '@comark/nuxt/plugins/toc'
 import { comarkContent, type AnyComarkContent, type ContentSource } from 'comark-content'
 import yaml from 'comark-content/plugins/yaml'
+import forge from 'comark-content/sources/forge'
 import fs from 'comark-content/sources/fs'
-import github from 'comark-content/sources/github'
 import snapshot from 'comark-content/sources/snapshot'
 import breaks from 'comark/plugins/breaks'
+import { github } from 'forges/github'
 import type { H3Event } from 'h3'
 import cloudflareKVBinding from 'unstorage/drivers/cloudflare-kv-binding'
 
@@ -30,7 +31,7 @@ interface ProductionContentConfig {
     contentDir: string
 }
 
-const parserVersion = 'v1'
+const parserVersion = 'v2'
 const revisionStateKey = `docs:${parserVersion}:revision`
 const contentCacheTtlSeconds = 60 * 60 * 24 * 30
 const instances = new Map<string, Promise<AnyComarkContent>>()
@@ -209,12 +210,13 @@ function contentAt(
         }
 
         productionBase ??= createContent(
-            github({
+            forge({
+                provider: github({
+                    auth: environment.GITHUB_TOKEN ? { type: 'token', token: environment.GITHUB_TOKEN } : undefined,
+                }),
                 repo: config.repository,
-                branch: config.branch,
+                ref: config.branch,
                 path: config.contentDir,
-                token: environment.GITHUB_TOKEN,
-                ttl: contentCacheTtlSeconds,
             }),
             cacheDriver(environment.DOCS_CACHE),
         )
