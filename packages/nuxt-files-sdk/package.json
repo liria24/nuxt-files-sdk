@@ -50,27 +50,27 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@nuxt/kit": "^4.6.2",
-        "@nuxt/schema": "^4.6.2",
-        "c12": "4.0.0-rc.3",
-        "devframe": "^1.2.6",
-        "exsolve": "^1.1.3",
+        "@nuxt/kit": "^4.6.4",
+        "@nuxt/schema": "^4.6.4",
+        "c12": "4.0.0-rc.4",
+        "devframe": "^1.3.2",
+        "exsolve": "^1.2.0",
         "files-sdk": "^3.1.2",
         "jiti": "^2.7.0",
-        "local-pkg": "^1.2.1",
-        "oxc-parser": "^0.154.0",
+        "local-pkg": "^2.0.0",
+        "oxc-parser": "^0.157.0",
         "resolve.exports": "^2.0.4",
         "verkit": "^0.5.0"
     },
     "devDependencies": {
         "@arethetypeswrong/cli": "^0.18.5",
-        "@nuxt/devtools-kit": "4.0.0-beta.7",
-        "@types/node": "^26.6.5",
-        "@vitejs/devtools-kit": "^0.7.6",
+        "@nuxt/devtools-kit": "4.1.0",
+        "@types/node": "^26.6.6",
+        "@vitejs/devtools-kit": "^0.8.2",
         "h3": "^1.15.11",
         "publint": "^0.3.25",
         "typescript": "^7.0.2",
-        "vite-plus": "1.4.0",
+        "vite-plus": "1.5.0",
         "vue": "^3.5.44"
     },
     "peerDependencies": {

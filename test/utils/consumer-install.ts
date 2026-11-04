@@ -13,11 +13,12 @@ assert(['bun', 'npm', 'pnpm'].includes(requested), `Unsupported package manager:
 export const packageManager = requested as 'bun' | 'npm' | 'pnpm'
 const require = createRequire(import.meta.url)
 const bin = async () => {
-    const path = packageManager === 'pnpm' ? require.resolve('pnpm') : require.resolve('npm/package.json')
+    const path = packageManager === 'pnpm' ? require.resolve('pnpm/package.json') : require.resolve('npm/package.json')
     const manifest = JSON.parse(await readFile(path, 'utf8'))
     const workspace = JSON.parse(await readFile(resolve(repositoryRoot, 'package.json'), 'utf8'))
     assert.equal(manifest.version, workspace.devDependencies[packageManager], 'Use the pinned package manager')
-    return resolve(dirname(path), manifest.bin[packageManager])
+    // pnpm 12's manifest bin is native; its Node entry also works when install scripts are skipped.
+    return resolve(dirname(path), packageManager === 'pnpm' ? 'bin/pnpm.mjs' : manifest.bin[packageManager])
 }
 type Options = { signal?: AbortSignal; timeout?: number; frozen?: boolean }
 const command = async (args: string[], directory: string, options: Options) =>
